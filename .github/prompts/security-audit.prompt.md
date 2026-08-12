@@ -1,11 +1,13 @@
 ---
-description: "Perform a security audit on code, checking for OWASP Top 10 vulnerabilities and security best practices"
-agent: "agent"
-argument-hint: "Describe the code or area to audit"
+description: 'Perform a security audit on code, checking for OWASP Top 10 vulnerabilities and security best practices'
+agent: 'agent'
+argument-hint: 'Describe the code or area to audit'
 ---
+
 Perform a security audit of the provided code.
 
 ## OWASP Top 10 Checklist
+
 1. **Broken Access Control**: Missing authorization checks, IDOR vulnerabilities, privilege escalation
 2. **Cryptographic Failures**: Weak algorithms, hardcoded keys, sensitive data exposure
 3. **Injection**: SQL, NoSQL, OS command, LDAP, XSS injection points
@@ -18,7 +20,9 @@ Perform a security audit of the provided code.
 10. **SSRF**: Unvalidated URLs, internal network access from user input
 
 ## Output Format
+
 For each finding:
+
 - **Severity**: Critical / High / Medium / Low / Informational
 - **Category**: OWASP category
 - **Location**: File and line

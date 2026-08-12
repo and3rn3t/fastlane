@@ -20,10 +20,10 @@
 
 ## Requirements
 
-| # | Requirement | Priority | Notes |
-|---|---|---|---|
-| R1 | | must | |
-| R2 | | should | |
+| #   | Requirement | Priority | Notes |
+| --- | ----------- | -------- | ----- |
+| R1  |             | must     |       |
+| R2  |             | should   |       |
 
 ## Success Metrics
 

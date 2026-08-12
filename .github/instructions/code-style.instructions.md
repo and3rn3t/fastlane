@@ -1,7 +1,8 @@
 ---
-description: "Use when writing or modifying source code. Covers naming conventions, formatting, code organization, and idiomatic patterns."
-applyTo: "**/*.{ts,js,tsx,jsx,py,java,go,rs,cs,rb,swift,kt}"
+description: 'Use when writing or modifying source code. Covers naming conventions, formatting, code organization, and idiomatic patterns.'
+applyTo: '**/*.{ts,js,tsx,jsx,py,java,go,rs,cs,rb,swift,kt}'
 ---
+
 # Code Style Guidelines
 
 ## Naming

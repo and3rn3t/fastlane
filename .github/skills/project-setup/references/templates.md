@@ -88,6 +88,7 @@ project/
 ## Essential Config Files
 
 ### .editorconfig
+
 ```ini
 root = true
 
@@ -107,6 +108,7 @@ trim_trailing_whitespace = false
 ```
 
 ### .gitignore essentials
+
 ```
 node_modules/
 dist/

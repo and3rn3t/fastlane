@@ -1,11 +1,13 @@
 ---
-description: "Refactor code to improve readability, maintainability, and design without changing behavior"
-agent: "agent"
-argument-hint: "Describe what to refactor and the goal"
+description: 'Refactor code to improve readability, maintainability, and design without changing behavior'
+agent: 'agent'
+argument-hint: 'Describe what to refactor and the goal'
 ---
+
 Refactor the provided code while preserving its exact external behavior.
 
 ## Process
+
 1. **Understand** the current behavior by reading the code and its tests
 2. **Identify** code smells: long functions, deep nesting, duplication, unclear naming
 3. **Plan** refactoring steps — each should be a small, safe transformation
@@ -19,6 +21,7 @@ Refactor the provided code while preserving its exact external behavior.
 6. **Explain** what changed and why in a brief summary
 
 ## Constraints
+
 - Do NOT change external behavior or API contracts
 - Do NOT add new features during refactoring
 - Keep each change small enough to review independently

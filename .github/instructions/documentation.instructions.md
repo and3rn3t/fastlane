@@ -1,7 +1,8 @@
 ---
-description: "Use when writing documentation, README files, API docs, code comments, or inline documentation."
-applyTo: "**/*.md"
+description: 'Use when writing documentation, README files, API docs, code comments, or inline documentation.'
+applyTo: '**/*.md'
 ---
+
 # Documentation Guidelines
 
 ## Code Comments

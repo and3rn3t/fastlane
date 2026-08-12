@@ -1,11 +1,13 @@
 ---
-description: "Explain code in detail — what it does, how it works, and important design decisions"
-agent: "agent"
-argument-hint: "Point to the code you want explained"
+description: 'Explain code in detail — what it does, how it works, and important design decisions'
+agent: 'agent'
+argument-hint: 'Point to the code you want explained'
 ---
+
 Explain the provided code clearly and thoroughly.
 
 ## What to Cover
+
 1. **Purpose**: What does this code accomplish at a high level?
 2. **How it works**: Walk through the logic step by step
 3. **Key concepts**: Explain any patterns, algorithms, or techniques used
@@ -15,6 +17,7 @@ Explain the provided code clearly and thoroughly.
 7. **Design decisions**: Why was it built this way? What are the trade-offs?
 
 ## Format
+
 - Start with a one-paragraph summary
 - Use numbered steps for sequential logic
 - Use bullet points for related concepts

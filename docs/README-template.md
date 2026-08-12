@@ -19,13 +19,13 @@
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | React 19 + TypeScript |
-| Build | Vite |
-| Styling | Tailwind CSS v4 |
-| Testing | Vitest (+ Playwright e2e) |
-| Deploy | Cloudflare Workers/Pages via wrangler |
+| Layer     | Technology                            |
+| --------- | ------------------------------------- |
+| Framework | React 19 + TypeScript                 |
+| Build     | Vite                                  |
+| Styling   | Tailwind CSS v4                       |
+| Testing   | Vitest (+ Playwright e2e)             |
+| Deploy    | Cloudflare Workers/Pages via wrangler |
 
 <!-- Python variant:
 | Layer | Technology |
@@ -54,14 +54,14 @@ pip install -e ".[dev]"
 
 ## Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start dev server |
-| `pnpm test` | Run tests (Vitest) |
-| `pnpm lint` | ESLint |
-| `pnpm type-check` | `tsc --noEmit` |
-| `pnpm build` | Production build |
-| `pnpm validate` | lint + type-check + test — the done-gate |
+| Command           | Description                              |
+| ----------------- | ---------------------------------------- |
+| `pnpm dev`        | Start dev server                         |
+| `pnpm test`       | Run tests (Vitest)                       |
+| `pnpm lint`       | ESLint                                   |
+| `pnpm type-check` | `tsc --noEmit`                           |
+| `pnpm build`      | Production build                         |
+| `pnpm validate`   | lint + type-check + test — the done-gate |
 
 ## Testing
 

@@ -6,10 +6,10 @@
 
 > Keep this block tiny: at most 1-2 items in progress, 1-2 up next.
 
-| Status | Item | Notes |
-|---|---|---|
-| 🟡 in progress | | |
-| ⬜ up next | | |
+| Status         | Item | Notes |
+| -------------- | ---- | ----- |
+| 🟡 in progress |      |       |
+| ⬜ up next     |      |       |
 
 ## Wave Sequence
 
@@ -18,9 +18,9 @@
 ### Wave 1 — <name>
 
 | Status | Item | Notes |
-|---|---|---|
-| ⬜ | | |
-| ⬜ | | |
+| ------ | ---- | ----- |
+| ⬜     |      |       |
+| ⬜     |      |       |
 
 ## How To Pull Work
 

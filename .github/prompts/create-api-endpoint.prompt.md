@@ -1,11 +1,13 @@
 ---
-description: "Create a new REST API endpoint with validation, error handling, and tests"
-agent: "agent"
+description: 'Create a new REST API endpoint with validation, error handling, and tests'
+agent: 'agent'
 argument-hint: "Describe the endpoint (e.g., 'POST /api/users to create a new user')"
 ---
+
 Create a new API endpoint following the project's existing patterns.
 
 ## Steps
+
 1. **Find** existing endpoint examples in the codebase to match patterns
 2. **Create** the route handler with:
    - Input validation using the project's validation library
@@ -22,7 +24,9 @@ Create a new API endpoint following the project's existing patterns.
 6. **Update** API documentation if a docs file exists
 
 ## Response Format
+
 Use the project's existing response envelope. If none exists:
+
 ```json
 {
   "data": {},

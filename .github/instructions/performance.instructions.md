@@ -1,6 +1,7 @@
 ---
-description: "Use when optimizing performance, profiling, caching, reducing latency, improving throughput, or addressing performance bottlenecks."
+description: 'Use when optimizing performance, profiling, caching, reducing latency, improving throughput, or addressing performance bottlenecks.'
 ---
+
 # Performance Guidelines
 
 ## General Principles

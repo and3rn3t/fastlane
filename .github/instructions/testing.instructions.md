@@ -1,7 +1,8 @@
 ---
-description: "Use when writing tests, test utilities, or test infrastructure. Covers unit testing patterns, mocking strategies, and test organization."
-applyTo: "**/*.{test,spec}.{ts,js,tsx,jsx,py}"
+description: 'Use when writing tests, test utilities, or test infrastructure. Covers unit testing patterns, mocking strategies, and test organization.'
+applyTo: '**/*.{test,spec}.{ts,js,tsx,jsx,py}'
 ---
+
 # Testing Guidelines
 
 ## Structure

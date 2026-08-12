@@ -1,7 +1,8 @@
 ---
-description: "Use when designing or implementing REST APIs, GraphQL schemas, API endpoints, route handlers, or service interfaces."
-applyTo: ["**/api/**", "**/routes/**", "**/controllers/**", "**/resolvers/**"]
+description: 'Use when designing or implementing REST APIs, GraphQL schemas, API endpoints, route handlers, or service interfaces.'
+applyTo: ['**/api/**', '**/routes/**', '**/controllers/**', '**/resolvers/**']
 ---
+
 # API Design Guidelines
 
 ## REST Conventions

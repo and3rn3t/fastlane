@@ -1,7 +1,8 @@
 ---
-description: "Use when building UI components, frontend pages, styling, state management, or client-side interactivity."
-applyTo: ["**/*.{tsx,jsx,vue,svelte}", "**/components/**", "**/pages/**", "**/styles/**"]
+description: 'Use when building UI components, frontend pages, styling, state management, or client-side interactivity.'
+applyTo: ['**/*.{tsx,jsx,vue,svelte}', '**/components/**', '**/pages/**', '**/styles/**']
 ---
+
 # Frontend Guidelines
 
 ## Component Design

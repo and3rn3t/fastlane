@@ -1,6 +1,7 @@
 ---
-description: "Use when writing commit messages, creating branches, preparing pull requests, or following git workflow conventions."
+description: 'Use when writing commit messages, creating branches, preparing pull requests, or following git workflow conventions.'
 ---
+
 # Git Conventions
 
 ## Commit Messages

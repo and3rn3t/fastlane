@@ -9,6 +9,7 @@
 ## System Diagram
 
 <!-- Mermaid renders on GitHub: -->
+
 ```mermaid
 flowchart LR
   Client[Web App] --> Worker[Cloudflare Worker]
@@ -18,11 +19,11 @@ flowchart LR
 
 ## Components
 
-| Component | Responsibility | Location |
-|---|---|---|
-| Frontend | | `src/` |
-| API / Worker | | `worker/` or `functions/` |
-| Data | | KV / D1 / R2 |
+| Component    | Responsibility | Location                  |
+| ------------ | -------------- | ------------------------- |
+| Frontend     |                | `src/`                    |
+| API / Worker |                | `worker/` or `functions/` |
+| Data         |                | KV / D1 / R2              |
 
 ## Data Flow
 

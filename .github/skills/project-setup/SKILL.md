@@ -1,11 +1,13 @@
 ---
 name: project-setup
-description: "Set up a new project with proper structure, configuration, and tooling. Use when initializing new projects, adding CI/CD, configuring linters, or setting up development environments."
-argument-hint: "Describe the project type and tech stack"
+description: 'Set up a new project with proper structure, configuration, and tooling. Use when initializing new projects, adding CI/CD, configuring linters, or setting up development environments.'
+argument-hint: 'Describe the project type and tech stack'
 ---
+
 # Project Setup Workflow
 
 ## When to Use
+
 - Initializing a new project from scratch
 - Adding development tooling (linters, formatters, pre-commit hooks)
 - Setting up CI/CD pipelines
@@ -13,6 +15,7 @@ argument-hint: "Describe the project type and tech stack"
 - Adding AI customization files to an existing project
 
 ## Procedure
+
 1. Determine the project type and tech stack
 2. Reference the [project templates](./references/templates.md) for common setups
 3. Initialize the project structure with appropriate directories
@@ -32,6 +35,7 @@ argument-hint: "Describe the project type and tech stack"
 7. Verify the setup by running build, lint, and test commands
 
 ## Output
+
 - Complete project structure with all configuration files
 - Working build and test commands
 - AI customization files tailored to the project

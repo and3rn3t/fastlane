@@ -1,7 +1,8 @@
 ---
-description: "Use when handling authentication, authorization, user input validation, data encryption, API security, or any security-sensitive code."
-applyTo: ["**/auth/**", "**/security/**", "**/middleware/**"]
+description: 'Use when handling authentication, authorization, user input validation, data encryption, API security, or any security-sensitive code.'
+applyTo: ['**/auth/**', '**/security/**', '**/middleware/**']
 ---
+
 # Security Guidelines
 
 ## Input Validation

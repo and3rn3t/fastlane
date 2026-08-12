@@ -1,11 +1,13 @@
 ---
-description: "Optimize code for better performance — reduce latency, memory usage, or compute cost"
-agent: "agent"
-argument-hint: "Describe the performance issue or code to optimize"
+description: 'Optimize code for better performance — reduce latency, memory usage, or compute cost'
+agent: 'agent'
+argument-hint: 'Describe the performance issue or code to optimize'
 ---
+
 Optimize the provided code for better performance.
 
 ## Approach
+
 1. **Profile** first — identify the actual bottleneck, don't guess
 2. **Measure** current performance with benchmarks if possible
 3. **Optimize** using the appropriate strategy:
@@ -19,6 +21,7 @@ Optimize the provided code for better performance.
 5. **Document** the optimization with before/after metrics
 
 ## Constraints
+
 - Don't sacrifice readability for marginal gains
 - Maintain correctness — optimized code must produce identical results
 - Consider maintainability trade-offs

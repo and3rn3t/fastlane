@@ -1,11 +1,13 @@
 ---
-description: "Create a new UI component with proper structure, styling, accessibility, and tests"
-agent: "agent"
+description: 'Create a new UI component with proper structure, styling, accessibility, and tests'
+agent: 'agent'
 argument-hint: "Describe the component (e.g., 'A user avatar with status indicator and tooltip')"
 ---
+
 Create a new UI component following the project's existing patterns.
 
 ## Steps
+
 1. **Find** existing component examples to match the project's conventions
 2. **Create** the component with:
    - Clear prop types/interface with documentation
@@ -25,6 +27,7 @@ Create a new UI component following the project's existing patterns.
 5. **Create** a story/example if the project uses Storybook or similar
 
 ## Accessibility Checklist
+
 - [ ] Semantic HTML elements used
 - [ ] Interactive elements are keyboard accessible
 - [ ] Color contrast meets WCAG AA (4.5:1)

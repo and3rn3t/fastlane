@@ -1,7 +1,8 @@
 ---
-description: "Use when writing database queries, migrations, schema changes, ORM models, data access layers, or working with SQL/NoSQL databases."
-applyTo: ["**/migrations/**", "**/models/**", "**/schema/**", "**/database/**", "**/db/**"]
+description: 'Use when writing database queries, migrations, schema changes, ORM models, data access layers, or working with SQL/NoSQL databases.'
+applyTo: ['**/migrations/**', '**/models/**', '**/schema/**', '**/database/**', '**/db/**']
 ---
+
 # Database Guidelines
 
 ## Migrations
