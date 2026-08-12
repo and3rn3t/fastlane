@@ -1,0 +1,121 @@
+// Reducer entry point: creates games and applies actions immutably.
+
+import * as act from './actions'
+import { runJonesWeek } from './ai'
+import { WEEK_TIME } from './data'
+import { endWeek } from './week'
+import type { GameAction, GameState, Goals, PlayerState } from './types'
+
+function newPlayer(name: string, isAI: boolean): PlayerState {
+  return {
+    name,
+    isAI,
+    location: 'home',
+    timeLeft: WEEK_TIME,
+    cash: 200,
+    savings: 0,
+    happiness: 50,
+    education: 0,
+    jobId: null,
+    experience: 0,
+    dress: 20,
+    items: [],
+    apartment: 'none',
+    rentDue: 0,
+    weeksBehindOnRent: 0,
+    fed: 0,
+    groceries: 0,
+    lotteryTickets: 0,
+    relaxedThisWeek: 0,
+  }
+}
+
+export interface NewGameOptions {
+  playerName: string
+  goals: Goals
+  seed?: number
+}
+
+export function newGame(opts: NewGameOptions): GameState {
+  return {
+    week: 1,
+    rngSeed: opts.seed ?? Math.floor(Math.random() * 2 ** 31),
+    phase: 'playing',
+    winner: null,
+    goals: opts.goals,
+    economy: {
+      priceIndex: 1,
+      wageIndex: 1,
+      interestRate: 0.005,
+      lotteryJackpot: 500,
+    },
+    player: newPlayer(opts.playerName || 'You', false),
+    jones: newPlayer('Jones', true),
+    headline: 'A new life in the fast lane begins.',
+    log: [],
+    lastReport: null,
+  }
+}
+
+/**
+ * Apply a player action, returning a new state. Throws EngineError (with a
+ * user-readable message) if the move is invalid; the input state is untouched.
+ */
+export function applyAction(state: GameState, action: GameAction): GameState {
+  const draft = structuredClone(state)
+  switch (action.type) {
+    case 'travel':
+      act.travel(draft, 'player', action.to)
+      break
+    case 'work':
+      act.work(draft, 'player', action.hours)
+      break
+    case 'applyJob':
+      act.applyJob(draft, 'player', action.jobId)
+      break
+    case 'quitJob':
+      act.quitJob(draft, 'player')
+      break
+    case 'takeClass':
+      act.takeClass(draft, 'player')
+      break
+    case 'buyItem':
+      act.buyItem(draft, 'player', action.itemId)
+      break
+    case 'buyMeal':
+      act.buyMeal(draft, 'player')
+      break
+    case 'buyGroceries':
+      act.buyGroceries(draft, 'player', action.units)
+      break
+    case 'buyLottery':
+      act.buyLottery(draft, 'player', action.tickets)
+      break
+    case 'deposit':
+      act.deposit(draft, 'player', action.amount)
+      break
+    case 'withdraw':
+      act.withdraw(draft, 'player', action.amount)
+      break
+    case 'payRent':
+      act.payRent(draft, 'player')
+      break
+    case 'rentApartment':
+      act.rentApartment(draft, 'player', action.tier)
+      break
+    case 'sellItem':
+      act.sellItem(draft, 'player', action.itemId)
+      break
+    case 'relax':
+      act.relax(draft, 'player', action.hours)
+      break
+    case 'endWeek':
+      runJonesWeek(draft)
+      endWeek(draft)
+      break
+    case 'dismissReport':
+      if (draft.phase === 'weekReport') draft.phase = 'playing'
+      break
+  }
+  return draft
+}

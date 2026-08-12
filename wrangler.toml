@@ -1,0 +1,7 @@
+# See https://developers.cloudflare.com/workers/wrangler/configuration/
+name = "fastlane"
+compatibility_date = "2026-07-01"
+pages_build_output_dir = "./dist"
+
+[observability]
+enabled = true

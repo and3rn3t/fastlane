@@ -13,27 +13,35 @@
 
 ## Project Overview
 
-<!-- Describe your project here: what it does, who it's for. -->
+**Fast Lane** — a modern, single-player remake of the 1990 life-sim board game
+_Jones in the Fast Lane_. You get 60 hours a week to work, study, eat, pay rent,
+and have a life; the AI rival "Jones" plays by the same rules each week. First
+to hit all four life goals (Wealth, Happiness, Education, Career) wins.
 
-## Stack Defaults (and3rn3t projects)
+Architecture:
 
-Pick the profile that applies and delete the other.
+- `src/engine/` — pure, deterministic TypeScript game engine (no React imports).
+  All rules live here: `actions.ts` (player verbs), `week.ts` (weekly upkeep,
+  economy, events, victory), `ai.ts` (the Jones policy — it calls the same
+  action functions as the human player), `data.ts` (jobs/items/locations/tuning),
+  `rng.ts` (seeded PRNG; the seed lives in `GameState` so games replay identically).
+- `src/state/` — React context wrapping the engine reducer + localStorage saves.
+- `src/ui/` — components only; no game rules. Engine `EngineError` messages
+  surface as toasts.
 
-### Web app (default)
+Rules of thumb: game-balance changes go in `data.ts`; new mechanics get an
+action in `actions.ts` + a case in `engine.ts` + engine tests; the AI must only
+ever act through the same action functions as the player.
 
-- React + TypeScript + Vite; deployed to Cloudflare Workers via wrangler
+## Stack (web profile)
+
+- React + TypeScript + Vite; deployed to Cloudflare Pages/Workers via wrangler
 - Package manager: **pnpm** (declare `packageManager` in package.json; do not mix with npm)
 - Node: `>=24` (pinned in `.nvmrc`)
 - Tests: **Vitest** (+ Testing Library for components); coverage via `vitest run --coverage`
 - Lint/format: ESLint + Prettier
 
-### Python CLI / skill
-
-- pyproject.toml-based; stdlib-first, minimal dependencies
-- If it doubles as a Claude/OpenClaw skill, keep `SKILL.md` frontmatter accurate (name, description, triggers, version)
-- Tests: pytest in `tests/`
-
-## Build Commands (web profile)
+## Build Commands
 
 ```bash
 pnpm install
