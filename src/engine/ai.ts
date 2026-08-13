@@ -68,9 +68,9 @@ function ensureHousing(state: GameState): boolean {
 function bestQualifiedJob(state: GameState): JobDef | null {
   const p = jones(state)
   const current = careerScore(p)
-  const candidates = JOBS.filter(
-    (j) => j.prestige > current && act.qualifiesFor(p, j.id).ok
-  ).sort((a, b) => b.prestige - a.prestige)
+  const candidates = JOBS.filter((j) => j.prestige > current && act.qualifiesFor(p, j.id).ok).sort(
+    (a, b) => b.prestige - a.prestige
+  )
   return candidates[0] ?? null
 }
 
@@ -78,7 +78,9 @@ function bestQualifiedJob(state: GameState): JobDef | null {
 function nextTargetJob(state: GameState): JobDef | null {
   const p = jones(state)
   const current = careerScore(p)
-  const candidates = JOBS.filter((j) => j.prestige > current).sort((a, b) => a.prestige - b.prestige)
+  const candidates = JOBS.filter((j) => j.prestige > current).sort(
+    (a, b) => a.prestige - b.prestige
+  )
   return candidates[0] ?? null
 }
 

@@ -145,10 +145,7 @@ function ShopItems({ game, ids }: { game: GameState; ids: ItemId[] }) {
               <br />
               <span className="desc">{item.blurb}</span>
             </span>
-            <button
-              disabled={owned}
-              onClick={() => dispatchGame({ type: 'buyItem', itemId: id })}
-            >
+            <button disabled={owned} onClick={() => dispatchGame({ type: 'buyItem', itemId: id })}>
               {owned ? 'Owned' : `$${price(game, item.price)} (1h)`}
             </button>
           </div>
@@ -268,8 +265,8 @@ function HomeActions({ game }: { game: GameState }) {
   if (p.apartment === 'none') {
     return (
       <p className="blurb">
-        You don't have a place to live. Sleeping rough costs happiness every week — visit the
-        Rent Office soon.
+        You don't have a place to live. Sleeping rough costs happiness every week — visit the Rent
+        Office soon.
       </p>
     )
   }

@@ -1,19 +1,19 @@
 # Fast Lane
 
-A modern, single-player remake of the 1990 Sierra classic *Jones in the Fast
-Lane* — the life-sim board game where the rat race *is* the board.
+A modern, single-player remake of the 1990 Sierra classic _Jones in the Fast
+Lane_ — the life-sim board game where the rat race _is_ the board.
 
 You get **60 hours a week**. Rent is due, the fridge is empty, your outfit is
 wearing out, and your rival **Jones** is already at work. Travel the city loop,
 take jobs, earn degrees, buy the things that make life bearable, and hit all
 four life goals before Jones does:
 
-| Goal | Measured by |
-| --- | --- |
-| 💵 Wealth | Net worth (cash + savings) |
+| Goal         | Measured by                                               |
+| ------------ | --------------------------------------------------------- |
+| 💵 Wealth    | Net worth (cash + savings)                                |
 | 😊 Happiness | 0–100, drifts back toward 50 — comfort must be maintained |
-| 🎓 Education | Classes completed at City University |
-| 💼 Career | Prestige of your current job |
+| 🎓 Education | Classes completed at City University                      |
+| 💼 Career    | Prestige of your current job                              |
 
 You pick how ambitious each goal is at the start (Quick / Standard / Marathon,
 or per-goal sliders). Jones plays by **exactly the same rules** — his AI calls
@@ -55,5 +55,5 @@ See [AGENTS.md](AGENTS.md) for contributor conventions.
 
 ## License
 
-MIT. *Jones in the Fast Lane* is a trademark of its respective owners; this
+MIT. _Jones in the Fast Lane_ is a trademark of its respective owners; this
 project is an original homage with its own names, art, and code.

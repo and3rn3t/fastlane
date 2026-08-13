@@ -34,7 +34,12 @@
 
 body {
   margin: 0;
-  font-family: 'Avenir Next', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family:
+    'Avenir Next',
+    'Segoe UI',
+    system-ui,
+    -apple-system,
+    sans-serif;
   background: var(--bg);
   color: var(--ink);
   -webkit-font-smoothing: antialiased;
@@ -48,7 +53,9 @@ button {
   border-radius: 8px;
   padding: 0.45rem 0.9rem;
   cursor: pointer;
-  transition: filter 120ms, transform 120ms;
+  transition:
+    filter 120ms,
+    transform 120ms;
 }
 
 button:hover:not(:disabled) {

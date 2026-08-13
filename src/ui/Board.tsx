@@ -1,20 +1,22 @@
-import {
-  LOCATIONS,
-  goalProgress,
-  travelCost,
-  hasItem,
-  type GameState,
-} from '@/engine'
+import { LOCATIONS, goalProgress, travelCost, hasItem, type GameState } from '@/engine'
 import { useGame } from '@/state/GameContext'
 import { LOCATION_ICONS } from './icons'
 
 // Loop index → cell in a 4×4 grid, walking the perimeter clockwise so
 // board adjacency matches travel cost.
 const PERIMETER: Array<[row: number, col: number]> = [
-  [1, 1], [1, 2], [1, 3], [1, 4],
-  [2, 4], [3, 4],
-  [4, 4], [4, 3], [4, 2], [4, 1],
-  [3, 1], [2, 1],
+  [1, 1],
+  [1, 2],
+  [1, 3],
+  [1, 4],
+  [2, 4],
+  [3, 4],
+  [4, 4],
+  [4, 3],
+  [4, 2],
+  [4, 1],
+  [3, 1],
+  [2, 1],
 ]
 
 const TRACKS = [

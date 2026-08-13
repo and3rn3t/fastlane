@@ -14,12 +14,12 @@ export function WeekReportModal({ game }: { game: GameState }) {
           {report.entries
             .filter((e) => e.text !== report.headline)
             .map((e, i) => (
-            <div className="entry" key={i}>
-              <span className="who">
-                {e.actor === 'player' ? '🙂' : e.actor === 'jones' ? '🎩' : '🌍'}
-              </span>
-              <span>{e.text}</span>
-            </div>
+              <div className="entry" key={i}>
+                <span className="who">
+                  {e.actor === 'player' ? '🙂' : e.actor === 'jones' ? '🎩' : '🌍'}
+                </span>
+                <span>{e.text}</span>
+              </div>
             ))}
         </div>
         <button className="primary" onClick={() => dispatchGame({ type: 'dismissReport' })}>

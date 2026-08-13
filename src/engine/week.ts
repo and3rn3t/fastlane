@@ -127,8 +127,14 @@ const HEADLINES: Array<{ text: string; apply: (s: GameState) => void }> = [
   { text: 'Retail price war! Prices dip.', apply: (s) => (s.economy.priceIndex *= 0.95) },
   { text: 'Labor shortage — wages climb.', apply: (s) => (s.economy.wageIndex *= 1.05) },
   { text: 'Layoffs downtown — wages soften.', apply: (s) => (s.economy.wageIndex *= 0.96) },
-  { text: 'Fed hikes rates — savers rejoice.', apply: (s) => (s.economy.interestRate = Math.min(0.012, s.economy.interestRate + 0.002)) },
-  { text: 'Rates cut — savings earn less.', apply: (s) => (s.economy.interestRate = Math.max(0.002, s.economy.interestRate - 0.002)) },
+  {
+    text: 'Fed hikes rates — savers rejoice.',
+    apply: (s) => (s.economy.interestRate = Math.min(0.012, s.economy.interestRate + 0.002)),
+  },
+  {
+    text: 'Rates cut — savings earn less.',
+    apply: (s) => (s.economy.interestRate = Math.max(0.002, s.economy.interestRate - 0.002)),
+  },
 ]
 
 function personalEvent(state: GameState, key: PlayerKey) {

@@ -46,7 +46,9 @@ describe('jobs and work', () => {
 
   it('rejects unqualified applicants with reasons', () => {
     const s = applyAction(game(), { type: 'travel', to: 'employment' })
-    expect(() => applyAction(s, { type: 'applyJob', jobId: 'branch-manager' })).toThrow(/Not qualified/)
+    expect(() => applyAction(s, { type: 'applyJob', jobId: 'branch-manager' })).toThrow(
+      /Not qualified/
+    )
   })
 
   it('pays wages and accrues experience at the workplace only', () => {

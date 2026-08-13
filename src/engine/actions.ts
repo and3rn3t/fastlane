@@ -129,10 +129,16 @@ export function buyMeal(state: GameState, key: PlayerKey) {
 
 export function buyGroceries(state: GameState, key: PlayerKey, units: number) {
   const p = state[key]
-  require_(p.location === 'megamart' || p.location === 'market', 'Groceries are at MegaMart or Fresh Market')
+  require_(
+    p.location === 'megamart' || p.location === 'market',
+    'Groceries are at MegaMart or Fresh Market'
+  )
   require_(units >= 1, 'Buy at least one unit')
   const cap = groceryCap(p)
-  require_(p.groceries + units <= cap, `Storage full (${cap} units max${hasItem(p, 'fridge') ? '' : ' — a fridge holds more'})`)
+  require_(
+    p.groceries + units <= cap,
+    `Storage full (${cap} units max${hasItem(p, 'fridge') ? '' : ' — a fridge holds more'})`
+  )
   const unitPrice = p.location === 'megamart' ? GROCERY_PRICE_MEGAMART : GROCERY_PRICE_MARKET
   spendTime(p, 1)
   spendCash(p, price(state, unitPrice) * units)
@@ -200,7 +206,10 @@ export function withdraw(state: GameState, key: PlayerKey, amount: number) {
 
 export function payRent(state: GameState, key: PlayerKey) {
   const p = state[key]
-  require_(p.location === 'rentoffice' || hasItem(p, 'phone'), 'Pay at the Rent Office (or via smartphone)')
+  require_(
+    p.location === 'rentoffice' || hasItem(p, 'phone'),
+    'Pay at the Rent Office (or via smartphone)'
+  )
   require_(p.rentDue > 0, 'No rent due')
   const amount = Math.min(p.rentDue, p.cash)
   require_(amount > 0, 'Not enough cash')
@@ -211,7 +220,11 @@ export function payRent(state: GameState, key: PlayerKey) {
   log(state, key, `Paid $${amount} rent`)
 }
 
-export function rentApartment(state: GameState, key: PlayerKey, tier: Exclude<ApartmentTier, 'none'>) {
+export function rentApartment(
+  state: GameState,
+  key: PlayerKey,
+  tier: Exclude<ApartmentTier, 'none'>
+) {
   const p = state[key]
   require_(p.location === 'rentoffice', 'Rent at the Rent Office')
   require_(p.apartment !== tier, 'Already renting that apartment')

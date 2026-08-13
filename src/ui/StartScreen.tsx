@@ -16,9 +16,24 @@ interface SliderRow {
 }
 
 const ROWS: SliderRow[] = [
-  { key: 'wealth', label: '💵 Wealth', targets: WEALTH_TARGETS, format: (v) => `$${v.toLocaleString()}` },
-  { key: 'happiness', label: '😊 Happiness', targets: HAPPINESS_TARGETS, format: (v) => `${v}/100` },
-  { key: 'education', label: '🎓 Education', targets: EDUCATION_TARGETS, format: (v) => `${v} classes` },
+  {
+    key: 'wealth',
+    label: '💵 Wealth',
+    targets: WEALTH_TARGETS,
+    format: (v) => `$${v.toLocaleString()}`,
+  },
+  {
+    key: 'happiness',
+    label: '😊 Happiness',
+    targets: HAPPINESS_TARGETS,
+    format: (v) => `${v}/100`,
+  },
+  {
+    key: 'education',
+    label: '🎓 Education',
+    targets: EDUCATION_TARGETS,
+    format: (v) => `${v} classes`,
+  },
   { key: 'career', label: '💼 Career', targets: CAREER_TARGETS, format: (v) => `${v} prestige` },
 ]
 
@@ -47,8 +62,8 @@ export function StartScreen() {
           Fast <span>Lane</span>
         </h1>
         <p className="tagline">
-          Sixty hours a week. Rent is due, the fridge is empty, and Jones is already at work.
-          Hit all four life goals before he does.
+          Sixty hours a week. Rent is due, the fridge is empty, and Jones is already at work. Hit
+          all four life goals before he does.
         </p>
       </div>
 
