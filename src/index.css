@@ -117,6 +117,7 @@ input[type='range'] {
 
 .start {
   max-width: 640px;
+  width: 100%;
   margin: 4rem auto;
   background: var(--card);
   border-radius: var(--radius);
@@ -125,6 +126,23 @@ input[type='range'] {
   display: flex;
   flex-direction: column;
   gap: 1.25rem;
+}
+
+@media (max-width: 640px) {
+  .start {
+    margin: max(1rem, env(safe-area-inset-top)) auto max(1rem, env(safe-area-inset-bottom));
+    padding: 1.25rem;
+  }
+
+  .start h1 {
+    font-size: 2rem;
+  }
+
+  .goal-row {
+    grid-template-columns: 6.5rem 1fr 4.5rem;
+    gap: 0.5rem;
+    font-size: 0.9rem;
+  }
 }
 
 .start h1 {
@@ -147,6 +165,11 @@ input[type='range'] {
   grid-template-columns: 8rem 1fr 7rem;
   align-items: center;
   gap: 0.75rem;
+}
+
+.goal-row input[type='range'] {
+  width: 100%;
+  min-width: 0;
 }
 
 .goal-row .target {
@@ -268,13 +291,21 @@ input[type='range'] {
     gap: 0.6rem;
   }
 
+  /* Fades the trailing edge so the scrollable stat strip reads as "more this
+     way" instead of cut-off content. Scoped to mobile, where it actually
+     overflows — on wide screens everything fits and this would just clip
+     the last item for no reason. */
+  .topbar-stats {
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+    mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+  }
+
   .game-layout {
-    gap: 0;
+    gap: 0.6rem;
   }
 
   .side {
     gap: 0.6rem;
-    margin-top: -0.5rem;
   }
 
   .panel.sheet {

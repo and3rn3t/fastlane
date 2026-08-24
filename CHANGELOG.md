@@ -42,6 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Real-device Wave 0 QA (iPhone, dark mode, portrait, Safari tab) found two mobile bugs neither Chromium testing nor code review caught: `.goal-row`'s range input had no explicit width and overflowed its grid track, clipping goal values off-screen on `StartScreen` (never tested at mobile width before); `.side`'s negative `margin-top` (added for a "pulled up" sheet look) was covering the bottom board-tile row's text, not just its shadow. Also tightened `.start`'s desktop-era spacing for mobile and added a fade-mask on the topbar stat strip so it reads as scrollable instead of cut off.
+
 ## [0.1.0] - YYYY-MM-DD
 
 ### Added
