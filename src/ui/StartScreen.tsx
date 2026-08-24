@@ -62,8 +62,8 @@ export function StartScreen() {
           Fast <span>Lane</span>
         </h1>
         <p className="tagline">
-          Sixty hours a week. Rent is due, the fridge is empty, and Jones is already at work. Hit
-          all four life goals before he does.
+          Sixty hours a week. Rent is due, the fridge is empty, and Riley is already at work. Hit
+          all four life goals before they do.
         </p>
       </div>
 

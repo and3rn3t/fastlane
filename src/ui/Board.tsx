@@ -29,7 +29,7 @@ const TRACKS = [
 function CenterPanel({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
   const mine = goalProgress(game.player, game.goals)
-  const rival = goalProgress(game.jones, game.goals)
+  const rival = goalProgress(game.riley, game.goals)
 
   return (
     <div className="board-center">
@@ -42,7 +42,7 @@ function CenterPanel({ game }: { game: GameState }) {
       <div className="bar-cols">
         <span />
         <span>{game.player.name}</span>
-        <span>Jones</span>
+        <span>Riley</span>
       </div>
       <div className="progress-pair">
         {TRACKS.map((t) => (
@@ -79,7 +79,7 @@ export function Board({ game }: { game: GameState }) {
         const [row, col] = PERIMETER[loc.loopIndex]
         const here = p.location === loc.id
         const cost = travelCost(p.location, loc.id, bike)
-        const jonesHere = game.jones.location === loc.id
+        const rileyHere = game.riley.location === loc.id
         return (
           <button
             key={loc.id}
@@ -94,8 +94,8 @@ export function Board({ game }: { game: GameState }) {
             </span>
             <span className="name">{loc.name}</span>
             <span className="cost">{here ? 'You are here' : `${cost}h away`}</span>
-            {jonesHere && (
-              <span className="pawn-marker" title="Jones is here" aria-label="Jones is here">
+            {rileyHere && (
+              <span className="pawn-marker" title="Riley is here" aria-label="Riley is here">
                 🎩
               </span>
             )}

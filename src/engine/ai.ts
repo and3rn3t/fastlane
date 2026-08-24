@@ -1,4 +1,4 @@
-// Jones — the rival. Each week he runs this priority-driven policy using the
+// Riley — the rival. Each week they run this priority-driven policy using the
 // exact same action functions (and therefore rules) as the human player.
 
 import * as act from './actions'
@@ -7,13 +7,13 @@ import { ITEMS, JOBS, RENT, TUITION, jobById, travelCost } from './data'
 import { careerScore } from './week'
 import type { GameState, ItemId, JobDef, LocationId } from './types'
 
-const KEY = 'jones'
+const KEY = 'riley'
 
-function jones(state: GameState) {
-  return state.jones
+function riley(state: GameState) {
+  return state.riley
 }
 
-/** Cash Jones tries to keep on hand for rent and food before splurging. */
+/** Cash Riley tries to keep on hand for rent and food before splurging. */
 function reserve(state: GameState): number {
   return act.price(state, RENT.basic) + 60
 }
@@ -28,16 +28,16 @@ function attempt(fn: () => void): boolean {
   }
 }
 
-/** Travel if needed; false if he can't afford the time. */
+/** Travel if needed; false if they can't afford the time. */
 function goTo(state: GameState, to: LocationId): boolean {
-  const p = jones(state)
+  const p = riley(state)
   if (p.location === to) return true
   if (travelCost(p.location, to, act.hasItem(p, 'bike')) > p.timeLeft) return false
   return attempt(() => act.travel(state, KEY, to))
 }
 
 function ensureFood(state: GameState): boolean {
-  const p = jones(state)
+  const p = riley(state)
   const needed = act.foodShortfall(p)
   if (needed === 0) return false
   const unitCost = act.price(state, 4)
@@ -52,7 +52,7 @@ function ensureFood(state: GameState): boolean {
 }
 
 function ensureHousing(state: GameState): boolean {
-  const p = jones(state)
+  const p = riley(state)
   if (p.apartment === 'none') {
     if (p.cash < act.price(state, RENT.basic) * 1.5) return false
     if (!goTo(state, 'rentoffice')) return false
@@ -66,7 +66,7 @@ function ensureHousing(state: GameState): boolean {
 }
 
 function bestQualifiedJob(state: GameState): JobDef | null {
-  const p = jones(state)
+  const p = riley(state)
   const current = careerScore(p)
   const candidates = JOBS.filter((j) => j.prestige > current && act.qualifiesFor(p, j.id).ok).sort(
     (a, b) => b.prestige - a.prestige
@@ -74,9 +74,9 @@ function bestQualifiedJob(state: GameState): JobDef | null {
   return candidates[0] ?? null
 }
 
-/** The job Jones is working toward: lowest-prestige job above his current one. */
+/** The job Riley is working toward: lowest-prestige job above their current one. */
 function nextTargetJob(state: GameState): JobDef | null {
-  const p = jones(state)
+  const p = riley(state)
   const current = careerScore(p)
   const candidates = JOBS.filter((j) => j.prestige > current).sort(
     (a, b) => a.prestige - b.prestige
@@ -85,7 +85,7 @@ function nextTargetJob(state: GameState): JobDef | null {
 }
 
 function pursueCareer(state: GameState): boolean {
-  const p = jones(state)
+  const p = riley(state)
   const better = bestQualifiedJob(state)
   if (better) {
     if (!act.hasItem(p, 'phone') && !goTo(state, 'employment')) return false
@@ -110,14 +110,14 @@ function pursueCareer(state: GameState): boolean {
 }
 
 function studyOnce(state: GameState): boolean {
-  const p = jones(state)
+  const p = riley(state)
   if (p.cash < act.price(state, TUITION) + reserve(state)) return false
   if (!goTo(state, 'university')) return false
   return attempt(() => act.takeClass(state, KEY))
 }
 
 function workShift(state: GameState, maxHours: number): boolean {
-  const p = jones(state)
+  const p = riley(state)
   if (!p.jobId) return false
   const job = jobById(p.jobId)
   if (!goTo(state, job.workplace)) return false
@@ -127,7 +127,7 @@ function workShift(state: GameState, maxHours: number): boolean {
 }
 
 function pursueHappiness(state: GameState): boolean {
-  const p = jones(state)
+  const p = riley(state)
   if (p.happiness >= state.goals.happiness) return false
   const fun: ItemId[] = ['tv', 'stereo', 'console']
   const toBuy = fun.find((id) => !act.hasItem(p, id))
@@ -146,16 +146,16 @@ function pursueHappiness(state: GameState): boolean {
 }
 
 function bankSurplus(state: GameState): boolean {
-  const p = jones(state)
+  const p = riley(state)
   const surplus = p.cash - reserve(state) * 3
   if (surplus < 200) return false
   if (!goTo(state, 'bank')) return false
   return attempt(() => act.deposit(state, KEY, Math.round(surplus)))
 }
 
-/** Play out Jones's week. Called by the reducer before end-of-week upkeep. */
-export function runJonesWeek(state: GameState) {
-  const p = jones(state)
+/** Play out Riley's week. Called by the reducer before end-of-week upkeep. */
+export function runRileyWeek(state: GameState) {
+  const p = riley(state)
   let guard = 0
   while (p.timeLeft > 0 && guard < 80) {
     guard += 1

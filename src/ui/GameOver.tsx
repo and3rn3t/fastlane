@@ -7,11 +7,11 @@ export function GameOver({ game }: { game: GameState }) {
   return (
     <div className="app">
       <div className="start gameover">
-        <h1>{playerWon ? '🏆 You made it!' : '🎩 Jones got there first.'}</h1>
+        <h1>{playerWon ? '🏆 You made it!' : '🎩 Riley got there first.'}</h1>
         <p className="tagline">
           {playerWon
             ? `All four goals reached in ${game.week - 1} weeks. The fast lane is yours, ${game.player.name}.`
-            : `Jones hit all four goals in ${game.week - 1} weeks while you were... doing whatever that was.`}
+            : `Riley hit all four goals in ${game.week - 1} weeks while you were... doing whatever that was.`}
         </p>
         <div className="start-actions" style={{ justifyContent: 'center' }}>
           <button className="primary" onClick={quitToMenu}>

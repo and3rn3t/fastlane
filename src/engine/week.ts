@@ -190,17 +190,17 @@ export function endWeek(state: GameState) {
   const logStart = state.log.length
 
   upkeep(state, 'player')
-  upkeep(state, 'jones')
+  upkeep(state, 'riley')
   personalEvent(state, 'player')
-  personalEvent(state, 'jones')
+  personalEvent(state, 'riley')
   driftEconomy(state)
 
   const playerWins = meetsGoals(state.player, state.goals)
-  const jonesWins = meetsGoals(state.jones, state.goals)
-  if (playerWins || jonesWins) {
+  const rileyWins = meetsGoals(state.riley, state.goals)
+  if (playerWins || rileyWins) {
     state.phase = 'over'
-    // Ties go to the human — Jones has enough advantages.
-    state.winner = playerWins ? 'player' : 'jones'
+    // Ties go to the human — Riley has enough advantages.
+    state.winner = playerWins ? 'player' : 'riley'
   } else {
     state.phase = 'weekReport'
   }

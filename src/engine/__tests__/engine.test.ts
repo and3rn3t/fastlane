@@ -103,7 +103,7 @@ describe('end of week', () => {
     expect(s.player.happiness).toBeGreaterThan(happyFed - 10)
 
     const hungry = applyAction(game(), { type: 'endWeek' })
-    expect(hungry.player.happiness).toBeLessThan(hungry.jones.happiness + 30) // sanity
+    expect(hungry.player.happiness).toBeLessThan(hungry.riley.happiness + 30) // sanity
     expect(hungry.lastReport?.entries.some((e) => e.text.includes('hungry'))).toBe(true)
   })
 
@@ -154,16 +154,16 @@ describe('determinism', () => {
   })
 })
 
-describe('Jones AI', () => {
+describe('Riley AI', () => {
   it('makes real progress in the first weeks', () => {
     let s = game()
     for (let i = 0; i < 6 && s.phase !== 'over'; i++) {
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
-    expect(s.jones.jobId).not.toBeNull()
-    expect(s.jones.cash + s.jones.savings).toBeGreaterThan(200)
-    expect(s.jones.apartment).not.toBe('none')
+    expect(s.riley.jobId).not.toBeNull()
+    expect(s.riley.cash + s.riley.savings).toBeGreaterThan(200)
+    expect(s.riley.apartment).not.toBe('none')
   })
 
   it('wins an easy game within 60 weeks if the player idles', () => {
@@ -175,6 +175,6 @@ describe('Jones AI', () => {
       weeks += 1
     }
     expect(s.phase).toBe('over')
-    expect(s.winner).toBe('jones')
+    expect(s.winner).toBe('riley')
   })
 })

@@ -16,7 +16,7 @@ export function WeekReportModal({ game }: { game: GameState }) {
             .map((e, i) => (
               <div className="entry" key={i}>
                 <span className="who">
-                  {e.actor === 'player' ? '🙂' : e.actor === 'jones' ? '🎩' : '🌍'}
+                  {e.actor === 'player' ? '🙂' : e.actor === 'riley' ? '🎩' : '🌍'}
                 </span>
                 <span>{e.text}</span>
               </div>

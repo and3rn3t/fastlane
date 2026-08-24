@@ -111,7 +111,7 @@ export interface Economy {
 
 export interface LogEntry {
   week: number
-  actor: 'player' | 'jones' | 'world'
+  actor: 'player' | 'riley' | 'world'
   text: string
 }
 
@@ -127,17 +127,17 @@ export interface GameState {
   week: number
   rngSeed: number
   phase: GamePhase
-  winner: 'player' | 'jones' | null
+  winner: 'player' | 'riley' | null
   goals: Goals
   economy: Economy
   player: PlayerState
-  jones: PlayerState
+  riley: PlayerState
   headline: string
   log: LogEntry[]
   lastReport: WeekReport | null
 }
 
-export type PlayerKey = 'player' | 'jones'
+export type PlayerKey = 'player' | 'riley'
 
 export type GameAction =
   | { type: 'travel'; to: LocationId }

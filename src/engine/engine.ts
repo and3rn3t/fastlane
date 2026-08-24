@@ -1,7 +1,7 @@
 // Reducer entry point: creates games and applies actions immutably.
 
 import * as act from './actions'
-import { runJonesWeek } from './ai'
+import { runRileyWeek } from './ai'
 import { WEEK_TIME } from './data'
 import { endWeek } from './week'
 import type { GameAction, GameState, Goals, PlayerState } from './types'
@@ -50,7 +50,7 @@ export function newGame(opts: NewGameOptions): GameState {
       lotteryJackpot: 500,
     },
     player: newPlayer(opts.playerName || 'You', false),
-    jones: newPlayer('Jones', true),
+    riley: newPlayer('Riley', true),
     headline: 'A new life in the fast lane begins.',
     log: [],
     lastReport: null,
@@ -110,7 +110,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       act.relax(draft, 'player', action.hours)
       break
     case 'endWeek':
-      runJonesWeek(draft)
+      runRileyWeek(draft)
       endWeek(draft)
       break
     case 'dismissReport':
