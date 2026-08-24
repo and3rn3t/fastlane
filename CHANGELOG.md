@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Open Graph + Twitter Card tags and a rendered `public/og-image.png` share preview (Wave 0)
 - Save export/import (Wave 0): `GameContext.tsx` `exportSave`/`importSave`, an Export button in `TopBar`, an Import file picker on `StartScreen` — manual backup for players who never install to Home Screen
 - Riley turn playback (Wave 1): step-by-step replay of Riley's real week — the pawn walks their actual path, a bottom bar captions each action, Skip jumps to the report. Small additive engine change: `actions.ts`'s `log()` now attaches location, and 7 previously-silent actions now log
+- Onboarding + help (Wave 1): `Help.tsx` — a "?" button in `TopBar` opens a modal covering goals, time/board, dress/jobs, savings/economy, and Riley; auto-opens once per browser on first visit (`localStorage`, not save data, so a fresh game won't re-nag a returning player)
 - Working quality CI (`ci.yml`): lint, type-check, format check, tests, build on Node 24 (Python variant included)
 - `codeql.yml` and `dependency-review.yml` security workflows
 - `.nvmrc` (Node 24), `renovate.json` (canonical config), `commitlint.config.mjs` + `.husky/commit-msg`

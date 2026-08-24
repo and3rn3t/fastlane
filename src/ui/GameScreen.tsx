@@ -2,10 +2,30 @@ import { useEffect, useState } from 'react'
 import { jobById, netWorth, type GameState, type LocationId, type LogEntry } from '@/engine'
 import { useGame } from '@/state/GameContext'
 import { Board } from './Board'
+import { Help } from './Help'
 import { LocationPanel } from './LocationPanel'
 import { WeekReportModal } from './WeekReportModal'
 
 const REPLAY_STEP_MS = 650
+const HELP_SEEN_KEY = 'fastlane-help-seen'
+
+/** Opens Help once per browser, the first time a player reaches the game
+ * screen — a lightweight stand-in for a full coach-mark tour. Not tied to
+ * save data on purpose: it's "has this browser seen the tour", not "has this
+ * particular save" — so it won't re-nag a returning player on a new game. */
+function useAutoHelp() {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(HELP_SEEN_KEY) === '1') return
+      localStorage.setItem(HELP_SEEN_KEY, '1')
+      setOpen(true)
+    } catch {
+      // Storage blocked — just skip the auto-open, the "?" button still works.
+    }
+  }, [])
+  return [open, setOpen] as const
+}
 
 /**
  * Riley's week resolves instantly in the engine; this replays it as a
@@ -61,7 +81,7 @@ function useTurnReplay(game: GameState) {
   }
 }
 
-function TopBar({ game }: { game: GameState }) {
+function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
   const { quitToMenu, exportSave } = useGame()
   const p = game.player
   const job = p.jobId ? jobById(p.jobId) : null
@@ -72,6 +92,9 @@ function TopBar({ game }: { game: GameState }) {
           Fast <span>Lane</span>
         </span>
         <div className="topbar-actions">
+          <button onClick={onHelp} title="How to play" aria-label="Help">
+            ❓
+          </button>
           <button
             onClick={exportSave}
             title="Download a backup of your save"
@@ -143,9 +166,10 @@ function EventLog({ game }: { game: GameState }) {
 
 export function GameScreen({ game }: { game: GameState }) {
   const replay = useTurnReplay(game)
+  const [helpOpen, setHelpOpen] = useAutoHelp()
   return (
     <div className="app">
-      <TopBar game={game} />
+      <TopBar game={game} onHelp={() => setHelpOpen(true)} />
       <div className="game-layout">
         <Board game={game} rileyLocation={replay.location} />
         <div className="side">
@@ -162,6 +186,7 @@ export function GameScreen({ game }: { game: GameState }) {
         </div>
       )}
       {game.phase === 'weekReport' && replay.done && <WeekReportModal game={game} />}
+      {helpOpen && <Help onClose={() => setHelpOpen(false)} />}
     </div>
   )
 }

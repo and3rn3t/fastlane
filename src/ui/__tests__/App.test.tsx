@@ -40,12 +40,14 @@ describe('App', () => {
   it("ends the week, plays Riley's turn back, and shows the report", () => {
     renderApp()
     fireEvent.click(screen.getByText(/Start new game/))
+    // Dismiss the auto-opened Help dialog first so it doesn't shadow the report below.
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
     fireEvent.click(screen.getByRole('button', { name: /End week/ }))
     // Riley's turn replays before the report — skip it to reach the dialog,
     // same as a player would.
     expect(screen.getByRole('button', { name: /Skip/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Skip/ }))
-    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: /Week 1 report/i })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Start week 2/ }))
     expect(screen.getByText(/Week 2/)).toBeTruthy()
   })
@@ -57,5 +59,16 @@ describe('App', () => {
     first.unmount()
     renderApp()
     expect(screen.getByText(/Week 1/)).toBeTruthy() // resumed, not start screen
+  })
+
+  it('shows help automatically once, then only via the ? button', () => {
+    renderApp()
+    fireEvent.click(screen.getByText(/Start new game/))
+    expect(screen.getByRole('dialog', { name: /How to play/i })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+    expect(screen.queryByRole('dialog', { name: /How to play/i })).toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: /^Help$/i }))
+    expect(screen.getByRole('dialog', { name: /How to play/i })).toBeTruthy()
   })
 })
