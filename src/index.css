@@ -96,7 +96,8 @@ input[type='range'] {
 .app {
   max-width: 1200px;
   margin: 0 auto;
-  padding: 1rem;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -244,7 +245,8 @@ input[type='range'] {
 
 @media (max-width: 640px) {
   .app {
-    padding: 0.6rem;
+    padding: max(0.6rem, env(safe-area-inset-top)) max(0.6rem, env(safe-area-inset-right))
+      max(0.6rem, env(safe-area-inset-bottom)) max(0.6rem, env(safe-area-inset-left));
     gap: 0.6rem;
   }
 
@@ -554,7 +556,8 @@ input[type='range'] {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+    max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
   z-index: 10;
 }
 
@@ -578,7 +581,7 @@ input[type='range'] {
 
 .toast {
   position: fixed;
-  bottom: 1.2rem;
+  bottom: max(1.2rem, calc(env(safe-area-inset-bottom) + 0.8rem));
   left: 50%;
   transform: translateX(-50%);
   background: var(--bad);
