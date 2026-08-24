@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { jobById, netWorth, type GameState, type LocationId, type LogEntry } from '@/engine'
 import { useGame } from '@/state/GameContext'
-import { Board } from './Board'
+import { Board, DeltaBadge, useDeltaFlash } from './Board'
 import { Help } from './Help'
 import { LocationPanel } from './LocationPanel'
 import { WeekReportModal } from './WeekReportModal'
@@ -85,6 +85,7 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
   const { quitToMenu, exportSave } = useGame()
   const p = game.player
   const job = p.jobId ? jobById(p.jobId) : null
+  const cashDelta = useDeltaFlash(p.cash)
   return (
     <header className="topbar">
       <div className="topbar-row">
@@ -115,6 +116,7 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
         <div className="stat">
           <span className="label">Cash</span>
           <span className="value">${p.cash.toLocaleString()}</span>
+          <DeltaBadge delta={cashDelta} format={(n) => `${n > 0 ? '+' : '-'}$${Math.abs(n)}`} />
         </div>
         <div className="stat">
           <span className="label">Net worth</span>
