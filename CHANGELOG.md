@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Scroll polish (Wave 0): `overscroll-behavior` containment on the event log/modal/topbar-stats scroll regions so they don't chain into page-level rubber-band bounce
 - Home Screen icon/meta + iOS install nudge (Wave 0): `public/favicon.svg`, `public/apple-touch-icon.png` (placeholder), theme-color/apple-mobile-web-app meta, and `InstallPrompt.tsx` — an iOS-only "Add to Home Screen" banner shown after a player's first completed week
 - Open Graph + Twitter Card tags and a rendered `public/og-image.png` share preview (Wave 0)
+- Save export/import (Wave 0): `GameContext.tsx` `exportSave`/`importSave`, an Export button in `TopBar`, an Import file picker on `StartScreen` — manual backup for players who never install to Home Screen
 - Working quality CI (`ci.yml`): lint, type-check, format check, tests, build on Node 24 (Python variant included)
 - `codeql.yml` and `dependency-review.yml` security workflows
 - `.nvmrc` (Node 24), `renovate.json` (canonical config), `commitlint.config.mjs` + `.husky/commit-msg`

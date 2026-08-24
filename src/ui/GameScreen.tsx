@@ -4,7 +4,7 @@ import { Board } from './Board'
 import { LocationPanel } from './LocationPanel'
 
 function TopBar({ game }: { game: GameState }) {
-  const { quitToMenu } = useGame()
+  const { quitToMenu, exportSave } = useGame()
   const p = game.player
   const job = p.jobId ? jobById(p.jobId) : null
   return (
@@ -13,13 +13,22 @@ function TopBar({ game }: { game: GameState }) {
         <span className="brand">
           Fast <span>Lane</span>
         </span>
-        <button
-          onClick={() => {
-            if (window.confirm('Abandon this game and return to the menu?')) quitToMenu()
-          }}
-        >
-          Menu
-        </button>
+        <div className="topbar-actions">
+          <button
+            onClick={exportSave}
+            title="Download a backup of your save"
+            aria-label="Export save"
+          >
+            💾
+          </button>
+          <button
+            onClick={() => {
+              if (window.confirm('Abandon this game and return to the menu?')) quitToMenu()
+            }}
+          >
+            Menu
+          </button>
+        </div>
       </div>
       <div className="topbar-stats">
         <div className="stat">

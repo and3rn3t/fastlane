@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import {
   CAREER_TARGETS,
   EDUCATION_TARGETS,
@@ -44,9 +44,20 @@ const PRESETS: Record<string, Record<keyof Goals, number>> = {
 }
 
 export function StartScreen() {
-  const { startGame } = useGame()
+  const { startGame, importSave } = useGame()
   const [name, setName] = useState('')
   const [levels, setLevels] = useState<Record<keyof Goals, number>>(PRESETS.Standard)
+  const [importError, setImportError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    const text = await file.text()
+    const result = importSave(text)
+    setImportError(result.ok ? null : (result.error ?? 'Import failed.'))
+  }
 
   const goals: Goals = {
     wealth: WEALTH_TARGETS[levels.wealth - 1],
@@ -110,7 +121,16 @@ export function StartScreen() {
         >
           Start new game
         </button>
+        <button onClick={() => fileInputRef.current?.click()}>Import save</button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json,.json"
+          onChange={handleFileChange}
+          hidden
+        />
       </div>
+      {importError && <p className="locked">{importError}</p>}
     </div>
   )
 }
