@@ -12,3 +12,4 @@ export {
   wagePerHour,
 } from './actions'
 export { careerScore, goalProgress, meetsGoals } from './week'
+export { runAIWeek } from './ai'

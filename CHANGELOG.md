@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - End-of-game recap (Wave 1): `RecapChart.tsx` — two week-by-week line charts (net worth, career) on `GameOver`, built per the dataviz skill's full procedure (validated `--chart-you`/`--chart-riley` palette per mode, crosshair+tooltip, table-view twin, collision-avoiding end-labels). `GameState.history: WeekSnapshot[]` recorded once per week in `endWeek()` — **Wave 1 is now complete** (5/5 items; 2 needed small additive engine changes beyond the wave's original "UI-only" framing, both explicitly approved first)
 - Save schema versioning & migration (Wave 2, first item): `GameState.version` + a `MIGRATIONS` map in `GameContext.tsx`, run on both load and import. Includes an explicit `0 → 1` migration that upgrades every pre-existing save in place (preserving real player progress) rather than discarding it, since that shape is fully known. Truly unknown saves still fall back to a fresh game, now with a visible error toast instead of silent data loss
 - Global error boundary & save reset (Wave 2): `ErrorBoundary.tsx` wraps the app in `main.tsx`; a crash now shows a recoverable "Something broke" screen (download the save first, or reset and start over) instead of unmounting to a blank white page
+- Baseline balance simulation harness (Wave 2, last prereq): `pnpm sim [gameCount]` (`scripts/sim.ts`) runs headless AI-vs-AI games on the Standard preset, reporting win rate and average weeks-to-win — rerun after each remaining Wave 2 mechanic to catch a balance regression before a player does. Baseline: 65.5% player / 34.5% Riley win rate, 0% hit the 60-week cap, over 200 games
 - Working quality CI (`ci.yml`): lint, type-check, format check, tests, build on Node 24 (Python variant included)
 - `codeql.yml` and `dependency-review.yml` security workflows
 - `.nvmrc` (Node 24), `renovate.json` (canonical config), `commitlint.config.mjs` + `.husky/commit-msg`
@@ -42,6 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `AGENTS.md` documents and3rn3t stack defaults (React+TS+Vite+Wrangler / Python CLI profiles)
 - SECURITY.md, CODEOWNERS, LICENSE filled with real defaults instead of TODO placeholders
 - devcontainer Node feature and release workflow action versions updated
+- `ai.ts`'s AI policy parameterized from a hardcoded `riley` accessor to `runAIWeek(state, key: PlayerKey)`, so `scripts/sim.ts` can drive either side with the same logic; pure refactor, verified behavior-neutral against the existing seeded-RNG AI tests
 
 ### Removed
 

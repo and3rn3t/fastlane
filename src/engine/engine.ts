@@ -1,7 +1,7 @@
 // Reducer entry point: creates games and applies actions immutably.
 
 import * as act from './actions'
-import { runRileyWeek } from './ai'
+import { runAIWeek } from './ai'
 import { WEEK_TIME } from './data'
 import { endWeek } from './week'
 import {
@@ -119,10 +119,10 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break
     case 'endWeek': {
       // Captured before Riley's turn runs so the report includes it — endWeek()
-      // used to compute this internally, after runRileyWeek had already logged
+      // used to compute this internally, after runAIWeek had already logged
       // Riley's whole week, so lastReport.entries never actually contained it.
       const logStart = draft.log.length
-      runRileyWeek(draft)
+      runAIWeek(draft, 'riley')
       endWeek(draft, logStart)
       break
     }
