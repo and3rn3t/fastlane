@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Riley turn playback (Wave 1): step-by-step replay of Riley's real week — the pawn walks their actual path, a bottom bar captions each action, Skip jumps to the report. Small additive engine change: `actions.ts`'s `log()` now attaches location, and 7 previously-silent actions now log
 - Onboarding + help (Wave 1): `Help.tsx` — a "?" button in `TopBar` opens a modal covering goals, time/board, dress/jobs, savings/economy, and Riley; auto-opens once per browser on first visit (`localStorage`, not save data, so a fresh game won't re-nag a returning player)
 - Board animations (Wave 1): the player now has a board token (🙂, matching Riley's 🎩) that glides between tiles via a measured, CSS-transitioned position instead of teleporting; newly-arrived tiles pulse; cash/time changes flash a floating `+/-N`
+- Sound (Wave 1): `src/ui/sound.ts` — synthesized WebAudio blips (move/purchase/payday/disaster/win), no asset files, with a 🔊/🔇 toggle in `TopBar` persisted to `localStorage`
 - Working quality CI (`ci.yml`): lint, type-check, format check, tests, build on Node 24 (Python variant included)
 - `codeql.yml` and `dependency-review.yml` security workflows
 - `.nvmrc` (Node 24), `renovate.json` (canonical config), `commitlint.config.mjs` + `.husky/commit-msg`

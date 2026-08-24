@@ -9,6 +9,7 @@ import {
 } from '@/engine'
 import { useGame } from '@/state/GameContext'
 import { LOCATION_ICONS } from './icons'
+import { playMove } from './sound'
 
 // Loop index → cell in a 4×4 grid, walking the perimeter clockwise so
 // board adjacency matches travel cost.
@@ -197,7 +198,10 @@ export function Board({
             className={`tile${here ? ' here' : ''}`}
             style={{ gridRow: row, gridColumn: col }}
             disabled={here || cost > p.timeLeft}
-            onClick={() => dispatchGame({ type: 'travel', to: loc.id })}
+            onClick={() => {
+              playMove()
+              dispatchGame({ type: 'travel', to: loc.id })
+            }}
             title={here ? 'You are here' : `Travel: ${cost}h`}
           >
             <span className="icon" aria-hidden>

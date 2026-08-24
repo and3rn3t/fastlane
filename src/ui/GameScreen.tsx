@@ -4,6 +4,7 @@ import { useGame } from '@/state/GameContext'
 import { Board, DeltaBadge, useDeltaFlash } from './Board'
 import { Help } from './Help'
 import { LocationPanel } from './LocationPanel'
+import { isMuted, playDisaster, setMuted } from './sound'
 import { WeekReportModal } from './WeekReportModal'
 
 const REPLAY_STEP_MS = 650
@@ -25,6 +26,23 @@ function useAutoHelp() {
     }
   }, [])
   return [open, setOpen] as const
+}
+
+const DISASTER_KEYWORDS = ['went hungry', 'evicted', 'robbed']
+
+/** Plays a disaster blip once per new report if any of this week's player
+ * entries mention a bad event — text-matched against the exact phrases
+ * week.ts's upkeep() logs, not guessed. */
+function useDisasterSound(game: GameState) {
+  useEffect(() => {
+    const report = game.lastReport
+    if (!report) return
+    const hadDisaster = report.entries.some(
+      (e) => e.actor === 'player' && DISASTER_KEYWORDS.some((k) => e.text.includes(k))
+    )
+    if (hadDisaster) playDisaster()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [game.lastReport?.week])
 }
 
 /**
@@ -86,6 +104,7 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
   const p = game.player
   const job = p.jobId ? jobById(p.jobId) : null
   const cashDelta = useDeltaFlash(p.cash)
+  const [muted, setMutedState] = useState(() => isMuted())
   return (
     <header className="topbar">
       <div className="topbar-row">
@@ -95,6 +114,17 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
         <div className="topbar-actions">
           <button onClick={onHelp} title="How to play" aria-label="Help">
             ❓
+          </button>
+          <button
+            onClick={() => {
+              const next = !muted
+              setMuted(next)
+              setMutedState(next)
+            }}
+            title={muted ? 'Unmute sound' : 'Mute sound'}
+            aria-label={muted ? 'Unmute sound' : 'Mute sound'}
+          >
+            {muted ? '🔇' : '🔊'}
           </button>
           <button
             onClick={exportSave}
@@ -169,6 +199,7 @@ function EventLog({ game }: { game: GameState }) {
 export function GameScreen({ game }: { game: GameState }) {
   const replay = useTurnReplay(game)
   const [helpOpen, setHelpOpen] = useAutoHelp()
+  useDisasterSound(game)
   return (
     <div className="app">
       <TopBar game={game} onHelp={() => setHelpOpen(true)} />

@@ -1,9 +1,17 @@
+import { useEffect } from 'react'
 import type { GameState } from '@/engine'
 import { useGame } from '@/state/GameContext'
+import { playWin } from './sound'
 
 export function GameOver({ game }: { game: GameState }) {
   const { quitToMenu } = useGame()
   const playerWon = game.winner === 'player'
+
+  useEffect(() => {
+    if (playerWon) playWin()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   return (
     <div className="app">
       <div className="start gameover">

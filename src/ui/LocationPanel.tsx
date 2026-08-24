@@ -22,6 +22,7 @@ import {
 } from '@/engine'
 import { useGame } from '@/state/GameContext'
 import { LOCATION_ICONS } from './icons'
+import { playPayday, playPurchase } from './sound'
 
 function WorkAction({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
@@ -49,7 +50,10 @@ function WorkAction({ game }: { game: GameState }) {
       <button
         className="primary"
         disabled={max < 1}
-        onClick={() => dispatchGame({ type: 'work', hours: clamped })}
+        onClick={() => {
+          playPayday()
+          dispatchGame({ type: 'work', hours: clamped })
+        }}
       >
         Work {clamped}h (+${Math.round(clamped * rate)})
       </button>
@@ -122,7 +126,10 @@ function GroceryAction({ game }: { game: GameState }) {
       <button
         className="primary"
         disabled={room < 1}
-        onClick={() => dispatchGame({ type: 'buyGroceries', units: clamped })}
+        onClick={() => {
+          playPurchase()
+          dispatchGame({ type: 'buyGroceries', units: clamped })
+        }}
       >
         Buy {clamped} (${unitPrice * clamped}, 1h)
       </button>
@@ -145,7 +152,13 @@ function ShopItems({ game, ids }: { game: GameState; ids: ItemId[] }) {
               <br />
               <span className="desc">{item.blurb}</span>
             </span>
-            <button disabled={owned} onClick={() => dispatchGame({ type: 'buyItem', itemId: id })}>
+            <button
+              disabled={owned}
+              onClick={() => {
+                playPurchase()
+                dispatchGame({ type: 'buyItem', itemId: id })
+              }}
+            >
               {owned ? 'Owned' : `$${price(game, item.price)} (1h)`}
             </button>
           </div>
@@ -206,7 +219,13 @@ function RentActions({ game }: { game: GameState }) {
               <span className="locked"> — {3 - p.weeksBehindOnRent} week(s) until eviction!</span>
             )}
           </span>
-          <button className="primary" onClick={() => dispatchGame({ type: 'payRent' })}>
+          <button
+            className="primary"
+            onClick={() => {
+              playPurchase()
+              dispatchGame({ type: 'payRent' })
+            }}
+          >
             Pay rent (1h)
           </button>
         </div>
@@ -225,7 +244,10 @@ function RentActions({ game }: { game: GameState }) {
           </span>
           <button
             disabled={p.apartment === tier}
-            onClick={() => dispatchGame({ type: 'rentApartment', tier })}
+            onClick={() => {
+              playPurchase()
+              dispatchGame({ type: 'rentApartment', tier })
+            }}
           >
             {p.apartment === tier ? 'Current home' : 'Move in (2h, 1st week upfront)'}
           </button>
@@ -309,7 +331,13 @@ function MealAction({ game }: { game: GameState }) {
           Eaten this week: {game.player.fed}/{FOOD_NEEDED}
         </span>
       </span>
-      <button className="primary" onClick={() => dispatchGame({ type: 'buyMeal' })}>
+      <button
+        className="primary"
+        onClick={() => {
+          playPurchase()
+          dispatchGame({ type: 'buyMeal' })
+        }}
+      >
         Eat (${price(game, MEAL_PRICE)}, 2h)
       </button>
     </div>
@@ -336,7 +364,12 @@ function LotteryAction({ game }: { game: GameState }) {
         aria-label="Tickets"
         onChange={(e) => setTickets(Math.max(1, Math.min(20, Math.floor(Number(e.target.value)))))}
       />
-      <button onClick={() => dispatchGame({ type: 'buyLottery', tickets })}>
+      <button
+        onClick={() => {
+          playPurchase()
+          dispatchGame({ type: 'buyLottery', tickets })
+        }}
+      >
         Buy (${LOTTERY_TICKET_PRICE * tickets}, 1h)
       </button>
     </div>
@@ -352,7 +385,13 @@ function ClassAction({ game }: { game: GameState }) {
         <br />
         <span className="desc">Completed: {game.player.education} classes</span>
       </span>
-      <button className="primary" onClick={() => dispatchGame({ type: 'takeClass' })}>
+      <button
+        className="primary"
+        onClick={() => {
+          playPurchase()
+          dispatchGame({ type: 'takeClass' })
+        }}
+      >
         Enroll (${price(game, TUITION)}, 8h)
       </button>
     </div>
