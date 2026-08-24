@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Mobile-first responsive layout (Wave 0): scrollable topbar stat strip, shrunk board tiles under 480px, sheet-styled location panel
 - `viewport-fit=cover` + `env(safe-area-inset-*)` padding on `.app`/`.modal-backdrop`/`.toast` (Wave 0) so iPhone notch/Dynamic Island/home indicator never cover content
+- Touch-target sizing (Wave 0): 44px minimum on buttons/number inputs, `touch-action: manipulation`, explicit 16px input font-size, `inputMode`/`enterKeyHint` on numeric fields
 - Working quality CI (`ci.yml`): lint, type-check, format check, tests, build on Node 24 (Python variant included)
 - `codeql.yml` and `dependency-review.yml` security workflows
 - `.nvmrc` (Node 24), `renovate.json` (canonical config), `commitlint.config.mjs` + `.husky/commit-msg`

@@ -170,6 +170,8 @@ function BankActions({ game }: { game: GameState }) {
       </span>
       <input
         type="number"
+        inputMode="numeric"
+        enterKeyHint="done"
         min={1}
         value={amount}
         aria-label="Amount"
@@ -326,6 +328,8 @@ function LotteryAction({ game }: { game: GameState }) {
       </span>
       <input
         type="number"
+        inputMode="numeric"
+        enterKeyHint="done"
         min={1}
         max={20}
         value={tickets}
