@@ -1,7 +1,65 @@
-import { jobById, netWorth, type GameState } from '@/engine'
+import { useEffect, useState } from 'react'
+import { jobById, netWorth, type GameState, type LocationId, type LogEntry } from '@/engine'
 import { useGame } from '@/state/GameContext'
 import { Board } from './Board'
 import { LocationPanel } from './LocationPanel'
+import { WeekReportModal } from './WeekReportModal'
+
+const REPLAY_STEP_MS = 650
+
+/**
+ * Riley's week resolves instantly in the engine; this replays it as a
+ * step-by-step sequence (token walking the board, a caption per action)
+ * before the static week-report modal appears. Only entries with a
+ * `location` (per-action player/riley log lines) are replayable — world/
+ * upkeep entries have none and are skipped here, same as before.
+ */
+function useTurnReplay(game: GameState) {
+  const report = game.phase === 'weekReport' ? game.lastReport : null
+
+  const [trackedWeek, setTrackedWeek] = useState<number | undefined>(undefined)
+  const [progress, setProgress] = useState({ index: 0, skipped: false })
+
+  // Reset progress the moment a new report appears — done during render
+  // (React's blessed pattern for this) so there's no flicker frame where
+  // the old "done" state briefly shows the modal before an effect resets it.
+  if (report?.week !== trackedWeek) {
+    setTrackedWeek(report?.week)
+    setProgress({ index: 0, skipped: false })
+  }
+
+  const entries = (report?.entries ?? []).filter(
+    (e): e is LogEntry & { location: LocationId } => e.actor === 'riley' && e.location !== undefined
+  )
+  const entryCount = entries.length
+
+  useEffect(() => {
+    if (!report || progress.skipped || progress.index >= entryCount) return
+    const t = setTimeout(() => {
+      setProgress((s) => ({ ...s, index: s.index + 1 }))
+    }, REPLAY_STEP_MS)
+    return () => clearTimeout(t)
+  }, [report, progress, entryCount])
+
+  if (!report) {
+    return {
+      location: undefined as LocationId | undefined,
+      text: null as string | null,
+      done: true,
+      skip: () => {},
+    }
+  }
+
+  const done = progress.skipped || progress.index >= entryCount
+  const current = done ? null : entries[progress.index]
+
+  return {
+    location: current?.location,
+    text: current?.text ?? null,
+    done,
+    skip: () => setProgress((s) => ({ ...s, skipped: true })),
+  }
+}
 
 function TopBar({ game }: { game: GameState }) {
   const { quitToMenu, exportSave } = useGame()
@@ -84,16 +142,26 @@ function EventLog({ game }: { game: GameState }) {
 }
 
 export function GameScreen({ game }: { game: GameState }) {
+  const replay = useTurnReplay(game)
   return (
     <div className="app">
       <TopBar game={game} />
       <div className="game-layout">
-        <Board game={game} />
+        <Board game={game} rileyLocation={replay.location} />
         <div className="side">
           <LocationPanel game={game} />
           <EventLog game={game} />
         </div>
       </div>
+      {!replay.done && (
+        <div className="replay-overlay">
+          <div className="replay-bar">
+            <span>🎩 {replay.text}</span>
+            <button onClick={replay.skip}>Skip ▶▶</button>
+          </div>
+        </div>
+      )}
+      {game.phase === 'weekReport' && replay.done && <WeekReportModal game={game} />}
     </div>
   )
 }

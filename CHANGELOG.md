@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Home Screen icon/meta + iOS install nudge (Wave 0): `public/favicon.svg`, `public/apple-touch-icon.png` (placeholder), theme-color/apple-mobile-web-app meta, and `InstallPrompt.tsx` — an iOS-only "Add to Home Screen" banner shown after a player's first completed week
 - Open Graph + Twitter Card tags and a rendered `public/og-image.png` share preview (Wave 0)
 - Save export/import (Wave 0): `GameContext.tsx` `exportSave`/`importSave`, an Export button in `TopBar`, an Import file picker on `StartScreen` — manual backup for players who never install to Home Screen
+- Riley turn playback (Wave 1): step-by-step replay of Riley's real week — the pawn walks their actual path, a bottom bar captions each action, Skip jumps to the report. Small additive engine change: `actions.ts`'s `log()` now attaches location, and 7 previously-silent actions now log
 - Working quality CI (`ci.yml`): lint, type-check, format check, tests, build on Node 24 (Python variant included)
 - `codeql.yml` and `dependency-review.yml` security workflows
 - `.nvmrc` (Node 24), `renovate.json` (canonical config), `commitlint.config.mjs` + `.husky/commit-msg`
@@ -43,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Real-device Wave 0 QA (iPhone, dark mode, portrait, Safari tab) found two mobile bugs neither Chromium testing nor code review caught: `.goal-row`'s range input had no explicit width and overflowed its grid track, clipping goal values off-screen on `StartScreen` (never tested at mobile width before); `.side`'s negative `margin-top` (added for a "pulled up" sheet look) was covering the bottom board-tile row's text, not just its shadow. Also tightened `.start`'s desktop-era spacing for mobile and added a fade-mask on the topbar stat strip so it reads as scrollable instead of cut off. Round 2 (landscape + installed Home Screen app) came back clean — **Wave 0 is complete.**
+- `endWeek()`'s `logStart` was captured after `runRileyWeek()` had already run, so `lastReport.entries` — and the static week-report modal — never actually contained Riley's turn, only end-of-week system events. Found while building turn playback; now captured before Riley's turn runs.
 
 ## [0.1.0] - YYYY-MM-DD
 

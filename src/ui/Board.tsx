@@ -1,4 +1,11 @@
-import { LOCATIONS, goalProgress, travelCost, hasItem, type GameState } from '@/engine'
+import {
+  LOCATIONS,
+  goalProgress,
+  travelCost,
+  hasItem,
+  type GameState,
+  type LocationId,
+} from '@/engine'
 import { useGame } from '@/state/GameContext'
 import { LOCATION_ICONS } from './icons'
 
@@ -68,10 +75,19 @@ function CenterPanel({ game }: { game: GameState }) {
   )
 }
 
-export function Board({ game }: { game: GameState }) {
+export function Board({
+  game,
+  rileyLocation,
+}: {
+  game: GameState
+  /** Overrides where Riley's pawn renders — used during turn-playback replay
+   * to walk the token through the week instead of jumping to the final spot. */
+  rileyLocation?: LocationId
+}) {
   const { dispatchGame } = useGame()
   const p = game.player
   const bike = hasItem(p, 'bike')
+  const effectiveRileyLocation = rileyLocation ?? game.riley.location
 
   return (
     <div className="board">
@@ -79,7 +95,7 @@ export function Board({ game }: { game: GameState }) {
         const [row, col] = PERIMETER[loc.loopIndex]
         const here = p.location === loc.id
         const cost = travelCost(p.location, loc.id, bike)
-        const rileyHere = game.riley.location === loc.id
+        const rileyHere = effectiveRileyLocation === loc.id
         return (
           <button
             key={loc.id}

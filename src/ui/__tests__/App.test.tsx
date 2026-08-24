@@ -37,10 +37,14 @@ describe('App', () => {
     expect(screen.getByText(/Worked \d+h as Fry Cook/)).toBeTruthy()
   })
 
-  it('ends the week and shows the report', () => {
+  it("ends the week, plays Riley's turn back, and shows the report", () => {
     renderApp()
     fireEvent.click(screen.getByText(/Start new game/))
     fireEvent.click(screen.getByRole('button', { name: /End week/ }))
+    // Riley's turn replays before the report — skip it to reach the dialog,
+    // same as a player would.
+    expect(screen.getByRole('button', { name: /Skip/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Skip/ }))
     expect(screen.getByRole('dialog')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Start week 2/ }))
     expect(screen.getByText(/Week 2/)).toBeTruthy()

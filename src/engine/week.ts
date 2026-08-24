@@ -185,10 +185,12 @@ function driftEconomy(state: GameState) {
 /**
  * Close out the week for both players. The caller (reducer) is responsible for
  * running the AI's turn *before* this, so both have spent their time.
+ *
+ * @param logStart Index into state.log where this week's report should start
+ *   — must be captured by the caller *before* Riley's turn runs, so the
+ *   report actually includes it (see the endWeek case in engine.ts).
  */
-export function endWeek(state: GameState) {
-  const logStart = state.log.length
-
+export function endWeek(state: GameState, logStart: number) {
   upkeep(state, 'player')
   upkeep(state, 'riley')
   personalEvent(state, 'player')

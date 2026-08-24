@@ -28,6 +28,14 @@
   }
 }
 
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -376,6 +384,22 @@ input[type='range'] {
   top: 0.5rem;
   right: 0.55rem;
   font-size: 0.95rem;
+  animation: pawn-step 300ms ease-out;
+}
+
+@keyframes pawn-step {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 @media (max-width: 480px) {
@@ -683,4 +707,36 @@ input[type='range'] {
   border: none;
   color: inherit;
   font-size: 1rem;
+}
+
+/* ---------- turn playback ---------- */
+
+.replay-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 12;
+  display: flex;
+  align-items: flex-end;
+}
+
+.replay-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 0.7rem 1rem;
+  padding-bottom: max(0.7rem, calc(env(safe-area-inset-bottom) + 0.5rem));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  font-size: 0.9rem;
+}
+
+.replay-bar button {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  color: inherit;
 }

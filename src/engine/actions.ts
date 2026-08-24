@@ -8,6 +8,7 @@ import {
   GROCERY_CAP_FRIDGE,
   GROCERY_PRICE_MARKET,
   GROCERY_PRICE_MEGAMART,
+  LOCATIONS,
   LOTTERY_TICKET_PRICE,
   MEAL_PRICE,
   MEAL_TIME,
@@ -47,7 +48,7 @@ function spendCash(p: PlayerState, amount: number) {
 }
 
 function log(state: GameState, key: PlayerKey, text: string) {
-  state.log.push({ week: state.week, actor: key, text })
+  state.log.push({ week: state.week, actor: key, text, location: state[key].location })
 }
 
 export function hasItem(p: PlayerState, id: ItemId): boolean {
@@ -64,6 +65,7 @@ export function travel(state: GameState, key: PlayerKey, to: LocationId) {
   const cost = travelCost(p.location, to, hasItem(p, 'bike'))
   spendTime(p, cost)
   p.location = to
+  log(state, key, `Walked to ${LOCATIONS[to].name}`)
 }
 
 export function work(state: GameState, key: PlayerKey, hours: number) {
@@ -125,6 +127,7 @@ export function buyMeal(state: GameState, key: PlayerKey) {
   spendCash(p, price(state, MEAL_PRICE))
   p.fed += 1
   p.happiness = Math.min(100, p.happiness + 1)
+  log(state, key, 'Grabbed a hot meal')
 }
 
 export function buyGroceries(state: GameState, key: PlayerKey, units: number) {
@@ -143,6 +146,7 @@ export function buyGroceries(state: GameState, key: PlayerKey, units: number) {
   spendTime(p, 1)
   spendCash(p, price(state, unitPrice) * units)
   p.groceries += units
+  log(state, key, `Bought ${units} unit${units === 1 ? '' : 's'} of groceries`)
 }
 
 export function buyLottery(state: GameState, key: PlayerKey, tickets: number) {
@@ -153,6 +157,7 @@ export function buyLottery(state: GameState, key: PlayerKey, tickets: number) {
   spendCash(p, LOTTERY_TICKET_PRICE * tickets)
   p.lotteryTickets += tickets
   state.economy.lotteryJackpot += LOTTERY_TICKET_PRICE * tickets * 4
+  log(state, key, `Bought ${tickets} lottery ticket${tickets === 1 ? '' : 's'}`)
 }
 
 export function buyItem(state: GameState, key: PlayerKey, itemId: ItemId) {
@@ -193,6 +198,7 @@ export function deposit(state: GameState, key: PlayerKey, amount: number) {
   spendTime(p, 1)
   spendCash(p, amount)
   p.savings += amount
+  log(state, key, `Deposited $${amount}`)
 }
 
 export function withdraw(state: GameState, key: PlayerKey, amount: number) {
@@ -202,6 +208,7 @@ export function withdraw(state: GameState, key: PlayerKey, amount: number) {
   spendTime(p, 1)
   p.savings -= amount
   p.cash += amount
+  log(state, key, `Withdrew $${amount}`)
 }
 
 export function payRent(state: GameState, key: PlayerKey) {
@@ -249,6 +256,7 @@ export function relax(state: GameState, key: PlayerKey, hours: number) {
   spendTime(p, used)
   p.relaxedThisWeek += used
   p.happiness = Math.min(100, p.happiness + used)
+  log(state, key, `Relaxed ${used}h`)
 }
 
 export function netWorth(p: PlayerState): number {

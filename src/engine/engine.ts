@@ -109,10 +109,15 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'relax':
       act.relax(draft, 'player', action.hours)
       break
-    case 'endWeek':
+    case 'endWeek': {
+      // Captured before Riley's turn runs so the report includes it — endWeek()
+      // used to compute this internally, after runRileyWeek had already logged
+      // Riley's whole week, so lastReport.entries never actually contained it.
+      const logStart = draft.log.length
       runRileyWeek(draft)
-      endWeek(draft)
+      endWeek(draft, logStart)
       break
+    }
     case 'dismissReport':
       if (draft.phase === 'weekReport') draft.phase = 'playing'
       break

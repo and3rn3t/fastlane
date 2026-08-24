@@ -113,6 +113,10 @@ export interface LogEntry {
   week: number
   actor: 'player' | 'riley' | 'world'
   text: string
+  /** Actor's location when this happened — set for per-action player/riley
+   * entries (via actions.ts's log()), absent on world/upkeep entries. Lets
+   * the UI replay a turn's path without the engine tracking history itself. */
+  location?: LocationId
 }
 
 export type GamePhase = 'playing' | 'weekReport' | 'over'
