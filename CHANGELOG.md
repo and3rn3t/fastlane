@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `viewport-fit=cover` + `env(safe-area-inset-*)` padding on `.app`/`.modal-backdrop`/`.toast` (Wave 0) so iPhone notch/Dynamic Island/home indicator never cover content
 - Touch-target sizing (Wave 0): 44px minimum on buttons/number inputs, `touch-action: manipulation`, explicit 16px input font-size, `inputMode`/`enterKeyHint` on numeric fields
 - Scroll polish (Wave 0): `overscroll-behavior` containment on the event log/modal/topbar-stats scroll regions so they don't chain into page-level rubber-band bounce
+- Home Screen icon/meta + iOS install nudge (Wave 0): `public/favicon.svg`, `public/apple-touch-icon.png` (placeholder), theme-color/apple-mobile-web-app meta, and `InstallPrompt.tsx` — an iOS-only "Add to Home Screen" banner shown after a player's first completed week
 - Working quality CI (`ci.yml`): lint, type-check, format check, tests, build on Node 24 (Python variant included)
 - `codeql.yml` and `dependency-review.yml` security workflows
 - `.nvmrc` (Node 24), `renovate.json` (canonical config), `commitlint.config.mjs` + `.husky/commit-msg`

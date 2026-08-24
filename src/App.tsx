@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useGame } from '@/state/GameContext'
 import { GameOver } from '@/ui/GameOver'
 import { GameScreen } from '@/ui/GameScreen'
+import { InstallPrompt } from '@/ui/InstallPrompt'
 import { StartScreen } from '@/ui/StartScreen'
 import { WeekReportModal } from '@/ui/WeekReportModal'
 
@@ -32,6 +33,7 @@ export default function App() {
       <GameScreen game={game} />
       {game.phase === 'weekReport' && <WeekReportModal game={game} />}
       <ErrorToast />
+      <InstallPrompt game={game} />
     </>
   )
 }

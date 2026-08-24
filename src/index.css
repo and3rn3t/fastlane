@@ -617,3 +617,32 @@ input[type='range'] {
   font-size: 2.6rem;
   margin-bottom: 0.5rem;
 }
+
+/* ---------- install prompt ---------- */
+
+.install-prompt {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 0.7rem 1rem;
+  padding-bottom: max(0.7rem, calc(env(safe-area-inset-bottom) + 0.5rem));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+  font-size: 0.85rem;
+  z-index: 15;
+}
+
+.install-prompt button {
+  margin-left: auto;
+  flex-shrink: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 1rem;
+}
