@@ -29,7 +29,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Renamed the AI rival from Jones to Riley across the engine (`PlayerKey`, `GameState.riley`, `ai.ts`), UI, and tests; README/AGENTS.md no longer name the 1990 title this project was inspired by. Reduces trademark/franchise-association exposure as the project grows a public user base. The live domain (`jones.andernet.dev`) still needs migrating — tracked in `docs/ROADMAP.md` Wave 0.
+- Renamed the AI rival from Jones to Riley across the engine (`PlayerKey`, `GameState.riley`, `ai.ts`), UI, and tests; README/AGENTS.md no longer name the 1990 title this project was inspired by. Reduces trademark/franchise-association exposure as the project grows a public user base.
+- Live domain migrated to `fastlane.andernet.dev` (from `jones.andernet.dev`), completing the rebrand above; `index.html`'s OG/Twitter URLs updated to match. The old domain has no redirect set up — it currently 530s instead of forwarding.
 - `AGENTS.md` is now the single source of truth; `CLAUDE.md`, `copilot-instructions.md`, `.cursorrules`, `.clinerules`, `.windsurfrules` are pointers
 - `AGENTS.md` documents and3rn3t stack defaults (React+TS+Vite+Wrangler / Python CLI profiles)
 - SECURITY.md, CODEOWNERS, LICENSE filled with real defaults instead of TODO placeholders
