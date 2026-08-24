@@ -24,7 +24,17 @@ function ErrorToast() {
 export default function App() {
   const { game } = useGame()
 
-  if (!game) return <StartScreen />
+  // ErrorToast renders in every branch — a failed-load message (see
+  // GameContext.tsx's loadSave) fires exactly when game is null, so it must
+  // be reachable from the StartScreen branch too, not just in-game.
+  if (!game) {
+    return (
+      <>
+        <StartScreen />
+        <ErrorToast />
+      </>
+    )
+  }
   if (game.phase === 'over') return <GameOver game={game} />
 
   return (

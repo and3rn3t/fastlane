@@ -4,7 +4,13 @@ import * as act from './actions'
 import { runRileyWeek } from './ai'
 import { WEEK_TIME } from './data'
 import { endWeek } from './week'
-import type { GameAction, GameState, Goals, PlayerState } from './types'
+import {
+  SAVE_VERSION,
+  type GameAction,
+  type GameState,
+  type Goals,
+  type PlayerState,
+} from './types'
 
 function newPlayer(name: string, isAI: boolean): PlayerState {
   return {
@@ -38,6 +44,7 @@ export interface NewGameOptions {
 
 export function newGame(opts: NewGameOptions): GameState {
   return {
+    version: SAVE_VERSION,
     week: 1,
     rngSeed: opts.seed ?? Math.floor(Math.random() * 2 ** 31),
     phase: 'playing',

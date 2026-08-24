@@ -72,3 +72,86 @@ describe('App', () => {
     expect(screen.getByRole('dialog', { name: /How to play/i })).toBeTruthy()
   })
 })
+
+describe('save migration', () => {
+  beforeEach(() => localStorage.clear())
+  afterEach(cleanup)
+
+  function legacyPlayer(name: string, cash: number) {
+    return {
+      name,
+      isAI: name !== 'Legacy',
+      location: 'home',
+      timeLeft: 42,
+      cash,
+      savings: 0,
+      happiness: 60,
+      education: 2,
+      jobId: null,
+      experience: 0,
+      dress: 20,
+      items: [],
+      apartment: 'none',
+      rentDue: 0,
+      weeksBehindOnRent: 0,
+      fed: 0,
+      groceries: 0,
+      lotteryTickets: 0,
+      relaxedThisWeek: 0,
+    }
+  }
+
+  it('upgrades a legacy (unversioned, pre-history) save in place — no data loss', () => {
+    // No `version`, no `history` — the exact shape every save had before
+    // this system and the end-of-game recap chart existed.
+    const legacy = {
+      week: 5,
+      rngSeed: 1,
+      phase: 'playing',
+      winner: null,
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      economy: { priceIndex: 1, wageIndex: 1, interestRate: 0.005, lotteryJackpot: 500 },
+      player: legacyPlayer('Legacy', 777),
+      riley: legacyPlayer('Riley', 300),
+      headline: 'A new life in the fast lane begins.',
+      log: [],
+      lastReport: null,
+    }
+    localStorage.setItem('fastlane-save-v1', JSON.stringify(legacy))
+
+    renderApp()
+
+    // Resumed the real save, not bounced to StartScreen — the $777 and
+    // Week 5 prove it's the actual legacy progress, not a fresh game.
+    expect(screen.getByText(/Week 5/)).toBeTruthy()
+    // Cash and net worth both read $777 (no savings) — either confirms it's
+    // the real legacy save, not a fresh one.
+    expect(screen.getAllByText('$777').length).toBeGreaterThan(0)
+
+    const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
+    expect(upgraded.version).toBe(1)
+    expect(upgraded.history).toEqual([])
+  })
+
+  it('falls back to a fresh game and surfaces an error toast on corrupted JSON', () => {
+    localStorage.setItem('fastlane-save-v1', '{not valid json')
+    renderApp()
+    expect(screen.getByText(/Start new game/)).toBeTruthy()
+    expect(screen.getByRole('alert')).toBeTruthy()
+  })
+
+  it('falls back to a fresh game on a save version newer than this build', () => {
+    const fromTheFuture = {
+      version: 999,
+      week: 1,
+      phase: 'playing',
+      player: legacyPlayer('You', 200),
+      riley: legacyPlayer('Riley', 200),
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+    }
+    localStorage.setItem('fastlane-save-v1', JSON.stringify(fromTheFuture))
+    renderApp()
+    expect(screen.getByText(/Start new game/)).toBeTruthy()
+    expect(screen.getByRole('alert')).toBeTruthy()
+  })
+})

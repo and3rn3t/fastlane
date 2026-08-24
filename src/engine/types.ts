@@ -138,7 +138,13 @@ export interface WeekSnapshot {
   rileyCareer: number
 }
 
+/** Bump on any GameState/PlayerState shape change and add a migration step in
+ * state/GameContext.tsx's MIGRATIONS map — see that file for the full scheme.
+ * The engine owns this number since it owns what the shape actually is. */
+export const SAVE_VERSION = 1
+
 export interface GameState {
+  version: number
   week: number
   rngSeed: number
   phase: GamePhase

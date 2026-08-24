@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useReducer, type ReactNode } from 'react'
 import {
   EngineError,
+  SAVE_VERSION,
   applyAction,
   newGame,
   type GameAction,
@@ -8,6 +9,9 @@ import {
   type NewGameOptions,
 } from '@/engine'
 
+// The "-v1" here is now just a name, not a version — frozen going forward.
+// Schema versioning lives in the save's own `version` field (SAVE_VERSION)
+// and the MIGRATIONS map below; never bump this key to invalidate old saves.
 const SAVE_KEY = 'fastlane-save-v1'
 
 interface Store {
@@ -44,9 +48,9 @@ function reducer(store: Store, action: StoreAction): Store {
   }
 }
 
-/** Loose structural check on an imported save — not a full schema, just enough
- * to reject garbage/unrelated JSON before it reaches the engine. */
-function isPlausibleSave(data: unknown): data is GameState {
+/** Loose structural check — not a full schema, just enough to reject
+ * garbage/unrelated JSON before it reaches the engine or a migration step. */
+function isPlausibleSave(data: unknown): data is Record<string, unknown> {
   if (typeof data !== 'object' || data === null) return false
   const d = data as Record<string, unknown>
   return (
@@ -61,22 +65,66 @@ function isPlausibleSave(data: unknown): data is GameState {
   )
 }
 
-/** Defaults fields added after a save was written, so an older save doesn't
- * crash code that assumes they exist (e.g. `history`, added for the
- * end-of-game recap chart). Not a real migration system — just enough to
- * keep old saves loading until Wave 2 builds proper schema versioning. */
-function normalizeSave(
-  game: Omit<GameState, 'history'> & { history?: GameState['history'] }
-): GameState {
-  return { history: [], ...game }
+/**
+ * One entry per save version that ever shipped, keyed by the version a save
+ * is coming FROM — the function returns a save conforming to version + 1.
+ * migrateSave() below runs these in sequence up to SAVE_VERSION.
+ *
+ * 0 → 1: the first versioned save. Everything before this system existed is
+ * "version 0" — unversioned, but a shape we know precisely (it's every save
+ * this app has ever produced), so it's upgraded in place rather than
+ * discarded. The only gap: `history` (added for the end-of-game recap chart)
+ * is missing on saves from before that shipped.
+ */
+const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<string, unknown>> = {
+  0: (save) => ({
+    ...save,
+    history: Array.isArray(save.history) ? save.history : [],
+  }),
+}
+
+/**
+ * Runs a save through whatever migrations it needs to reach SAVE_VERSION.
+ * Returns null (caller falls back to a fresh game) if the data doesn't look
+ * like a save at all, its version is newer than this build understands, or a
+ * migration step is missing — it never guesses at an unknown shape, since
+ * that's exactly the silent-corruption failure mode this system replaces.
+ */
+function migrateSave(raw: unknown): GameState | null {
+  if (!isPlausibleSave(raw)) return null
+  let save = raw
+  let version = typeof save.version === 'number' ? save.version : 0
+  if (version > SAVE_VERSION) return null // from a newer, incompatible build
+  while (version < SAVE_VERSION) {
+    const migrate = MIGRATIONS[version]
+    if (!migrate) return null // no known path forward
+    save = migrate(save)
+    version += 1
+  }
+  return { ...save, version: SAVE_VERSION } as unknown as GameState
 }
 
 function loadSave(): Store {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
-    if (raw) return { game: normalizeSave(JSON.parse(raw) as GameState), error: null }
+    if (raw) {
+      const game = migrateSave(JSON.parse(raw))
+      // A save existed but couldn't be used — distinct from "no save yet",
+      // which is the normal case for a brand-new player and stays silent.
+      if (!game) {
+        return {
+          game: null,
+          error:
+            "Couldn't load your save (it may be from an incompatible version) — starting fresh.",
+        }
+      }
+      return { game, error: null }
+    }
   } catch {
-    // Corrupt or inaccessible save — start fresh.
+    return {
+      game: null,
+      error: 'Your save looked corrupted and could not be loaded — starting fresh.',
+    }
   }
   return { game: null, error: null }
 }
@@ -130,10 +178,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
       } catch {
         return { ok: false, error: 'That file is not valid JSON.' }
       }
-      if (!isPlausibleSave(parsed)) {
+      const game = migrateSave(parsed)
+      if (!game) {
         return { ok: false, error: "That doesn't look like a Fast Lane save file." }
       }
-      dispatch({ type: 'importSave', game: normalizeSave(parsed) })
+      dispatch({ type: 'importSave', game })
       return { ok: true }
     },
   }
