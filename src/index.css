@@ -32,6 +32,11 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  overscroll-behavior-y: none;
+}
+
 body {
   margin: 0;
   font-family:
@@ -194,6 +199,8 @@ input[type='range'] {
   align-items: center;
   gap: 0.6rem 1.4rem;
   overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
   padding-bottom: 2px;
 }
@@ -534,6 +541,8 @@ input[type='range'] {
 .log {
   max-height: 220px;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 0.3rem;
@@ -574,6 +583,8 @@ input[type='range'] {
   width: 100%;
   max-height: 80vh;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   display: flex;
   flex-direction: column;
   gap: 0.9rem;
