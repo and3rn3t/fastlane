@@ -12,7 +12,7 @@ import {
 // The "-v1" here is now just a name, not a version — frozen going forward.
 // Schema versioning lives in the save's own `version` field (SAVE_VERSION)
 // and the MIGRATIONS map below; never bump this key to invalidate old saves.
-const SAVE_KEY = 'fastlane-save-v1'
+export const SAVE_KEY = 'fastlane-save-v1'
 
 interface Store {
   game: GameState | null
