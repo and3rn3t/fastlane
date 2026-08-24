@@ -212,5 +212,12 @@ export function endWeek(state: GameState, logStart: number) {
     headline: state.headline,
     entries: state.log.slice(logStart),
   }
+  state.history.push({
+    week: state.week,
+    playerNetWorth: netWorth(state.player),
+    playerCareer: careerScore(state.player),
+    rileyNetWorth: netWorth(state.riley),
+    rileyCareer: careerScore(state.riley),
+  })
   state.week += 1
 }

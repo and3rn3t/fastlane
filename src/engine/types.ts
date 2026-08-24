@@ -127,6 +127,17 @@ export interface WeekReport {
   entries: LogEntry[]
 }
 
+/** One row per completed week — net worth/career for both players, recorded
+ * in week.ts's endWeek() so the end-of-game recap can chart real progression
+ * instead of only the final score. */
+export interface WeekSnapshot {
+  week: number
+  playerNetWorth: number
+  playerCareer: number
+  rileyNetWorth: number
+  rileyCareer: number
+}
+
 export interface GameState {
   week: number
   rngSeed: number
@@ -139,6 +150,7 @@ export interface GameState {
   headline: string
   log: LogEntry[]
   lastReport: WeekReport | null
+  history: WeekSnapshot[]
 }
 
 export type PlayerKey = 'player' | 'riley'

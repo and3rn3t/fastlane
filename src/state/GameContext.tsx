@@ -61,10 +61,20 @@ function isPlausibleSave(data: unknown): data is GameState {
   )
 }
 
+/** Defaults fields added after a save was written, so an older save doesn't
+ * crash code that assumes they exist (e.g. `history`, added for the
+ * end-of-game recap chart). Not a real migration system — just enough to
+ * keep old saves loading until Wave 2 builds proper schema versioning. */
+function normalizeSave(
+  game: Omit<GameState, 'history'> & { history?: GameState['history'] }
+): GameState {
+  return { history: [], ...game }
+}
+
 function loadSave(): Store {
   try {
     const raw = localStorage.getItem(SAVE_KEY)
-    if (raw) return { game: JSON.parse(raw) as GameState, error: null }
+    if (raw) return { game: normalizeSave(JSON.parse(raw) as GameState), error: null }
   } catch {
     // Corrupt or inaccessible save — start fresh.
   }
@@ -123,7 +133,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       if (!isPlausibleSave(parsed)) {
         return { ok: false, error: "That doesn't look like a Fast Lane save file." }
       }
-      dispatch({ type: 'importSave', game: parsed })
+      dispatch({ type: 'importSave', game: normalizeSave(parsed) })
       return { ok: true }
     },
   }

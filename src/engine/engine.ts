@@ -54,6 +54,7 @@ export function newGame(opts: NewGameOptions): GameState {
     headline: 'A new life in the fast lane begins.',
     log: [],
     lastReport: null,
+    history: [],
   }
 }
 
