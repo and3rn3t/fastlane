@@ -9,45 +9,49 @@ function TopBar({ game }: { game: GameState }) {
   const job = p.jobId ? jobById(p.jobId) : null
   return (
     <header className="topbar">
-      <span className="brand">
-        Fast <span>Lane</span>
-      </span>
-      <div className="stat">
-        <span className="label">Cash</span>
-        <span className="value">${p.cash.toLocaleString()}</span>
+      <div className="topbar-row">
+        <span className="brand">
+          Fast <span>Lane</span>
+        </span>
+        <button
+          onClick={() => {
+            if (window.confirm('Abandon this game and return to the menu?')) quitToMenu()
+          }}
+        >
+          Menu
+        </button>
       </div>
-      <div className="stat">
-        <span className="label">Net worth</span>
-        <span className="value">${netWorth(p).toLocaleString()}</span>
-      </div>
-      <div className="stat">
-        <span className="label">Job</span>
-        <span className="value">{job ? job.title : '—'}</span>
-      </div>
-      <div className="stat">
-        <span className="label">Dress</span>
-        <span className={`value${p.dress < 10 ? ' low' : ''}`}>{p.dress}</span>
-      </div>
-      <div className="stat">
-        <span className="label">Food</span>
-        <span className={`value${p.fed + p.groceries < 6 ? ' low' : ''}`}>
-          {Math.min(6, p.fed + p.groceries)}/6
+      <div className="topbar-stats">
+        <div className="stat">
+          <span className="label">Cash</span>
+          <span className="value">${p.cash.toLocaleString()}</span>
+        </div>
+        <div className="stat">
+          <span className="label">Net worth</span>
+          <span className="value">${netWorth(p).toLocaleString()}</span>
+        </div>
+        <div className="stat">
+          <span className="label">Job</span>
+          <span className="value">{job ? job.title : '—'}</span>
+        </div>
+        <div className="stat">
+          <span className="label">Dress</span>
+          <span className={`value${p.dress < 10 ? ' low' : ''}`}>{p.dress}</span>
+        </div>
+        <div className="stat">
+          <span className="label">Food</span>
+          <span className={`value${p.fed + p.groceries < 6 ? ' low' : ''}`}>
+            {Math.min(6, p.fed + p.groceries)}/6
+          </span>
+        </div>
+        <div className="stat">
+          <span className="label">Rent due</span>
+          <span className={`value${p.rentDue > 0 ? ' low' : ''}`}>${p.rentDue}</span>
+        </div>
+        <span className="headline" title="This week's news">
+          📰 {game.headline}
         </span>
       </div>
-      <div className="stat">
-        <span className="label">Rent due</span>
-        <span className={`value${p.rentDue > 0 ? ' low' : ''}`}>${p.rentDue}</span>
-      </div>
-      <span className="headline" title="This week's news">
-        📰 {game.headline}
-      </span>
-      <button
-        onClick={() => {
-          if (window.confirm('Abandon this game and return to the menu?')) quitToMenu()
-        }}
-      >
-        Menu
-      </button>
     </header>
   )
 }

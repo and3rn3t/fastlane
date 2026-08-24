@@ -358,7 +358,7 @@ function ClassAction({ game }: { game: GameState }) {
 export function LocationPanel({ game }: { game: GameState }) {
   const loc = LOCATIONS[game.player.location]
   return (
-    <div className="panel">
+    <div className="panel sheet">
       <h2>
         <span aria-hidden>{LOCATION_ICONS[loc.id]}</span> {loc.name}
       </h2>
