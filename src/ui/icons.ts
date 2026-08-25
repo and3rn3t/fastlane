@@ -14,4 +14,5 @@ export const LOCATION_ICONS: Record<LocationId, string> = {
   pawn: '💰',
   rentoffice: '🔑',
   clinic: '⚕️',
+  casino: '🎰',
 }

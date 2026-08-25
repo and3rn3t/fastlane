@@ -3,6 +3,11 @@
 // these so human and rival play by identical rules.
 
 import {
+  CASINO_MAX_BET,
+  CASINO_MIN_BET,
+  CASINO_PAYOUT_MULTIPLIER,
+  CASINO_TIME,
+  CASINO_WIN_CHANCE,
   DOCTOR_HEAL,
   DOCTOR_PRICE,
   DOCTOR_TIME,
@@ -27,6 +32,7 @@ import {
   maxLoan,
   travelCost,
 } from './data'
+import { roll } from './rng'
 import type { ApartmentTier, GameState, ItemId, LocationId, PlayerKey, PlayerState } from './types'
 
 export class EngineError extends Error {}
@@ -184,6 +190,23 @@ export function buyLottery(state: GameState, key: PlayerKey, tickets: number) {
   p.lotteryTickets += tickets
   state.economy.lotteryJackpot += LOTTERY_TICKET_PRICE * tickets * 4
   log(state, key, `Bought ${tickets} lottery ticket${tickets === 1 ? '' : 's'}`)
+}
+
+export function playCasino(state: GameState, key: PlayerKey, bet: number) {
+  const p = state[key]
+  require_(p.location === 'casino', 'The wheel is at the casino')
+  require_(bet >= CASINO_MIN_BET, `Bet at least $${CASINO_MIN_BET}`)
+  require_(bet <= CASINO_MAX_BET, `Bets are capped at $${CASINO_MAX_BET}`)
+  spendTime(p, CASINO_TIME)
+  spendCash(p, bet)
+  const won = roll(state) < CASINO_WIN_CHANCE
+  if (won) {
+    const payout = Math.round(bet * CASINO_PAYOUT_MULTIPLIER)
+    p.cash += payout
+    log(state, key, `${p.name} won $${payout} at the wheel!`)
+  } else {
+    log(state, key, `${p.name} lost $${bet} at the wheel`)
+  }
 }
 
 export function buyItem(state: GameState, key: PlayerKey, itemId: ItemId) {

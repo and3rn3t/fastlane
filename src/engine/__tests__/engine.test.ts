@@ -15,9 +15,9 @@ function game(goals: Goals = easyGoals, seed = 42): GameState {
 describe('travel', () => {
   it('costs loop distance in time units', () => {
     expect(travelCost('home', 'employment', false)).toBe(1)
-    // Wraps around the loop the other way — 2h since Clinic (loopIndex 12)
-    // now sits between rentoffice and home on that side.
-    expect(travelCost('home', 'rentoffice', false)).toBe(2)
+    // Wraps around the loop the other way — 3h now that Clinic and Casino
+    // (loopIndex 12, 13) both sit between rentoffice and home on that side.
+    expect(travelCost('home', 'rentoffice', false)).toBe(3)
     expect(travelCost('home', 'factory', false)).toBe(5)
     expect(travelCost('employment', 'employment', false)).toBe(0)
   })
@@ -197,10 +197,14 @@ describe('durable goods', () => {
   })
 
   it('an uninsured item can be stolen from an unsecured home', () => {
-    // Seed found by brute force: bike goes missing on the 4th endWeek.
+    // Seed found by brute force: bike goes missing on the 6th endWeek. (This
+    // shifted from the 4th once Casino was added — Casino's new travel
+    // distances change Riley's AI decisions, which shifts how many RNG
+    // rolls Riley's own upkeep consumes, which shifts the shared rngSeed
+    // stream the player's own rolls draw from later in the same week.)
     let s = applyAction(game(easyGoals, 2), { type: 'travel', to: 'gadgets' })
     s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
@@ -220,11 +224,35 @@ describe('durable goods', () => {
     s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
     s = applyAction(s, { type: 'travel', to: 'bank' })
     s = applyAction(s, { type: 'buyItem', itemId: 'insurance' })
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 6; i++) {
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
     expect(s.player.items).toContain('bike')
+  })
+})
+
+describe('casino', () => {
+  it('rejects bets below the minimum, above the max, or away from the casino', () => {
+    expect(() => applyAction(game(), { type: 'playCasino', bet: 50 })).toThrow(/casino/)
+    const atCasino = applyAction(game(), { type: 'travel', to: 'casino' })
+    expect(() => applyAction(atCasino, { type: 'playCasino', bet: 1 })).toThrow(/at least/)
+    expect(() => applyAction(atCasino, { type: 'playCasino', bet: 9999 })).toThrow(/capped/)
+  })
+
+  it('a win pays out double the bet; a loss costs the bet — seeds found by brute force', () => {
+    let win = applyAction(game(easyGoals, 0), { type: 'travel', to: 'casino' })
+    const winCashBefore = win.player.cash
+    win = applyAction(win, { type: 'playCasino', bet: 50 })
+    expect(win.player.cash).toBe(winCashBefore + 50) // net +50: staked 50, paid back 100
+    expect(win.lastReport).toBeNull() // resolves immediately, not at week's end
+    expect(win.log.some((e) => e.text.includes('won'))).toBe(true)
+
+    let lose = applyAction(game(easyGoals, 1), { type: 'travel', to: 'casino' })
+    const loseCashBefore = lose.player.cash
+    lose = applyAction(lose, { type: 'playCasino', bet: 50 })
+    expect(lose.player.cash).toBe(loseCashBefore - 50)
+    expect(lose.log.some((e) => e.text.includes('lost'))).toBe(true)
   })
 })
 

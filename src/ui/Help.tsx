@@ -54,6 +54,13 @@ export function Help({ onClose }: { onClose: () => void }) {
             </p>
           </section>
           <section>
+            <h3>🎰 The Casino</h3>
+            <p className="blurb">
+              Lucky Star Casino lets you bet on the wheel for a quick payout — but the odds favor
+              the house, on purpose. Riley never plays; it's a player-only risk, not a strategy.
+            </p>
+          </section>
+          <section>
             <h3>🎩 Riley</h3>
             <p className="blurb">
               Riley plays by exactly the same rules as you — same actions, same economy, no

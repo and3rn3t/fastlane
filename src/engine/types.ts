@@ -12,6 +12,7 @@ export type LocationId =
   | 'pawn'
   | 'rentoffice'
   | 'clinic'
+  | 'casino'
 
 export type ItemId =
   | 'outfit-casual'
@@ -214,5 +215,6 @@ export type GameAction =
   | { type: 'seeDoctor' }
   | { type: 'takeLoan'; amount: number }
   | { type: 'repayLoan'; amount: number }
+  | { type: 'playCasino'; bet: number }
   | { type: 'endWeek' }
   | { type: 'dismissReport' }

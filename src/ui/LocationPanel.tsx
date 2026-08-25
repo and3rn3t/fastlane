@@ -1,5 +1,9 @@
 import { useState } from 'react'
 import {
+  CASINO_MAX_BET,
+  CASINO_MIN_BET,
+  CASINO_PAYOUT_MULTIPLIER,
+  CASINO_WIN_CHANCE,
   DOCTOR_PRICE,
   FOOD_NEEDED,
   GROCERY_PRICE_MARKET,
@@ -435,6 +439,44 @@ function LotteryAction({ game }: { game: GameState }) {
   )
 }
 
+function CasinoAction({ game }: { game: GameState }) {
+  const { dispatchGame } = useGame()
+  const p = game.player
+  const [bet, setBet] = useState(CASINO_MIN_BET)
+  const clamped = Math.max(0, Math.min(CASINO_MAX_BET, bet, p.cash))
+  const potentialWin = Math.round(clamped * CASINO_PAYOUT_MULTIPLIER)
+  return (
+    <div className="action-row">
+      <span className="grow">
+        The Wheel — bet ${clamped}, win ${potentialWin} ({Math.round(CASINO_WIN_CHANCE * 100)}%
+        chance)
+        <br />
+        <span className="desc">The house always has the edge. Play for fun, not a plan.</span>
+      </span>
+      <input
+        type="number"
+        inputMode="numeric"
+        enterKeyHint="done"
+        min={CASINO_MIN_BET}
+        max={Math.min(CASINO_MAX_BET, p.cash)}
+        value={bet}
+        aria-label="Bet amount"
+        onChange={(e) => setBet(Math.max(0, Math.floor(Number(e.target.value))))}
+      />
+      <button
+        className="primary"
+        disabled={clamped < CASINO_MIN_BET}
+        onClick={() => {
+          playPurchase()
+          dispatchGame({ type: 'playCasino', bet: clamped })
+        }}
+      >
+        Spin (1h)
+      </button>
+    </div>
+  )
+}
+
 function ClassAction({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
   return (
@@ -526,6 +568,7 @@ export function LocationPanel({ game }: { game: GameState }) {
       {loc.id === 'pawn' && <PawnActions game={game} />}
       {loc.id === 'rentoffice' && <RentActions game={game} />}
       {loc.id === 'clinic' && <DoctorAction game={game} />}
+      {loc.id === 'casino' && <CasinoAction game={game} />}
     </div>
   )
 }

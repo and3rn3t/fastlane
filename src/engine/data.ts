@@ -57,6 +57,13 @@ export function maxLoan(creditScore: number): number {
   return 300 + creditScore * 20
 }
 
+export const CASINO_MIN_BET = 10
+export const CASINO_MAX_BET = 500
+export const CASINO_TIME = 1
+/** Tuned for a ~10% house edge (winChance × payout < 1) — a trap, on purpose. */
+export const CASINO_WIN_CHANCE = 0.45
+export const CASINO_PAYOUT_MULTIPLIER = 2
+
 /** Consecutive weeks of showing up (working ≥1h) at the same job before it
  * earns the next promotion level. */
 export const PROMOTION_TENURE_WEEKS = 6
@@ -144,9 +151,15 @@ export const LOCATIONS: Record<LocationId, LocationDef> = {
     blurb: 'See a doctor — overwork and cheap food catch up with everyone.',
     loopIndex: 12,
   },
+  casino: {
+    id: 'casino',
+    name: 'Lucky Star Casino',
+    blurb: 'The wheel always favors the house — you knew that going in.',
+    loopIndex: 13,
+  },
 }
 
-export const LOOP_SIZE = 13
+export const LOOP_SIZE = 14
 
 export const JOBS: JobDef[] = [
   // Burger Barn

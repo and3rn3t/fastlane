@@ -135,6 +135,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'repayLoan':
       act.repayLoan(draft, 'player', action.amount)
       break
+    case 'playCasino':
+      act.playCasino(draft, 'player', action.bet)
+      break
     case 'endWeek': {
       // Captured before Riley's turn runs so the report includes it — endWeek()
       // used to compute this internally, after runAIWeek had already logged
