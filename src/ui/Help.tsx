@@ -72,6 +72,14 @@ export function Help({ onClose }: { onClose: () => void }) {
               cash to spare), or Gambler (bets surplus at the casino instead of banking it).
             </p>
           </section>
+          <section>
+            <h3>🏆 Your record</h3>
+            <p className="blurb">
+              Lifetime wins, fastest win, and achievements ("Debt-Free," "Ivy League," and more)
+              persist across games on this device — shown on the start screen once you've finished
+              your first game.
+            </p>
+          </section>
         </div>
         <button className="primary" onClick={onClose}>
           Got it

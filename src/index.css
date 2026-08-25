@@ -765,6 +765,62 @@ input[type='range'] {
   margin-bottom: 0.5rem;
 }
 
+.achievement-unlocked {
+  background: color-mix(in srgb, var(--gold) 14%, var(--card));
+  border: 1px solid var(--gold);
+  border-radius: var(--radius);
+  padding: 0.7rem 1rem;
+  text-align: left;
+}
+
+.achievement-unlocked p {
+  margin: 0.2rem 0;
+  font-size: 0.9rem;
+}
+
+/* ---------- achievements & stats ---------- */
+
+.stats-summary {
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.achievements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.achievement-badge {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--card-soft);
+  min-width: 140px;
+  font-size: 0.78rem;
+}
+
+.achievement-badge.unlocked {
+  border-color: var(--gold);
+  background: color-mix(in srgb, var(--gold) 10%, var(--card));
+}
+
+.achievement-badge .name {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.achievement-badge:not(.unlocked) .name {
+  color: var(--ink-soft);
+}
+
+.achievement-badge .desc {
+  color: var(--ink-soft);
+}
+
 /* ---------- install prompt ---------- */
 
 .install-prompt {

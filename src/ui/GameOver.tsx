@@ -1,15 +1,25 @@
-import { useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { GameState } from '@/engine'
 import { useGame } from '@/state/GameContext'
+import { recordGameResult, type Achievement } from '@/stats'
 import { RecapChart } from './RecapChart'
 import { playWin } from './sound'
 
 export function GameOver({ game }: { game: GameState }) {
   const { quitToMenu } = useGame()
   const playerWon = game.winner === 'player'
+  const [newlyUnlocked, setNewlyUnlocked] = useState<Achievement[]>([])
+  // Guards against StrictMode's dev-only double effect invocation: without
+  // it, the second call correctly dedupes on rngSeed and returns an empty
+  // list, which then overwrites the first (correct) result in state.
+  const recordedRef = useRef(false)
 
   useEffect(() => {
     if (playerWon) playWin()
+    if (!recordedRef.current) {
+      recordedRef.current = true
+      setNewlyUnlocked(recordGameResult(game).newlyUnlocked)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -33,6 +43,15 @@ export function GameOver({ game }: { game: GameState }) {
             ? `All four goals reached in ${game.week - 1} weeks. The fast lane is yours, ${game.player.name}.`
             : `Riley hit all four goals in ${game.week - 1} weeks while you were... doing whatever that was.`}
         </p>
+        {newlyUnlocked.length > 0 && (
+          <div className="achievement-unlocked">
+            {newlyUnlocked.map((a) => (
+              <p key={a.id}>
+                🏆 Achievement unlocked: <strong>{a.name}</strong> — {a.description}
+              </p>
+            ))}
+          </div>
+        )}
         {game.history.length > 0 && (
           <div className="recap-charts">
             <RecapChart

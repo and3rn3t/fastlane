@@ -10,6 +10,7 @@ import {
   type RulePresetName,
 } from '@/engine'
 import { useGame } from '@/state/GameContext'
+import { ACHIEVEMENTS, loadStats } from '@/stats'
 
 const RILEY_PROFILES: Array<{ id: AiProfileName; label: string; blurb: string }> = [
   { id: 'balanced', label: 'Balanced', blurb: 'Plays every goal evenly — the toughest opponent.' },
@@ -69,6 +70,7 @@ const PRESETS: Record<string, Record<keyof Goals, number>> = {
 
 export function StartScreen() {
   const { startGame, importSave } = useGame()
+  const [stats] = useState(loadStats)
   const [name, setName] = useState('')
   const [levels, setLevels] = useState<Record<keyof Goals, number>>(PRESETS.Standard)
   const [rileyProfile, setRileyProfile] = useState<AiProfileName>('balanced')
@@ -103,6 +105,33 @@ export function StartScreen() {
           all four life goals before they do.
         </p>
       </div>
+
+      {stats.gamesPlayed > 0 && (
+        <div>
+          <span>🏆 Your Record</span>
+          <p className="stats-summary">
+            {stats.gamesWon}/{stats.gamesPlayed} games won
+            {stats.fastestWinWeeks !== null && ` · fastest win: ${stats.fastestWinWeeks} weeks`}
+          </p>
+          <div className="achievements">
+            {ACHIEVEMENTS.map((a) => {
+              const unlocked = stats.unlockedAchievements.includes(a.id)
+              return (
+                <div
+                  key={a.id}
+                  className={`achievement-badge${unlocked ? ' unlocked' : ''}`}
+                  title={a.description}
+                >
+                  <span className="name">
+                    {unlocked ? '🏆' : '🔒'} {a.name}
+                  </span>
+                  <span className="desc">{a.description}</span>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       <label>
         Your name{' '}
