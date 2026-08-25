@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useReducer, type ReactNode } from 'react'
 import {
   EngineError,
+  HEALTH_START,
   SAVE_VERSION,
   applyAction,
   newGame,
@@ -75,11 +76,30 @@ function isPlausibleSave(data: unknown): data is Record<string, unknown> {
  * this app has ever produced), so it's upgraded in place rather than
  * discarded. The only gap: `history` (added for the end-of-game recap chart)
  * is missing on saves from before that shipped.
+ *
+ * 1 → 2: Health & doctor added `health`/`hoursWorkedThisWeek` to each
+ * player. A save from before that ships with a full tank of health and no
+ * overwork on the books, same as a fresh player would start.
  */
+function upgradePlayerToV2(player: unknown): unknown {
+  if (typeof player !== 'object' || player === null) return player
+  const p = player as Record<string, unknown>
+  return {
+    ...p,
+    health: typeof p.health === 'number' ? p.health : HEALTH_START,
+    hoursWorkedThisWeek: typeof p.hoursWorkedThisWeek === 'number' ? p.hoursWorkedThisWeek : 0,
+  }
+}
+
 const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<string, unknown>> = {
   0: (save) => ({
     ...save,
     history: Array.isArray(save.history) ? save.history : [],
+  }),
+  1: (save) => ({
+    ...save,
+    player: upgradePlayerToV2(save.player),
+    riley: upgradePlayerToV2(save.riley),
   }),
 }
 

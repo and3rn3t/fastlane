@@ -15,7 +15,9 @@ function game(goals: Goals = easyGoals, seed = 42): GameState {
 describe('travel', () => {
   it('costs loop distance in time units', () => {
     expect(travelCost('home', 'employment', false)).toBe(1)
-    expect(travelCost('home', 'rentoffice', false)).toBe(1) // wraps around the loop
+    // Wraps around the loop the other way — 2h since Clinic (loopIndex 12)
+    // now sits between rentoffice and home on that side.
+    expect(travelCost('home', 'rentoffice', false)).toBe(2)
     expect(travelCost('home', 'factory', false)).toBe(5)
     expect(travelCost('employment', 'employment', false)).toBe(0)
   })
@@ -120,6 +122,59 @@ describe('end of week', () => {
     expect(s.player.timeLeft).toBe(WEEK_TIME)
     expect(s.player.location).toBe('home')
     expect(s.week).toBe(2)
+  })
+})
+
+describe('health', () => {
+  it('overworking past 40h/week drains health', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'employment' })
+    s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
+    s = applyAction(s, { type: 'travel', to: 'burgers' })
+    s = applyAction(s, { type: 'work', hours: 45 })
+    s = applyAction(s, { type: 'endWeek' })
+    expect(s.player.health).toBe(100 - Math.round(5 * 0.5)) // 5h over the 40h threshold
+    expect(s.lastReport?.entries.some((e) => e.text.includes('overworked'))).toBe(true)
+  })
+
+  it('working exactly 40h/week costs no health', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'employment' })
+    s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
+    s = applyAction(s, { type: 'travel', to: 'burgers' })
+    s = applyAction(s, { type: 'work', hours: 40 })
+    s = applyAction(s, { type: 'endWeek' })
+    expect(s.player.health).toBe(100)
+  })
+
+  it('a week fed entirely from cheap groceries costs health even without hunger', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'megamart' })
+    s = applyAction(s, { type: 'buyGroceries', units: FOOD_NEEDED })
+    s = applyAction(s, { type: 'endWeek' })
+    expect(s.player.health).toBe(98)
+    expect(s.lastReport?.entries.some((e) => e.text.includes('cheap groceries'))).toBe(true)
+  })
+
+  it('the Clinic heals health for cash and time', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'employment' })
+    s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
+    s = applyAction(s, { type: 'travel', to: 'burgers' })
+    s = applyAction(s, { type: 'work', hours: 50 })
+    s = applyAction(s, { type: 'endWeek' })
+    const hurtHealth = s.player.health
+    expect(hurtHealth).toBeLessThan(100)
+
+    s = applyAction(s, { type: 'travel', to: 'clinic' })
+    const cashBefore = s.player.cash
+    const timeBefore = s.player.timeLeft
+    s = applyAction(s, { type: 'seeDoctor' })
+    expect(s.player.health).toBe(Math.min(100, hurtHealth + 35))
+    expect(s.player.cash).toBeLessThan(cashBefore)
+    expect(s.player.timeLeft).toBe(timeBefore - 3)
+  })
+
+  it('rejects seeing the doctor away from the Clinic or at full health', () => {
+    expect(() => applyAction(game(), { type: 'seeDoctor' })).toThrow(/Clinic/)
+    const atClinic = applyAction(game(), { type: 'travel', to: 'clinic' })
+    expect(() => applyAction(atClinic, { type: 'seeDoctor' })).toThrow(/full health/)
   })
 })
 

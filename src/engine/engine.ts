@@ -2,7 +2,7 @@
 
 import * as act from './actions'
 import { runAIWeek } from './ai'
-import { WEEK_TIME } from './data'
+import { HEALTH_START, WEEK_TIME } from './data'
 import { endWeek } from './week'
 import {
   SAVE_VERSION,
@@ -33,6 +33,8 @@ function newPlayer(name: string, isAI: boolean): PlayerState {
     groceries: 0,
     lotteryTickets: 0,
     relaxedThisWeek: 0,
+    health: HEALTH_START,
+    hoursWorkedThisWeek: 0,
   }
 }
 
@@ -116,6 +118,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break
     case 'relax':
       act.relax(draft, 'player', action.hours)
+      break
+    case 'seeDoctor':
+      act.seeDoctor(draft, 'player')
       break
     case 'endWeek': {
       // Captured before Riley's turn runs so the report includes it — endWeek()

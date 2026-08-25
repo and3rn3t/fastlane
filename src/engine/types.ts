@@ -11,6 +11,7 @@ export type LocationId =
   | 'market'
   | 'pawn'
   | 'rentoffice'
+  | 'clinic'
 
 export type ItemId =
   | 'outfit-casual'
@@ -97,6 +98,13 @@ export interface PlayerState {
   lotteryTickets: number
   /** Time units of relaxing already used this week (capped). */
   relaxedThisWeek: number
+  /** 0–100; drained by overworking or skipping hot meals for cheap groceries,
+   * restored at the Clinic. Feeds happiness rather than being its own goal. */
+  health: number
+  /** Time units worked this week — resets with the rest of the weekly state;
+   * tracked separately from lifetime `experience` so upkeep can tell overwork
+   * apart from a light week. */
+  hoursWorkedThisWeek: number
 }
 
 export interface Economy {
@@ -141,7 +149,7 @@ export interface WeekSnapshot {
 /** Bump on any GameState/PlayerState shape change and add a migration step in
  * state/GameContext.tsx's MIGRATIONS map — see that file for the full scheme.
  * The engine owns this number since it owns what the shape actually is. */
-export const SAVE_VERSION = 1
+export const SAVE_VERSION = 2
 
 export interface GameState {
   version: number
@@ -177,5 +185,6 @@ export type GameAction =
   | { type: 'rentApartment'; tier: Exclude<ApartmentTier, 'none'> }
   | { type: 'sellItem'; itemId: ItemId }
   | { type: 'relax'; hours: number }
+  | { type: 'seeDoctor' }
   | { type: 'endWeek' }
   | { type: 'dismissReport' }

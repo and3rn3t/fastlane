@@ -161,6 +161,10 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
           <span className={`value${p.dress < 10 ? ' low' : ''}`}>{p.dress}</span>
         </div>
         <div className="stat">
+          <span className="label">Health</span>
+          <span className={`value${p.health < 40 ? ' low' : ''}`}>{p.health}</span>
+        </div>
+        <div className="stat">
           <span className="label">Food</span>
           <span className={`value${p.fed + p.groceries < 6 ? ' low' : ''}`}>
             {Math.min(6, p.fed + p.groceries)}/6

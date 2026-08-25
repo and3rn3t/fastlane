@@ -6,7 +6,13 @@ import {
   DRESS_WEAR_PER_WEEK,
   EVICTION_WEEKS,
   FOOD_NEEDED,
+  HEALTH_CHEAP_FOOD_DRAIN,
+  HEALTH_LOW_HAPPINESS_PENALTY,
+  HEALTH_LOW_THRESHOLD,
+  HEALTH_OVERWORK_RATE,
+  HEALTH_SICK_THRESHOLD,
   LOTTERY_WIN_CHANCE,
+  OVERWORK_THRESHOLD,
   RENT,
   WEEK_TIME,
   itemById,
@@ -42,6 +48,30 @@ export function goalProgress(p: PlayerState, goals: Goals) {
   }
 }
 
+/** Overwork and a groceries-only diet both cost health; low health then
+ * drags happiness down too. Split out of upkeep() to keep it readable. */
+function healthUpkeep(state: GameState, key: PlayerKey, fedFromGroceries: number) {
+  const p = state[key]
+  const who = p.name
+
+  const overHours = p.hoursWorkedThisWeek - OVERWORK_THRESHOLD
+  if (overHours > 0) {
+    const drain = Math.round(overHours * HEALTH_OVERWORK_RATE)
+    p.health = Math.max(0, p.health - drain)
+    log(state, key, `${who} overworked (${p.hoursWorkedThisWeek}h): health -${drain}`)
+  }
+
+  const ateWithoutGoingHungry = p.fed + fedFromGroceries >= FOOD_NEEDED
+  if (ateWithoutGoingHungry && fedFromGroceries > p.fed) {
+    p.health = Math.max(0, p.health - HEALTH_CHEAP_FOOD_DRAIN)
+    log(state, key, `${who} lived on cheap groceries all week: health -${HEALTH_CHEAP_FOOD_DRAIN}`)
+  }
+
+  if (p.health < HEALTH_LOW_THRESHOLD) {
+    p.happiness = Math.max(0, p.happiness - HEALTH_LOW_HAPPINESS_PENALTY)
+  }
+}
+
 function upkeep(state: GameState, key: PlayerKey) {
   const p = state[key]
   const who = p.name
@@ -54,6 +84,7 @@ function upkeep(state: GameState, key: PlayerKey) {
     p.happiness = Math.max(0, p.happiness - 4 * shortfall)
     log(state, key, `${who} went hungry (${shortfall} meals short): happiness -${4 * shortfall}`)
   }
+  healthUpkeep(state, key, fromGroceries)
 
   // Rent accrues; miss enough weeks and you're out.
   if (p.apartment !== 'none') {
@@ -117,6 +148,7 @@ function upkeep(state: GameState, key: PlayerKey) {
   // Fresh week.
   p.fed = 0
   p.relaxedThisWeek = 0
+  p.hoursWorkedThisWeek = 0
   p.timeLeft = WEEK_TIME
   p.location = 'home'
 }
@@ -140,7 +172,7 @@ const HEADLINES: Array<{ text: string; apply: (s: GameState) => void }> = [
 function personalEvent(state: GameState, key: PlayerKey) {
   const p = state[key]
   if (roll(state) >= 0.35) return
-  const which = rollInt(state, 4)
+  const which = rollInt(state, 5)
   switch (which) {
     case 0: {
       const found = 10 + rollInt(state, 40)
@@ -166,6 +198,19 @@ function personalEvent(state: GameState, key: PlayerKey) {
     case 3: {
       p.happiness = Math.min(100, p.happiness + 3)
       log(state, key, `${p.name} ran into an old friend (+3 happiness)`)
+      break
+    }
+    case 4: {
+      // Health was just reset for the upcoming week (upkeep ran first), so
+      // this lost time comes out of next week, same as a real sick day would.
+      if (p.health < HEALTH_SICK_THRESHOLD) {
+        const cost = Math.min(4 + rollInt(state, 8), p.timeLeft)
+        p.timeLeft -= cost
+        p.happiness = Math.max(0, p.happiness - 5)
+        log(state, key, `${p.name} got sick and lost ${cost}h recovering`)
+      } else {
+        log(state, key, `${p.name} felt a cold coming on but shook it off`)
+      }
       break
     }
   }

@@ -25,6 +25,21 @@ export const RENT: Record<'basic' | 'secure', number> = {
 
 export const DRESS_WEAR_PER_WEEK = 3
 
+export const HEALTH_START = 100
+/** Hours worked in a week beyond this drain health, at HEALTH_OVERWORK_RATE per excess hour. */
+export const OVERWORK_THRESHOLD = 40
+export const HEALTH_OVERWORK_RATE = 0.5
+/** Health cost of a week fed mostly from cheap groceries instead of hot meals. */
+export const HEALTH_CHEAP_FOOD_DRAIN = 2
+/** Below this, low health starts dragging happiness down too. */
+export const HEALTH_LOW_THRESHOLD = 40
+export const HEALTH_LOW_HAPPINESS_PENALTY = 3
+/** Below this, a sickness event (personalEvent) can actually cost time. */
+export const HEALTH_SICK_THRESHOLD = 50
+export const DOCTOR_PRICE = 45
+export const DOCTOR_TIME = 3
+export const DOCTOR_HEAL = 35
+
 export const LOCATIONS: Record<LocationId, LocationDef> = {
   home: {
     id: 'home',
@@ -98,9 +113,15 @@ export const LOCATIONS: Record<LocationId, LocationDef> = {
     blurb: 'Rent an apartment and settle what you owe.',
     loopIndex: 11,
   },
+  clinic: {
+    id: 'clinic',
+    name: 'Clinic',
+    blurb: 'See a doctor — overwork and cheap food catch up with everyone.',
+    loopIndex: 12,
+  },
 }
 
-export const LOOP_SIZE = 12
+export const LOOP_SIZE = 13
 
 export const JOBS: JobDef[] = [
   // Burger Barn

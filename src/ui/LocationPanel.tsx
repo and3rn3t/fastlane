@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import {
+  DOCTOR_PRICE,
   FOOD_NEEDED,
   GROCERY_PRICE_MARKET,
   GROCERY_PRICE_MEGAMART,
@@ -398,6 +399,30 @@ function ClassAction({ game }: { game: GameState }) {
   )
 }
 
+function DoctorAction({ game }: { game: GameState }) {
+  const { dispatchGame } = useGame()
+  const p = game.player
+  return (
+    <div className="action-row">
+      <span className="grow">
+        Health: <strong className={p.health < 40 ? 'low' : ''}>{p.health}/100</strong>
+        <br />
+        <span className="desc">Overwork and living on cheap groceries wear it down.</span>
+      </span>
+      <button
+        className="primary"
+        disabled={p.health >= 100}
+        onClick={() => {
+          playPurchase()
+          dispatchGame({ type: 'seeDoctor' })
+        }}
+      >
+        {p.health >= 100 ? 'Feeling great' : `See doctor ($${price(game, DOCTOR_PRICE)}, 3h)`}
+      </button>
+    </div>
+  )
+}
+
 export function LocationPanel({ game }: { game: GameState }) {
   const loc = LOCATIONS[game.player.location]
   return (
@@ -433,6 +458,7 @@ export function LocationPanel({ game }: { game: GameState }) {
       )}
       {loc.id === 'pawn' && <PawnActions game={game} />}
       {loc.id === 'rentoffice' && <RentActions game={game} />}
+      {loc.id === 'clinic' && <DoctorAction game={game} />}
     </div>
   )
 }

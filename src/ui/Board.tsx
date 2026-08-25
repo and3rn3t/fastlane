@@ -11,18 +11,23 @@ import { useGame } from '@/state/GameContext'
 import { LOCATION_ICONS } from './icons'
 import { playMove } from './sound'
 
-// Loop index → cell in a 4×4 grid, walking the perimeter clockwise so
-// board adjacency matches travel cost.
+// Loop index → cell in a 4×5 grid (4 cols, 5 rows — an extra row rather than
+// column, since a taller board fits a narrow phone screen better than a
+// wider one), walking the perimeter clockwise so board adjacency roughly
+// matches travel cost. The frame has 14 edge cells for 13 locations; one
+// (row 2, col 4, next to the center panel) is deliberately skipped so the
+// gap reads as the panel's own irregular shape rather than a missing tile.
 const PERIMETER: Array<[row: number, col: number]> = [
   [1, 1],
   [1, 2],
   [1, 3],
   [1, 4],
-  [2, 4],
   [3, 4],
   [4, 4],
-  [4, 3],
-  [4, 2],
+  [5, 4],
+  [5, 3],
+  [5, 2],
+  [5, 1],
   [4, 1],
   [3, 1],
   [2, 1],

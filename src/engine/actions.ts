@@ -3,6 +3,9 @@
 // these so human and rival play by identical rules.
 
 import {
+  DOCTOR_HEAL,
+  DOCTOR_PRICE,
+  DOCTOR_TIME,
   FOOD_NEEDED,
   GROCERY_CAP_BASE,
   GROCERY_CAP_FRIDGE,
@@ -78,6 +81,7 @@ export function work(state: GameState, key: PlayerKey, hours: number) {
   const pay = Math.round(hours * wagePerHour(state, job.id))
   p.cash += pay
   p.experience += hours
+  p.hoursWorkedThisWeek += hours
   log(state, key, `Worked ${hours}h as ${job.title} for $${pay}`)
 }
 
@@ -257,6 +261,16 @@ export function relax(state: GameState, key: PlayerKey, hours: number) {
   p.relaxedThisWeek += used
   p.happiness = Math.min(100, p.happiness + used)
   log(state, key, `Relaxed ${used}h`)
+}
+
+export function seeDoctor(state: GameState, key: PlayerKey) {
+  const p = state[key]
+  require_(p.location === 'clinic', 'The doctor is at the Clinic')
+  require_(p.health < 100, 'Already at full health')
+  spendTime(p, DOCTOR_TIME)
+  spendCash(p, price(state, DOCTOR_PRICE))
+  p.health = Math.min(100, p.health + DOCTOR_HEAL)
+  log(state, key, `Saw the doctor (+${DOCTOR_HEAL} health)`)
 }
 
 export function netWorth(p: PlayerState): number {

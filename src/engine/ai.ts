@@ -6,7 +6,16 @@
 
 import * as act from './actions'
 import { EngineError } from './actions'
-import { ITEMS, JOBS, RENT, TUITION, jobById, travelCost } from './data'
+import {
+  DOCTOR_PRICE,
+  HEALTH_SICK_THRESHOLD,
+  ITEMS,
+  JOBS,
+  RENT,
+  TUITION,
+  jobById,
+  travelCost,
+} from './data'
 import { careerScore } from './week'
 import type { GameState, ItemId, JobDef, LocationId, PlayerKey } from './types'
 
@@ -64,6 +73,14 @@ function ensureHousing(state: GameState, key: PlayerKey): boolean {
     return attempt(() => act.payRent(state, key))
   }
   return false
+}
+
+function ensureHealth(state: GameState, key: PlayerKey): boolean {
+  const p = get(state, key)
+  if (p.health >= HEALTH_SICK_THRESHOLD) return false
+  if (p.cash < act.price(state, DOCTOR_PRICE) + reserve(state)) return false
+  if (!goTo(state, key, 'clinic')) return false
+  return attempt(() => act.seeDoctor(state, key))
 }
 
 function bestQualifiedJob(state: GameState, key: PlayerKey): JobDef | null {
@@ -166,6 +183,7 @@ export function runAIWeek(state: GameState, key: PlayerKey) {
 
     if (ensureFood(state, key)) continue
     if (ensureHousing(state, key)) continue
+    if (ensureHealth(state, key)) continue
     if (pursueCareer(state, key)) continue
 
     const behindOnMoney = act.netWorth(p) < g.wealth

@@ -41,6 +41,14 @@ export function Help({ onClose }: { onClose: () => void }) {
             </p>
           </section>
           <section>
+            <h3>⚕️ Health</h3>
+            <p className="blurb">
+              Working over 40h in a week, or living on cheap groceries instead of hot meals, wears
+              your Health down — and low Health can make you sick, costing time the following week.
+              Visit the Clinic to see a doctor and recover.
+            </p>
+          </section>
+          <section>
             <h3>🎩 Riley</h3>
             <p className="blurb">
               Riley plays by exactly the same rules as you — same actions, same economy, no
