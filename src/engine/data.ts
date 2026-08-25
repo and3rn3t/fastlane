@@ -1,4 +1,4 @@
-import type { ItemDef, JobDef, LocationDef, LocationId } from './types'
+import type { ItemDef, JobDef, LocationDef, LocationId, RulesConfig } from './types'
 
 export const WEEK_TIME = 60
 export const FOOD_NEEDED = 6
@@ -434,3 +434,14 @@ export const WEALTH_TARGETS = [800, 1500, 2500, 4000, 6000, 8500, 11500, 15000, 
 export const HAPPINESS_TARGETS = [55, 60, 65, 70, 75, 80, 85, 90, 95, 100]
 export const EDUCATION_TARGETS = [3, 6, 9, 12, 15, 18, 21, 24, 27, 30]
 export const CAREER_TARGETS = [10, 18, 25, 30, 35, 45, 55, 70, 80, 88]
+
+export type RulePresetName = 'classic' | 'brutal' | 'zen'
+
+/** StartScreen rule presets. Classic is today's exact defaults, so a save
+ * created before Rule presets existed and one that explicitly picks Classic
+ * are indistinguishable in play. */
+export const RULE_PRESETS: Record<RulePresetName, RulesConfig> = {
+  classic: { eventFrequency: 1, economyVolatility: 1, startingCash: 200 },
+  brutal: { eventFrequency: 1.5, economyVolatility: 1.5, startingCash: 100 },
+  zen: { eventFrequency: 0.5, economyVolatility: 0.5, startingCash: 350 },
+}

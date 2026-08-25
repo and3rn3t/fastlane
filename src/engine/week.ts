@@ -246,25 +246,28 @@ function upkeep(state: GameState, key: PlayerKey) {
   p.location = 'home'
 }
 
-const HEADLINES: Array<{ text: string; apply: (s: GameState) => void }> = [
-  { text: 'Steady week in the city.', apply: () => {} },
-  { text: 'Inflation ticks up — prices rise.', apply: (s) => (s.economy.priceIndex *= 1.05) },
-  { text: 'Retail price war! Prices dip.', apply: (s) => (s.economy.priceIndex *= 0.95) },
-  { text: 'Labor shortage — wages climb.', apply: (s) => (s.economy.wageIndex *= 1.05) },
-  { text: 'Layoffs downtown — wages soften.', apply: (s) => (s.economy.wageIndex *= 0.96) },
-  {
-    text: 'Fed hikes rates — savers rejoice.',
-    apply: (s) => (s.economy.interestRate = Math.min(0.012, s.economy.interestRate + 0.002)),
-  },
-  {
-    text: 'Rates cut — savings earn less.',
-    apply: (s) => (s.economy.interestRate = Math.max(0.002, s.economy.interestRate - 0.002)),
-  },
+// Percentage/point deltas, not multipliers directly — driftEconomy() scales
+// each by rules.economyVolatility before applying it, so Brutal/Zen presets
+// don't need their own copy of this table.
+const HEADLINES: Array<{
+  text: string
+  priceDelta?: number
+  wageDelta?: number
+  interestDelta?: number
+}> = [
+  { text: 'Steady week in the city.' },
+  { text: 'Inflation ticks up — prices rise.', priceDelta: 0.05 },
+  { text: 'Retail price war! Prices dip.', priceDelta: -0.05 },
+  { text: 'Labor shortage — wages climb.', wageDelta: 0.05 },
+  { text: 'Layoffs downtown — wages soften.', wageDelta: -0.04 },
+  { text: 'Fed hikes rates — savers rejoice.', interestDelta: 0.002 },
+  { text: 'Rates cut — savings earn less.', interestDelta: -0.002 },
 ]
 
 function personalEvent(state: GameState, key: PlayerKey) {
   const p = state[key]
-  if (roll(state) >= 0.35) return
+  const triggerChance = Math.min(0.9, 0.35 * state.rules.eventFrequency)
+  if (roll(state) >= triggerChance) return
   const which = rollInt(state, 5)
   switch (which) {
     case 0: {
@@ -311,7 +314,15 @@ function personalEvent(state: GameState, key: PlayerKey) {
 
 function driftEconomy(state: GameState) {
   const headline = HEADLINES[rollInt(state, HEADLINES.length)]
-  headline.apply(state)
+  const v = state.rules.economyVolatility
+  if (headline.priceDelta) state.economy.priceIndex *= 1 + headline.priceDelta * v
+  if (headline.wageDelta) state.economy.wageIndex *= 1 + headline.wageDelta * v
+  if (headline.interestDelta) {
+    state.economy.interestRate = Math.max(
+      0.002,
+      Math.min(0.012, state.economy.interestRate + headline.interestDelta * v)
+    )
+  }
   state.headline = headline.text
   // Clamp so a long game can't run away.
   state.economy.priceIndex = Math.min(1.6, Math.max(0.7, state.economy.priceIndex))

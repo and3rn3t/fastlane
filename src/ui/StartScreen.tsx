@@ -3,9 +3,11 @@ import {
   CAREER_TARGETS,
   EDUCATION_TARGETS,
   HAPPINESS_TARGETS,
+  RULE_PRESETS,
   WEALTH_TARGETS,
   type AiProfileName,
   type Goals,
+  type RulePresetName,
 } from '@/engine'
 import { useGame } from '@/state/GameContext'
 
@@ -18,6 +20,16 @@ const RILEY_PROFILES: Array<{ id: AiProfileName; label: string; blurb: string }>
     label: 'Gambler',
     blurb: 'Bets surplus cash at the casino instead of banking it.',
   },
+]
+
+const RULE_OPTIONS: Array<{ id: RulePresetName; label: string; blurb: string }> = [
+  { id: 'classic', label: 'Classic', blurb: 'The standard rules — a fair, unmodified economy.' },
+  {
+    id: 'brutal',
+    label: 'Brutal',
+    blurb: 'Less starting cash, more frequent events, bigger economic swings.',
+  },
+  { id: 'zen', label: 'Zen', blurb: 'More starting cash, calmer events, a gentler economy.' },
 ]
 
 interface SliderRow {
@@ -60,6 +72,7 @@ export function StartScreen() {
   const [name, setName] = useState('')
   const [levels, setLevels] = useState<Record<keyof Goals, number>>(PRESETS.Standard)
   const [rileyProfile, setRileyProfile] = useState<AiProfileName>('balanced')
+  const [rulePreset, setRulePreset] = useState<RulePresetName>('classic')
   const [importError, setImportError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -128,6 +141,23 @@ export function StartScreen() {
       ))}
 
       <div>
+        <span>Rules</span>
+        <div className="presets">
+          {RULE_OPTIONS.map((rule) => (
+            <button
+              key={rule.id}
+              className={rulePreset === rule.id ? 'primary' : ''}
+              aria-pressed={rulePreset === rule.id}
+              onClick={() => setRulePreset(rule.id)}
+            >
+              {rule.label}
+            </button>
+          ))}
+        </div>
+        <p className="blurb">{RULE_OPTIONS.find((rule) => rule.id === rulePreset)!.blurb}</p>
+      </div>
+
+      <div>
         <span>Riley's playstyle</span>
         <div className="presets">
           {RILEY_PROFILES.map((prof) => (
@@ -147,7 +177,14 @@ export function StartScreen() {
       <div className="start-actions">
         <button
           className="primary"
-          onClick={() => startGame({ playerName: name.trim() || 'You', goals, rileyProfile })}
+          onClick={() =>
+            startGame({
+              playerName: name.trim() || 'You',
+              goals,
+              rileyProfile,
+              rules: RULE_PRESETS[rulePreset],
+            })
+          }
         >
           Start new game
         </button>

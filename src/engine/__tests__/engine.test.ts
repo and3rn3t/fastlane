@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { AI_PROFILES } from '../ai'
 import { EngineError, netWorth, wagePerHour } from '../actions'
-import { FOOD_NEEDED, WEEK_TIME, maxLoan, travelCost } from '../data'
+import { FOOD_NEEDED, RULE_PRESETS, WEEK_TIME, maxLoan, travelCost } from '../data'
 import { applyAction, newGame } from '../engine'
 import { careerScore, meetsGoals } from '../week'
 import type { GameState, Goals } from '../types'
@@ -471,5 +471,60 @@ describe('AI personalities', () => {
       expect(s.riley.jobId).not.toBeNull()
       expect(s.riley.cash + s.riley.savings).toBeGreaterThanOrEqual(0)
     }
+  })
+})
+
+describe('rule presets', () => {
+  it('defaults a new game to Classic rules', () => {
+    const s = newGame({ playerName: 'Tester', goals: easyGoals })
+    expect(s.rules).toEqual(RULE_PRESETS.classic)
+  })
+
+  it('starting cash follows the chosen preset for both players', () => {
+    const brutal = newGame({ playerName: 'T', goals: easyGoals, rules: RULE_PRESETS.brutal })
+    expect(brutal.player.cash).toBe(100)
+    expect(brutal.riley.cash).toBe(100)
+
+    const zen = newGame({ playerName: 'T', goals: easyGoals, rules: RULE_PRESETS.zen })
+    expect(zen.player.cash).toBe(350)
+  })
+
+  it('Brutal produces more personal events than Zen, aggregated across seeds', () => {
+    // A single-seed comparison would be fragile (see the Casino RNG-sharing
+    // note above) — this aggregates over many seeds/weeks instead, the same
+    // approach pnpm sim uses for balance signals.
+    function countPersonalEvents(rules: typeof RULE_PRESETS.classic): number {
+      let total = 0
+      for (let seed = 0; seed < 20; seed++) {
+        let s = newGame({ playerName: 'T', goals: easyGoals, seed, rules })
+        for (let w = 0; w < 10 && s.phase !== 'over'; w++) {
+          const before = s.log.length
+          s = applyAction(s, { type: 'endWeek' })
+          total += s.log.length - before
+          if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+        }
+      }
+      return total
+    }
+    const brutalCount = countPersonalEvents(RULE_PRESETS.brutal)
+    const zenCount = countPersonalEvents(RULE_PRESETS.zen)
+    expect(brutalCount).toBeGreaterThan(zenCount)
+  })
+
+  it('Brutal swings the economy further from neutral than Zen, aggregated across seeds', () => {
+    function avgDrift(rules: typeof RULE_PRESETS.classic): number {
+      let total = 0
+      const seeds = 20
+      for (let seed = 0; seed < seeds; seed++) {
+        let s = newGame({ playerName: 'T', goals: easyGoals, seed, rules })
+        for (let w = 0; w < 15 && s.phase !== 'over'; w++) {
+          s = applyAction(s, { type: 'endWeek' })
+          if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+        }
+        total += Math.abs(s.economy.priceIndex - 1) + Math.abs(s.economy.wageIndex - 1)
+      }
+      return total / seeds
+    }
+    expect(avgDrift(RULE_PRESETS.brutal)).toBeGreaterThan(avgDrift(RULE_PRESETS.zen))
   })
 })

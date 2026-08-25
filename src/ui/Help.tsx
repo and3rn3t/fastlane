@@ -14,7 +14,8 @@ export function Help({ onClose }: { onClose: () => void }) {
             <p className="blurb">
               Hit all four life goals before Riley does: 💵 Wealth (net worth), 😊 Happiness, 🎓
               Education (classes completed), and 💼 Career (job prestige). Track progress on the
-              board's center panel.
+              board's center panel. The Rules you picked (Classic/Brutal/Zen) set your starting cash
+              and how often/how hard random events and economic swings hit.
             </p>
           </section>
           <section>

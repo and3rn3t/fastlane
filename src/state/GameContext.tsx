@@ -3,6 +3,7 @@ import {
   CREDIT_SCORE_START,
   EngineError,
   HEALTH_START,
+  RULE_PRESETS,
   SAVE_VERSION,
   applyAction,
   newGame,
@@ -94,6 +95,10 @@ function isPlausibleSave(data: unknown): data is Record<string, unknown> {
  * setting, not a per-player field. A save from before AI personalities
  * existed was necessarily playing against the only policy that existed
  * then, so it defaults to 'balanced', which reproduces that policy exactly.
+ *
+ * 5 → 6: Rule presets added `GameState.rules`. A save from before that was
+ * necessarily playing under the only rules that existed then, so it
+ * defaults to RULE_PRESETS.classic — those exact values, not a guess.
  */
 function upgradePlayerToV2(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
@@ -151,6 +156,11 @@ const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<strin
   4: (save) => ({
     ...save,
     rileyProfile: typeof save.rileyProfile === 'string' ? save.rileyProfile : 'balanced',
+  }),
+  5: (save) => ({
+    ...save,
+    rules:
+      typeof save.rules === 'object' && save.rules !== null ? save.rules : RULE_PRESETS.classic,
   }),
 }
 

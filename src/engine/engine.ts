@@ -2,7 +2,7 @@
 
 import * as act from './actions'
 import { AI_PROFILES, runAIWeek } from './ai'
-import { CREDIT_SCORE_START, HEALTH_START, WEEK_TIME } from './data'
+import { CREDIT_SCORE_START, HEALTH_START, RULE_PRESETS, WEEK_TIME } from './data'
 import { endWeek } from './week'
 import {
   SAVE_VERSION,
@@ -11,15 +11,16 @@ import {
   type GameState,
   type Goals,
   type PlayerState,
+  type RulesConfig,
 } from './types'
 
-function newPlayer(name: string, isAI: boolean): PlayerState {
+function newPlayer(name: string, isAI: boolean, startingCash: number): PlayerState {
   return {
     name,
     isAI,
     location: 'home',
     timeLeft: WEEK_TIME,
-    cash: 200,
+    cash: startingCash,
     savings: 0,
     happiness: 50,
     education: 0,
@@ -51,9 +52,11 @@ export interface NewGameOptions {
   goals: Goals
   seed?: number
   rileyProfile?: AiProfileName
+  rules?: RulesConfig
 }
 
 export function newGame(opts: NewGameOptions): GameState {
+  const rules = opts.rules ?? RULE_PRESETS.classic
   return {
     version: SAVE_VERSION,
     week: 1,
@@ -67,9 +70,10 @@ export function newGame(opts: NewGameOptions): GameState {
       interestRate: 0.005,
       lotteryJackpot: 500,
     },
-    player: newPlayer(opts.playerName || 'You', false),
-    riley: newPlayer('Riley', true),
+    player: newPlayer(opts.playerName || 'You', false, rules.startingCash),
+    riley: newPlayer('Riley', true, rules.startingCash),
     rileyProfile: opts.rileyProfile ?? 'balanced',
+    rules,
     headline: 'A new life in the fast lane begins.',
     log: [],
     lastReport: null,
