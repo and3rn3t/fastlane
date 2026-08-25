@@ -35,6 +35,8 @@ function newPlayer(name: string, isAI: boolean): PlayerState {
     relaxedThisWeek: 0,
     health: HEALTH_START,
     hoursWorkedThisWeek: 0,
+    jobTenureWeeks: 0,
+    promotionLevel: 0,
   }
 }
 

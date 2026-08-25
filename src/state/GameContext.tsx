@@ -80,6 +80,10 @@ function isPlausibleSave(data: unknown): data is Record<string, unknown> {
  * 1 → 2: Health & doctor added `health`/`hoursWorkedThisWeek` to each
  * player. A save from before that ships with a full tank of health and no
  * overwork on the books, same as a fresh player would start.
+ *
+ * 2 → 3: Job promotions & career ladder added `jobTenureWeeks`/
+ * `promotionLevel`. A save from before that starts at 0 on both — no
+ * retroactive credit for time already spent at a job, same as a fresh hire.
  */
 function upgradePlayerToV2(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
@@ -88,6 +92,16 @@ function upgradePlayerToV2(player: unknown): unknown {
     ...p,
     health: typeof p.health === 'number' ? p.health : HEALTH_START,
     hoursWorkedThisWeek: typeof p.hoursWorkedThisWeek === 'number' ? p.hoursWorkedThisWeek : 0,
+  }
+}
+
+function upgradePlayerToV3(player: unknown): unknown {
+  if (typeof player !== 'object' || player === null) return player
+  const p = player as Record<string, unknown>
+  return {
+    ...p,
+    jobTenureWeeks: typeof p.jobTenureWeeks === 'number' ? p.jobTenureWeeks : 0,
+    promotionLevel: typeof p.promotionLevel === 'number' ? p.promotionLevel : 0,
   }
 }
 
@@ -100,6 +114,11 @@ const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<strin
     ...save,
     player: upgradePlayerToV2(save.player),
     riley: upgradePlayerToV2(save.riley),
+  }),
+  2: (save) => ({
+    ...save,
+    player: upgradePlayerToV3(save.player),
+    riley: upgradePlayerToV3(save.riley),
   }),
 }
 

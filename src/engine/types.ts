@@ -105,6 +105,13 @@ export interface PlayerState {
    * tracked separately from lifetime `experience` so upkeep can tell overwork
    * apart from a light week. */
   hoursWorkedThisWeek: number
+  /** Weeks continuously employed at the current job with at least some hours
+   * worked that week — a no-show week resets this to 0, same as quitting or
+   * taking a new job. Drives in-job promotions. */
+  jobTenureWeeks: number
+  /** Promotions earned at the current job (0..MAX_PROMOTIONS) — boosts wage
+   * and prestige without switching jobs. Resets on quit or a new hire. */
+  promotionLevel: number
 }
 
 export interface Economy {
@@ -149,7 +156,7 @@ export interface WeekSnapshot {
 /** Bump on any GameState/PlayerState shape change and add a migration step in
  * state/GameContext.tsx's MIGRATIONS map — see that file for the full scheme.
  * The engine owns this number since it owns what the shape actually is. */
-export const SAVE_VERSION = 2
+export const SAVE_VERSION = 3
 
 export interface GameState {
   version: number

@@ -7,7 +7,10 @@ import {
   JOBS,
   LOCATIONS,
   LOTTERY_TICKET_PRICE,
+  MAX_PROMOTIONS,
   MEAL_PRICE,
+  PROMOTION_PRESTIGE_BONUS,
+  PROMOTION_TENURE_WEEKS,
   RELAX_CAP,
   RENT,
   TUITION,
@@ -34,11 +37,22 @@ function WorkAction({ game }: { game: GameState }) {
   if (job.workplace !== p.location) return null
   const max = p.timeLeft
   const clamped = Math.min(hours, max)
-  const rate = wagePerHour(game, job.id)
+  const rate = wagePerHour(game, job.id, p.promotionLevel)
+  const weeksToPromotion =
+    p.promotionLevel < MAX_PROMOTIONS
+      ? PROMOTION_TENURE_WEEKS * (p.promotionLevel + 1) - p.jobTenureWeeks
+      : 0
   return (
     <div className="action-row">
       <span className="grow">
         Work as <strong>{job.title}</strong> (${rate.toFixed(2)}/h)
+        {p.promotionLevel > 0 && ` · promoted ×${p.promotionLevel}`}
+        <br />
+        <span className="desc">
+          {p.promotionLevel >= MAX_PROMOTIONS
+            ? 'Fully promoted here'
+            : `Next promotion in ${Math.max(1, weeksToPromotion)} week${weeksToPromotion === 1 ? '' : 's'} of showing up`}
+        </span>
       </span>
       <input
         type="range"
@@ -77,7 +91,9 @@ function JobBoard({ game }: { game: GameState }) {
                 {job.title} · {LOCATIONS[job.workplace].name}
               </div>
               <div className="meta">
-                ${wagePerHour(game, job.id).toFixed(2)}/h · prestige {job.prestige}
+                ${wagePerHour(game, job.id, isCurrent ? p.promotionLevel : 0).toFixed(2)}/h ·
+                prestige{' '}
+                {job.prestige + (isCurrent ? p.promotionLevel * PROMOTION_PRESTIGE_BONUS : 0)}
                 {job.minEducation > 0 && ` · ${job.minEducation} classes`}
                 {job.minDress > 0 && ` · dress ${job.minDress}`}
                 {job.minExperience > 0 && ` · ${job.minExperience}h exp`}

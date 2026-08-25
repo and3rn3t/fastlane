@@ -129,11 +129,13 @@ describe('save migration', () => {
     expect(screen.getAllByText('$777').length).toBeGreaterThan(0)
 
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(2)
+    expect(upgraded.version).toBe(3)
     expect(upgraded.history).toEqual([])
-    // 0 → 1 → 2 ran in sequence — health/hoursWorkedThisWeek backfilled too.
+    // 0 → 1 → 2 → 3 ran in sequence — every field along the way backfilled.
     expect(upgraded.player.health).toBe(100)
     expect(upgraded.player.hoursWorkedThisWeek).toBe(0)
+    expect(upgraded.player.jobTenureWeeks).toBe(0)
+    expect(upgraded.player.promotionLevel).toBe(0)
   })
 
   it('upgrades a v1 (pre-Health) save, backfilling health in place', () => {
@@ -158,10 +160,39 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 3/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(2)
+    expect(upgraded.version).toBe(3)
     expect(upgraded.player.health).toBe(100)
     expect(upgraded.riley.health).toBe(100)
     expect(upgraded.player.hoursWorkedThisWeek).toBe(0)
+    expect(upgraded.player.promotionLevel).toBe(0)
+  })
+
+  it('upgrades a v2 (pre-Promotions) save, backfilling tenure in place', () => {
+    const v2 = {
+      version: 2,
+      week: 4,
+      rngSeed: 1,
+      phase: 'playing',
+      winner: null,
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      economy: { priceIndex: 1, wageIndex: 1, interestRate: 0.005, lotteryJackpot: 500 },
+      player: { ...legacyPlayer('V2Player', 444), health: 88, hoursWorkedThisWeek: 12 },
+      riley: { ...legacyPlayer('Riley', 300), health: 100, hoursWorkedThisWeek: 0 },
+      headline: 'A new life in the fast lane begins.',
+      log: [],
+      lastReport: null,
+      history: [],
+    }
+    localStorage.setItem('fastlane-save-v1', JSON.stringify(v2))
+
+    renderApp()
+
+    expect(screen.getByText(/Week 4/)).toBeTruthy()
+    const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
+    expect(upgraded.version).toBe(3)
+    expect(upgraded.player.health).toBe(88) // untouched by this migration
+    expect(upgraded.player.jobTenureWeeks).toBe(0)
+    expect(upgraded.player.promotionLevel).toBe(0)
   })
 
   it('falls back to a fresh game and surfaces an error toast on corrupted JSON', () => {

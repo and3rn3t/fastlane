@@ -40,6 +40,14 @@ export const DOCTOR_PRICE = 45
 export const DOCTOR_TIME = 3
 export const DOCTOR_HEAL = 35
 
+/** Consecutive weeks of showing up (working ≥1h) at the same job before it
+ * earns the next promotion level. */
+export const PROMOTION_TENURE_WEEKS = 6
+export const MAX_PROMOTIONS = 3
+/** Wage multiplier and prestige points added per promotion level. */
+export const PROMOTION_WAGE_BONUS = 0.15
+export const PROMOTION_PRESTIGE_BONUS = 4
+
 export const LOCATIONS: Record<LocationId, LocationDef> = {
   home: {
     id: 'home',

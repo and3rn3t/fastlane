@@ -30,6 +30,8 @@ export function Help({ onClose }: { onClose: () => void }) {
             <p className="blurb">
               Clothes wear out — your Dress score drops 3 every week. Better jobs require a minimum
               Dress, Education, and Experience. Buy outfits at Sharp Threads to stay qualified.
+              Staying at a job and showing up earns promotions over time — Career can grow without
+              switching jobs.
             </p>
           </section>
           <section>

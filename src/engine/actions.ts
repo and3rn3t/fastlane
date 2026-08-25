@@ -17,6 +17,7 @@ import {
   MEAL_TIME,
   CLASS_TIME,
   PAWN_RATE,
+  PROMOTION_WAGE_BONUS,
   RELAX_CAP,
   RENT,
   TUITION,
@@ -36,8 +37,9 @@ export function price(state: GameState, base: number): number {
   return Math.round(base * state.economy.priceIndex)
 }
 
-export function wagePerHour(state: GameState, jobId: string): number {
-  return jobById(jobId).wage * state.economy.wageIndex
+export function wagePerHour(state: GameState, jobId: string, promotionLevel = 0): number {
+  const base = jobById(jobId).wage * state.economy.wageIndex
+  return base * (1 + promotionLevel * PROMOTION_WAGE_BONUS)
 }
 
 function spendTime(p: PlayerState, units: number) {
@@ -78,7 +80,7 @@ export function work(state: GameState, key: PlayerKey, hours: number) {
   require_(p.location === job.workplace, `You must be at your workplace to work`)
   require_(hours >= 1, 'Work at least one hour')
   spendTime(p, hours)
-  const pay = Math.round(hours * wagePerHour(state, job.id))
+  const pay = Math.round(hours * wagePerHour(state, job.id, p.promotionLevel))
   p.cash += pay
   p.experience += hours
   p.hoursWorkedThisWeek += hours
@@ -105,6 +107,8 @@ export function applyJob(state: GameState, key: PlayerKey, jobId: string) {
   require_(qual.ok, `Not qualified: ${qual.reasons.join(', ')}`)
   spendTime(p, 2)
   p.jobId = job.id
+  p.jobTenureWeeks = 0
+  p.promotionLevel = 0
   log(state, key, `Hired as ${job.title} at $${wagePerHour(state, job.id).toFixed(2)}/h`)
 }
 
@@ -113,6 +117,8 @@ export function quitJob(state: GameState, key: PlayerKey) {
   require_(p.jobId !== null, 'No job to quit')
   log(state, key, `Quit job as ${jobById(p.jobId).title}`)
   p.jobId = null
+  p.jobTenureWeeks = 0
+  p.promotionLevel = 0
 }
 
 export function takeClass(state: GameState, key: PlayerKey) {

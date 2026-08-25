@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EngineError } from '../actions'
+import { EngineError, wagePerHour } from '../actions'
 import { FOOD_NEEDED, WEEK_TIME, travelCost } from '../data'
 import { applyAction, newGame } from '../engine'
 import { careerScore, meetsGoals } from '../week'
@@ -69,6 +69,71 @@ describe('jobs and work', () => {
     s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
     s = applyAction(s, { type: 'travel', to: 'burgers' })
     expect(() => applyAction(s, { type: 'work', hours: 99 })).toThrow(/time/)
+  })
+})
+
+describe('promotions', () => {
+  function hireFryCook(s: GameState): GameState {
+    s = applyAction(s, { type: 'travel', to: 'employment' })
+    return applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
+  }
+
+  function workNWeeks(s: GameState, weeks: number, hours = 10): GameState {
+    for (let i = 0; i < weeks; i++) {
+      s = applyAction(s, { type: 'travel', to: 'burgers' })
+      s = applyAction(s, { type: 'work', hours })
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    }
+    return s
+  }
+
+  it('promotes after enough consecutive weeks of showing up', () => {
+    let s = hireFryCook(game())
+    s = workNWeeks(s, 6) // PROMOTION_TENURE_WEEKS
+    expect(s.player.jobTenureWeeks).toBe(6)
+    expect(s.player.promotionLevel).toBe(1)
+    expect(careerScore(s.player)).toBe(5 + 4) // base prestige + one promotion's bonus
+    expect(s.lastReport?.entries.some((e) => e.text.includes('promoted'))).toBe(true)
+  })
+
+  it('boosts wage once promoted', () => {
+    let s = hireFryCook(game())
+    s = workNWeeks(s, 6)
+    expect(s.player.promotionLevel).toBeGreaterThan(0)
+    const promoted = wagePerHour(s, 'fry-cook', s.player.promotionLevel)
+    const base = wagePerHour(s, 'fry-cook', 0)
+    expect(promoted).toBeGreaterThan(base)
+  })
+
+  it('a no-show week resets tenure toward the next promotion, not an earned one', () => {
+    let s = hireFryCook(game())
+    s = workNWeeks(s, 3)
+    expect(s.player.jobTenureWeeks).toBe(3)
+    s = applyAction(s, { type: 'endWeek' }) // no work this week
+    if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    expect(s.player.jobTenureWeeks).toBe(0)
+    expect(s.player.promotionLevel).toBe(0)
+  })
+
+  it('switching jobs resets tenure and promotion', () => {
+    let s = hireFryCook(game())
+    s = workNWeeks(s, 6)
+    expect(s.player.promotionLevel).toBe(1)
+    s = applyAction(s, { type: 'travel', to: 'employment' })
+    // janitor has no dress/education/experience minimums — dress has worn
+    // down over the 6 weeks above, so a dress-gated job would reject this.
+    s = applyAction(s, { type: 'applyJob', jobId: 'janitor' })
+    expect(s.player.jobTenureWeeks).toBe(0)
+    expect(s.player.promotionLevel).toBe(0)
+  })
+
+  it('quitting resets tenure and promotion', () => {
+    let s = hireFryCook(game())
+    s = workNWeeks(s, 6)
+    s = applyAction(s, { type: 'quitJob' })
+    expect(s.player.jobTenureWeeks).toBe(0)
+    expect(s.player.promotionLevel).toBe(0)
   })
 })
 

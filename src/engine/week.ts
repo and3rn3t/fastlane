@@ -12,7 +12,10 @@ import {
   HEALTH_OVERWORK_RATE,
   HEALTH_SICK_THRESHOLD,
   LOTTERY_WIN_CHANCE,
+  MAX_PROMOTIONS,
   OVERWORK_THRESHOLD,
+  PROMOTION_PRESTIGE_BONUS,
+  PROMOTION_TENURE_WEEKS,
   RENT,
   WEEK_TIME,
   itemById,
@@ -26,7 +29,8 @@ function log(state: GameState, actor: PlayerKey | 'world', text: string) {
 }
 
 export function careerScore(p: PlayerState): number {
-  return p.jobId ? jobById(p.jobId).prestige : 0
+  if (!p.jobId) return 0
+  return Math.min(100, jobById(p.jobId).prestige + p.promotionLevel * PROMOTION_PRESTIGE_BONUS)
 }
 
 export function meetsGoals(p: PlayerState, goals: Goals): boolean {
@@ -69,6 +73,32 @@ function healthUpkeep(state: GameState, key: PlayerKey, fedFromGroceries: number
 
   if (p.health < HEALTH_LOW_THRESHOLD) {
     p.happiness = Math.max(0, p.happiness - HEALTH_LOW_HAPPINESS_PENALTY)
+  }
+}
+
+/** Tenure builds while employed and showing up (working ≥1h that week); a
+ * no-show week resets the clock toward the *next* promotion without rolling
+ * back one already earned. Split out of upkeep() to keep it readable. */
+function careerUpkeep(state: GameState, key: PlayerKey) {
+  const p = state[key]
+  if (!p.jobId) {
+    p.jobTenureWeeks = 0
+    return
+  }
+  if (p.hoursWorkedThisWeek > 0) {
+    p.jobTenureWeeks += 1
+  } else {
+    p.jobTenureWeeks = 0
+    return
+  }
+  const eligibleLevel = Math.min(
+    MAX_PROMOTIONS,
+    Math.floor(p.jobTenureWeeks / PROMOTION_TENURE_WEEKS)
+  )
+  if (eligibleLevel > p.promotionLevel) {
+    p.promotionLevel = eligibleLevel
+    const job = jobById(p.jobId)
+    log(state, key, `${p.name} got promoted at ${job.title} (level ${eligibleLevel})`)
   }
 }
 
@@ -144,6 +174,8 @@ function upkeep(state: GameState, key: PlayerKey) {
     }
     p.lotteryTickets = 0
   }
+
+  careerUpkeep(state, key)
 
   // Fresh week.
   p.fed = 0
