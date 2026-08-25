@@ -89,6 +89,11 @@ function isPlausibleSave(data: unknown): data is Record<string, unknown> {
  * 3 → 4: Loans & credit added `loanBalance`/`loanWeeksBehind`/`creditScore`/
  * `garnished`/`loanPaidThisWeek`. A save from before that starts debt-free
  * with a fresh CREDIT_SCORE_START rating, same as a new player.
+ *
+ * 4 → 5: AI personalities added `GameState.rileyProfile` — a game-level
+ * setting, not a per-player field. A save from before AI personalities
+ * existed was necessarily playing against the only policy that existed
+ * then, so it defaults to 'balanced', which reproduces that policy exactly.
  */
 function upgradePlayerToV2(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
@@ -142,6 +147,10 @@ const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<strin
     ...save,
     player: upgradePlayerToV4(save.player),
     riley: upgradePlayerToV4(save.riley),
+  }),
+  4: (save) => ({
+    ...save,
+    rileyProfile: typeof save.rileyProfile === 'string' ? save.rileyProfile : 'balanced',
   }),
 }
 

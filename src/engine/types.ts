@@ -176,7 +176,12 @@ export interface WeekSnapshot {
 /** Bump on any GameState/PlayerState shape change and add a migration step in
  * state/GameContext.tsx's MIGRATIONS map — see that file for the full scheme.
  * The engine owns this number since it owns what the shape actually is. */
-export const SAVE_VERSION = 4
+export const SAVE_VERSION = 5
+
+/** Named weight presets for Riley's AI policy (ai.ts's AI_PROFILES) — a
+ * game-level setting, not per-player state, since it configures how Riley's
+ * turn is decided rather than anything about a player's progress. */
+export type AiProfileName = 'balanced' | 'hustler' | 'scholar' | 'gambler'
 
 export interface GameState {
   version: number
@@ -188,6 +193,7 @@ export interface GameState {
   economy: Economy
   player: PlayerState
   riley: PlayerState
+  rileyProfile: AiProfileName
   headline: string
   log: LogEntry[]
   lastReport: WeekReport | null

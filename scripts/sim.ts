@@ -5,9 +5,20 @@
 // each Wave 2 item lands to catch a balance regression here, not in a
 // player's actual game.
 //
-// Usage: pnpm sim [gameCount]   (default 200)
+// Usage: pnpm sim [gameCount] [rileyProfile]   (default 200, balanced)
+//   rileyProfile: balanced | hustler | scholar | gambler — the player side
+//   always runs Balanced, so this measures how each Riley profile fares
+//   against a standard opponent ("AI-vs-AI sim test per profile").
 
-import { applyAction, newGame, runAIWeek, type GameState, type Goals } from '../src/engine/index.ts'
+import {
+  AI_PROFILES,
+  applyAction,
+  newGame,
+  runAIWeek,
+  type AiProfileName,
+  type GameState,
+  type Goals,
+} from '../src/engine/index.ts'
 
 // The StartScreen "Standard" preset (level 4 of 10) — the default a new
 // player would actually pick, so the baseline reflects real play.
@@ -19,13 +30,16 @@ interface SimResult {
   weeks: number
 }
 
-function runOneGame(seed: number): SimResult {
-  let state: GameState = newGame({ playerName: 'Sim', goals: STANDARD_GOALS, seed })
+function runOneGame(seed: number, rileyProfile: AiProfileName): SimResult {
+  // Riley's profile lives on GameState itself — endWeek's 'endWeek' case
+  // reads state.rileyProfile and looks up the matching AiProfile, so setting
+  // it here is all runAIWeek('riley', ...) inside applyAction needs.
+  let state: GameState = newGame({ playerName: 'Sim', goals: STANDARD_GOALS, seed, rileyProfile })
 
   for (let i = 0; i < MAX_WEEKS; i++) {
-    // Player side runs the same AI policy Riley uses — an even AI-vs-AI
-    // matchup is what makes the win rate a meaningful balance signal.
-    runAIWeek(state, 'player')
+    // Player side always runs Balanced — a fixed opponent is what makes the
+    // win rate a meaningful signal for whatever Riley profile is under test.
+    runAIWeek(state, 'player', AI_PROFILES.balanced)
     state = applyAction(state, { type: 'endWeek' })
     if (state.phase === 'over') {
       return { winner: state.winner ?? 'none', weeks: state.week - 1 }
@@ -41,9 +55,16 @@ function average(nums: number[]): number {
 
 function main() {
   const gameCount = Number(process.argv[2]) || 200
+  const profileArg = process.argv[3]
+  const rileyProfile: AiProfileName =
+    profileArg && profileArg in AI_PROFILES ? (profileArg as AiProfileName) : 'balanced'
+  if (profileArg && !(profileArg in AI_PROFILES)) {
+    console.warn(`⚠ Unknown profile "${profileArg}" — falling back to balanced.`)
+  }
+
   const results: SimResult[] = []
   for (let seed = 0; seed < gameCount; seed++) {
-    results.push(runOneGame(seed))
+    results.push(runOneGame(seed, rileyProfile))
   }
 
   const playerWins = results.filter((r) => r.winner === 'player')
@@ -52,7 +73,10 @@ function main() {
 
   const pct = (n: number) => `${((n / gameCount) * 100).toFixed(1)}%`
 
-  console.log(`\nFast Lane balance simulation — ${gameCount} games, Standard goals, AI vs AI\n`)
+  console.log(
+    `\nFast Lane balance simulation — ${gameCount} games, Standard goals, AI vs AI ` +
+      `(Riley: ${AI_PROFILES[rileyProfile].name})\n`
+  )
   console.log(`Player win rate:  ${pct(playerWins.length)} (${playerWins.length}/${gameCount})`)
   console.log(`Riley win rate:   ${pct(rileyWins.length)} (${rileyWins.length}/${gameCount})`)
   console.log(

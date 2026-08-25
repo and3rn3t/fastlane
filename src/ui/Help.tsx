@@ -57,14 +57,18 @@ export function Help({ onClose }: { onClose: () => void }) {
             <h3>🎰 The Casino</h3>
             <p className="blurb">
               Lucky Star Casino lets you bet on the wheel for a quick payout — but the odds favor
-              the house, on purpose. Riley never plays; it's a player-only risk, not a strategy.
+              the house, on purpose. Only a Gambler Riley ever plays it; other playstyles treat it
+              as a player-only risk, not a strategy.
             </p>
           </section>
           <section>
             <h3>🎩 Riley</h3>
             <p className="blurb">
               Riley plays by exactly the same rules as you — same actions, same economy, no
-              cheating. Watch their turn play out after you end each week.
+              cheating. Watch their turn play out after you end each week. Pick their playstyle on
+              the start screen: Balanced (the toughest, well-rounded across all four goals), Hustler
+              (chases money at the expense of everything else), Scholar (studies whenever there's
+              cash to spare), or Gambler (bets surplus at the casino instead of banking it).
             </p>
           </section>
         </div>

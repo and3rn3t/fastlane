@@ -4,9 +4,21 @@ import {
   EDUCATION_TARGETS,
   HAPPINESS_TARGETS,
   WEALTH_TARGETS,
+  type AiProfileName,
   type Goals,
 } from '@/engine'
 import { useGame } from '@/state/GameContext'
+
+const RILEY_PROFILES: Array<{ id: AiProfileName; label: string; blurb: string }> = [
+  { id: 'balanced', label: 'Balanced', blurb: 'Plays every goal evenly — the toughest opponent.' },
+  { id: 'hustler', label: 'Hustler', blurb: 'Works every spare hour, chases money above all.' },
+  { id: 'scholar', label: 'Scholar', blurb: 'Studies whenever there is cash to spare.' },
+  {
+    id: 'gambler',
+    label: 'Gambler',
+    blurb: 'Bets surplus cash at the casino instead of banking it.',
+  },
+]
 
 interface SliderRow {
   key: keyof Goals
@@ -47,6 +59,7 @@ export function StartScreen() {
   const { startGame, importSave } = useGame()
   const [name, setName] = useState('')
   const [levels, setLevels] = useState<Record<keyof Goals, number>>(PRESETS.Standard)
+  const [rileyProfile, setRileyProfile] = useState<AiProfileName>('balanced')
   const [importError, setImportError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -114,10 +127,27 @@ export function StartScreen() {
         </div>
       ))}
 
+      <div>
+        <span>Riley's playstyle</span>
+        <div className="presets">
+          {RILEY_PROFILES.map((prof) => (
+            <button
+              key={prof.id}
+              className={rileyProfile === prof.id ? 'primary' : ''}
+              aria-pressed={rileyProfile === prof.id}
+              onClick={() => setRileyProfile(prof.id)}
+            >
+              {prof.label}
+            </button>
+          ))}
+        </div>
+        <p className="blurb">{RILEY_PROFILES.find((prof) => prof.id === rileyProfile)!.blurb}</p>
+      </div>
+
       <div className="start-actions">
         <button
           className="primary"
-          onClick={() => startGame({ playerName: name.trim() || 'You', goals })}
+          onClick={() => startGame({ playerName: name.trim() || 'You', goals, rileyProfile })}
         >
           Start new game
         </button>

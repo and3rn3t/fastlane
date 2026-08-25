@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { AI_PROFILES } from '../ai'
 import { EngineError, netWorth, wagePerHour } from '../actions'
 import { FOOD_NEEDED, WEEK_TIME, maxLoan, travelCost } from '../data'
 import { applyAction, newGame } from '../engine'
@@ -418,5 +419,57 @@ describe('Riley AI', () => {
     }
     expect(s.phase).toBe('over')
     expect(s.winner).toBe('riley')
+  })
+})
+
+describe('AI personalities', () => {
+  function run(seed: number, rileyProfile: keyof typeof AI_PROFILES, weeks: number): GameState {
+    let s = newGame({ playerName: 'Tester', goals: easyGoals, seed, rileyProfile })
+    for (let i = 0; i < weeks && s.phase !== 'over'; i++) {
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    }
+    return s
+  }
+
+  it('defaults a new game to the Balanced profile', () => {
+    expect(newGame({ playerName: 'Tester', goals: easyGoals }).rileyProfile).toBe('balanced')
+  })
+
+  it('stores whichever profile newGame was given', () => {
+    expect(game().rileyProfile).toBe('balanced') // the shared test helper's default
+    const s = newGame({ playerName: 'T', goals: easyGoals, rileyProfile: 'hustler' })
+    expect(s.rileyProfile).toBe('hustler')
+  })
+
+  it('Hustler works more hours than Balanced given the same seed', () => {
+    // Seed found by brute force: a clear gap by week 8.
+    const balanced = run(12, 'balanced', 8)
+    const hustler = run(12, 'hustler', 8)
+    expect(hustler.riley.experience).toBeGreaterThan(balanced.riley.experience)
+  })
+
+  it('Gambler visits the casino; Balanced never does', () => {
+    // Seed found by brute force: Gambler plays the wheel at least once by week 25.
+    const gambler = run(1, 'gambler', 25)
+    const balanced = run(1, 'balanced', 25)
+    const gambledAtAll = (s: GameState) =>
+      s.log.some((e) => e.actor === 'riley' && e.text.includes('wheel'))
+    expect(gambledAtAll(gambler)).toBe(true)
+    expect(gambledAtAll(balanced)).toBe(false)
+  })
+
+  it('Scholar studies without going broke or homeless', () => {
+    const s = run(7, 'scholar', 10)
+    expect(s.riley.apartment).not.toBe('none')
+    expect(s.riley.education).toBeGreaterThan(0)
+  })
+
+  it('every profile produces a playable game — none stalls or crashes', () => {
+    for (const profile of Object.keys(AI_PROFILES) as Array<keyof typeof AI_PROFILES>) {
+      const s = run(0, profile, 10)
+      expect(s.riley.jobId).not.toBeNull()
+      expect(s.riley.cash + s.riley.savings).toBeGreaterThanOrEqual(0)
+    }
   })
 })

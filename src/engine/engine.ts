@@ -1,11 +1,12 @@
 // Reducer entry point: creates games and applies actions immutably.
 
 import * as act from './actions'
-import { runAIWeek } from './ai'
+import { AI_PROFILES, runAIWeek } from './ai'
 import { CREDIT_SCORE_START, HEALTH_START, WEEK_TIME } from './data'
 import { endWeek } from './week'
 import {
   SAVE_VERSION,
+  type AiProfileName,
   type GameAction,
   type GameState,
   type Goals,
@@ -49,6 +50,7 @@ export interface NewGameOptions {
   playerName: string
   goals: Goals
   seed?: number
+  rileyProfile?: AiProfileName
 }
 
 export function newGame(opts: NewGameOptions): GameState {
@@ -67,6 +69,7 @@ export function newGame(opts: NewGameOptions): GameState {
     },
     player: newPlayer(opts.playerName || 'You', false),
     riley: newPlayer('Riley', true),
+    rileyProfile: opts.rileyProfile ?? 'balanced',
     headline: 'A new life in the fast lane begins.',
     log: [],
     lastReport: null,
@@ -143,7 +146,7 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       // used to compute this internally, after runAIWeek had already logged
       // Riley's whole week, so lastReport.entries never actually contained it.
       const logStart = draft.log.length
-      runAIWeek(draft, 'riley')
+      runAIWeek(draft, 'riley', AI_PROFILES[draft.rileyProfile])
       endWeek(draft, logStart)
       break
     }
