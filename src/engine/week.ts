@@ -3,6 +3,8 @@
 
 import { foodShortfall, hasItem, netWorth, price } from './actions'
 import {
+  CREDIT_GAIN_ON_PAYMENT,
+  CREDIT_LOSS_ON_MISS,
   DRESS_WEAR_PER_WEEK,
   EVICTION_WEEKS,
   FOOD_NEEDED,
@@ -12,6 +14,8 @@ import {
   HEALTH_OVERWORK_RATE,
   HEALTH_SICK_THRESHOLD,
   ITEM_THEFT_CHANCE,
+  LOAN_INTEREST_RATE,
+  LOAN_MISSED_WEEKS_FOR_GARNISHMENT,
   LOTTERY_WIN_CHANCE,
   MAX_PROMOTIONS,
   OVERWORK_THRESHOLD,
@@ -126,6 +130,35 @@ function burglaryUpkeep(state: GameState, key: PlayerKey) {
   log(state, key, `${who}'s ${item.name} was stolen!`)
 }
 
+/** Interest accrues on any outstanding balance every week regardless of
+ * payment; a payment (voluntary or garnished, tracked via
+ * loanPaidThisWeek) raises credit and resets the missed-weeks clock, a
+ * skipped week lowers credit and — after enough of them — triggers
+ * garnishment in work(). Split out to keep upkeep() readable. */
+function loanUpkeep(state: GameState, key: PlayerKey) {
+  const p = state[key]
+  const who = p.name
+  if (p.loanBalance <= 0) {
+    p.loanWeeksBehind = 0
+    return
+  }
+  const interest = Math.round(p.loanBalance * LOAN_INTEREST_RATE)
+  p.loanBalance += interest
+  if (interest > 0) log(state, key, `${who}'s loan accrued $${interest} interest`)
+
+  if (p.loanPaidThisWeek) {
+    p.loanWeeksBehind = 0
+    p.creditScore = Math.min(100, p.creditScore + CREDIT_GAIN_ON_PAYMENT)
+    return
+  }
+  p.loanWeeksBehind += 1
+  p.creditScore = Math.max(0, p.creditScore - CREDIT_LOSS_ON_MISS)
+  if (p.loanWeeksBehind >= LOAN_MISSED_WEEKS_FOR_GARNISHMENT && !p.garnished) {
+    p.garnished = true
+    log(state, key, `${who}'s wages are being garnished for the unpaid loan!`)
+  }
+}
+
 function upkeep(state: GameState, key: PlayerKey) {
   const p = state[key]
   const who = p.name
@@ -188,6 +221,7 @@ function upkeep(state: GameState, key: PlayerKey) {
   }
 
   burglaryUpkeep(state, key)
+  loanUpkeep(state, key)
 
   // Lottery draw.
   if (p.lotteryTickets > 0) {
@@ -207,6 +241,7 @@ function upkeep(state: GameState, key: PlayerKey) {
   p.fed = 0
   p.relaxedThisWeek = 0
   p.hoursWorkedThisWeek = 0
+  p.loanPaidThisWeek = false
   p.timeLeft = WEEK_TIME
   p.location = 'home'
 }

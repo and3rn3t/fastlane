@@ -2,7 +2,7 @@
 
 import * as act from './actions'
 import { runAIWeek } from './ai'
-import { HEALTH_START, WEEK_TIME } from './data'
+import { CREDIT_SCORE_START, HEALTH_START, WEEK_TIME } from './data'
 import { endWeek } from './week'
 import {
   SAVE_VERSION,
@@ -37,6 +37,11 @@ function newPlayer(name: string, isAI: boolean): PlayerState {
     hoursWorkedThisWeek: 0,
     jobTenureWeeks: 0,
     promotionLevel: 0,
+    loanBalance: 0,
+    loanWeeksBehind: 0,
+    creditScore: CREDIT_SCORE_START,
+    garnished: false,
+    loanPaidThisWeek: false,
   }
 }
 
@@ -123,6 +128,12 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break
     case 'seeDoctor':
       act.seeDoctor(draft, 'player')
+      break
+    case 'takeLoan':
+      act.takeLoan(draft, 'player', action.amount)
+      break
+    case 'repayLoan':
+      act.repayLoan(draft, 'player', action.amount)
       break
     case 'endWeek': {
       // Captured before Riley's turn runs so the report includes it — endWeek()

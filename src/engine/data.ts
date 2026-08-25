@@ -43,6 +43,20 @@ export const DOCTOR_HEAL = 35
 /** Chance per week (no secure apartment, uninsured, owns something stealable). */
 export const ITEM_THEFT_CHANCE = 0.08
 
+export const CREDIT_SCORE_START = 50
+export const CREDIT_GAIN_ON_PAYMENT = 3
+export const CREDIT_LOSS_ON_MISS = 8
+export const LOAN_INTEREST_RATE = 0.02
+/** Consecutive unpaid weeks before wage garnishment kicks in. */
+export const LOAN_MISSED_WEEKS_FOR_GARNISHMENT = 3
+/** Fraction of each paycheck redirected to the loan while garnished. */
+export const GARNISHMENT_RATE = 0.3
+
+/** Credit score → max total loan balance (principal + accrued interest). */
+export function maxLoan(creditScore: number): number {
+  return 300 + creditScore * 20
+}
+
 /** Consecutive weeks of showing up (working ≥1h) at the same job before it
  * earns the next promotion level. */
 export const PROMOTION_TENURE_WEEKS = 6

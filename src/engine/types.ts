@@ -117,6 +117,20 @@ export interface PlayerState {
   /** Promotions earned at the current job (0..MAX_PROMOTIONS) — boosts wage
    * and prestige without switching jobs. Resets on quit or a new hire. */
   promotionLevel: number
+  /** Outstanding loan principal + accrued interest. */
+  loanBalance: number
+  /** Consecutive weeks with an unpaid loan balance — garnishment kicks in at
+   * LOAN_MISSED_WEEKS_FOR_GARNISHMENT, same shape as weeksBehindOnRent. */
+  loanWeeksBehind: number
+  /** 0–100 — a payment this week raises it, a missed one lowers it, and it
+   * sets the loan limit via `maxLoan()`. */
+  creditScore: number
+  /** True once garnishment has kicked in — work() auto-diverts a cut of each
+   * paycheck to the loan until it's paid off, then clears automatically. */
+  garnished: boolean
+  /** Whether any loan payment (voluntary or garnished) landed this week —
+   * read by upkeep, reset with the rest of the weekly state. */
+  loanPaidThisWeek: boolean
 }
 
 export interface Economy {
@@ -161,7 +175,7 @@ export interface WeekSnapshot {
 /** Bump on any GameState/PlayerState shape change and add a migration step in
  * state/GameContext.tsx's MIGRATIONS map — see that file for the full scheme.
  * The engine owns this number since it owns what the shape actually is. */
-export const SAVE_VERSION = 3
+export const SAVE_VERSION = 4
 
 export interface GameState {
   version: number
@@ -198,5 +212,7 @@ export type GameAction =
   | { type: 'sellItem'; itemId: ItemId }
   | { type: 'relax'; hours: number }
   | { type: 'seeDoctor' }
+  | { type: 'takeLoan'; amount: number }
+  | { type: 'repayLoan'; amount: number }
   | { type: 'endWeek' }
   | { type: 'dismissReport' }

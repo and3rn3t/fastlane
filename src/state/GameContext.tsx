@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useReducer, type ReactNode } from 'react'
 import {
+  CREDIT_SCORE_START,
   EngineError,
   HEALTH_START,
   SAVE_VERSION,
@@ -84,6 +85,10 @@ function isPlausibleSave(data: unknown): data is Record<string, unknown> {
  * 2 → 3: Job promotions & career ladder added `jobTenureWeeks`/
  * `promotionLevel`. A save from before that starts at 0 on both — no
  * retroactive credit for time already spent at a job, same as a fresh hire.
+ *
+ * 3 → 4: Loans & credit added `loanBalance`/`loanWeeksBehind`/`creditScore`/
+ * `garnished`/`loanPaidThisWeek`. A save from before that starts debt-free
+ * with a fresh CREDIT_SCORE_START rating, same as a new player.
  */
 function upgradePlayerToV2(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
@@ -105,6 +110,19 @@ function upgradePlayerToV3(player: unknown): unknown {
   }
 }
 
+function upgradePlayerToV4(player: unknown): unknown {
+  if (typeof player !== 'object' || player === null) return player
+  const p = player as Record<string, unknown>
+  return {
+    ...p,
+    loanBalance: typeof p.loanBalance === 'number' ? p.loanBalance : 0,
+    loanWeeksBehind: typeof p.loanWeeksBehind === 'number' ? p.loanWeeksBehind : 0,
+    creditScore: typeof p.creditScore === 'number' ? p.creditScore : CREDIT_SCORE_START,
+    garnished: typeof p.garnished === 'boolean' ? p.garnished : false,
+    loanPaidThisWeek: typeof p.loanPaidThisWeek === 'boolean' ? p.loanPaidThisWeek : false,
+  }
+}
+
 const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<string, unknown>> = {
   0: (save) => ({
     ...save,
@@ -119,6 +137,11 @@ const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<strin
     ...save,
     player: upgradePlayerToV3(save.player),
     riley: upgradePlayerToV3(save.riley),
+  }),
+  3: (save) => ({
+    ...save,
+    player: upgradePlayerToV4(save.player),
+    riley: upgradePlayerToV4(save.riley),
   }),
 }
 

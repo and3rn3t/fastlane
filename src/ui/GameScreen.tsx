@@ -174,6 +174,14 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
           <span className="label">Rent due</span>
           <span className={`value${p.rentDue > 0 ? ' low' : ''}`}>${p.rentDue}</span>
         </div>
+        {p.loanBalance > 0 && (
+          <div className="stat">
+            <span className="label">Loan</span>
+            <span className={`value${p.garnished ? ' low' : ''}`}>
+              ${p.loanBalance.toLocaleString()}
+            </span>
+          </div>
+        )}
         <span className="headline" title="This week's news">
           📰 {game.headline}
         </span>

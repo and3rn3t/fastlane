@@ -18,6 +18,7 @@ import {
   hasItem,
   itemById,
   jobById,
+  maxLoan,
   price,
   qualifiesFor,
   wagePerHour,
@@ -218,6 +219,47 @@ function BankActions({ game }: { game: GameState }) {
         onClick={() => dispatchGame({ type: 'withdraw', amount })}
       >
         Withdraw (1h)
+      </button>
+    </div>
+  )
+}
+
+function LoanActions({ game }: { game: GameState }) {
+  const { dispatchGame } = useGame()
+  const p = game.player
+  const [amount, setAmount] = useState(200)
+  const limit = maxLoan(p.creditScore)
+  const available = Math.max(0, limit - p.loanBalance)
+  return (
+    <div className="action-row">
+      <span className="grow">
+        Credit score: <strong>{p.creditScore}</strong> · limit ${limit.toLocaleString()}
+        <br />
+        <span className={`desc${p.garnished ? ' locked' : ''}`}>
+          {p.loanBalance > 0 ? `Owe $${p.loanBalance.toLocaleString()}` : 'No outstanding loan'}
+          {p.garnished && ' — wages are being garnished until it clears'}
+        </span>
+      </span>
+      <input
+        type="number"
+        inputMode="numeric"
+        enterKeyHint="done"
+        min={1}
+        value={amount}
+        aria-label="Loan amount"
+        onChange={(e) => setAmount(Math.max(0, Math.floor(Number(e.target.value))))}
+      />
+      <button
+        disabled={amount < 1 || amount > available}
+        onClick={() => dispatchGame({ type: 'takeLoan', amount })}
+      >
+        Borrow (1h)
+      </button>
+      <button
+        disabled={amount < 1 || amount > p.loanBalance || amount > p.cash}
+        onClick={() => dispatchGame({ type: 'repayLoan', amount })}
+      >
+        Repay (1h)
       </button>
     </div>
   )
@@ -468,6 +510,7 @@ export function LocationPanel({ game }: { game: GameState }) {
       {loc.id === 'bank' && (
         <>
           <BankActions game={game} />
+          <LoanActions game={game} />
           <ShopItems game={game} ids={['insurance']} />
         </>
       )}

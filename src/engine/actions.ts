@@ -7,6 +7,7 @@ import {
   DOCTOR_PRICE,
   DOCTOR_TIME,
   FOOD_NEEDED,
+  GARNISHMENT_RATE,
   GROCERY_CAP_BASE,
   GROCERY_CAP_FRIDGE,
   GROCERY_PRICE_MARKET,
@@ -23,6 +24,7 @@ import {
   TUITION,
   itemById,
   jobById,
+  maxLoan,
   travelCost,
 } from './data'
 import type { ApartmentTier, GameState, ItemId, LocationId, PlayerKey, PlayerState } from './types'
@@ -81,10 +83,23 @@ export function work(state: GameState, key: PlayerKey, hours: number) {
   require_(hours >= 1, 'Work at least one hour')
   spendTime(p, hours)
   const pay = Math.round(hours * wagePerHour(state, job.id, p.promotionLevel))
-  p.cash += pay
   p.experience += hours
   p.hoursWorkedThisWeek += hours
-  log(state, key, `Worked ${hours}h as ${job.title} for $${pay}`)
+  if (p.garnished && p.loanBalance > 0) {
+    const seized = Math.min(Math.round(pay * GARNISHMENT_RATE), p.loanBalance)
+    p.cash += pay - seized
+    p.loanBalance -= seized
+    p.loanPaidThisWeek = true
+    if (p.loanBalance <= 0) p.garnished = false
+    log(
+      state,
+      key,
+      `Worked ${hours}h as ${job.title} for $${pay} ($${seized} garnished toward the loan)`
+    )
+  } else {
+    p.cash += pay
+    log(state, key, `Worked ${hours}h as ${job.title} for $${pay}`)
+  }
 }
 
 export function qualifiesFor(p: PlayerState, jobId: string): { ok: boolean; reasons: string[] } {
@@ -256,6 +271,30 @@ export function rentApartment(
   log(state, key, `Moved into a ${tier === 'basic' ? 'basic' : 'secure'} apartment`)
 }
 
+export function takeLoan(state: GameState, key: PlayerKey, amount: number) {
+  const p = state[key]
+  require_(p.location === 'bank', 'Loans are at First Bank')
+  require_(amount > 0, 'Nothing to borrow')
+  const limit = maxLoan(p.creditScore)
+  require_(p.loanBalance + amount <= limit, `Exceeds your loan limit ($${limit})`)
+  spendTime(p, 1)
+  p.cash += amount
+  p.loanBalance += amount
+  log(state, key, `Took out a $${amount} loan`)
+}
+
+export function repayLoan(state: GameState, key: PlayerKey, amount: number) {
+  const p = state[key]
+  require_(p.location === 'bank', 'Loans are at First Bank')
+  require_(amount > 0 && amount <= p.loanBalance, 'Invalid amount')
+  spendTime(p, 1)
+  spendCash(p, amount)
+  p.loanBalance -= amount
+  p.loanPaidThisWeek = true
+  if (p.loanBalance <= 0) p.garnished = false
+  log(state, key, `Paid $${amount} toward the loan`)
+}
+
 export function relax(state: GameState, key: PlayerKey, hours: number) {
   const p = state[key]
   require_(p.location === 'home', 'Relax at home')
@@ -281,7 +320,7 @@ export function seeDoctor(state: GameState, key: PlayerKey) {
 }
 
 export function netWorth(p: PlayerState): number {
-  return Math.round(p.cash + p.savings)
+  return Math.round(p.cash + p.savings - p.loanBalance)
 }
 
 export function foodOnHand(p: PlayerState): number {

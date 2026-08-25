@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { EngineError, wagePerHour } from '../actions'
-import { FOOD_NEEDED, WEEK_TIME, travelCost } from '../data'
+import { EngineError, netWorth, wagePerHour } from '../actions'
+import { FOOD_NEEDED, WEEK_TIME, maxLoan, travelCost } from '../data'
 import { applyAction, newGame } from '../engine'
 import { careerScore, meetsGoals } from '../week'
 import type { GameState, Goals } from '../types'
@@ -225,6 +225,62 @@ describe('durable goods', () => {
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
     expect(s.player.items).toContain('bike')
+  })
+})
+
+describe('loans', () => {
+  it('borrows up to the credit limit and adds it to cash, not net worth', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'bank' })
+    const cashBefore = s.player.cash
+    const netWorthBefore = netWorth(s.player)
+    s = applyAction(s, { type: 'takeLoan', amount: 300 })
+    expect(s.player.cash).toBe(cashBefore + 300)
+    expect(s.player.loanBalance).toBe(300)
+    // Borrowing is a wash on net worth — cash up, debt up by the same amount.
+    expect(netWorth(s.player)).toBe(netWorthBefore)
+
+    const limit = maxLoan(s.player.creditScore)
+    expect(() => applyAction(s, { type: 'takeLoan', amount: limit })).toThrow(/limit/)
+  })
+
+  it('accrues interest weekly regardless of payment', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'bank' })
+    s = applyAction(s, { type: 'takeLoan', amount: 1000 })
+    s = applyAction(s, { type: 'endWeek' })
+    expect(s.player.loanBalance).toBe(1020) // 1000 * 1.02
+    expect(s.player.loanWeeksBehind).toBe(1)
+    expect(s.player.creditScore).toBeLessThan(50) // missed payment
+  })
+
+  it('a payment resets the missed-weeks clock and raises credit', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'bank' })
+    s = applyAction(s, { type: 'takeLoan', amount: 1000 })
+    s = applyAction(s, { type: 'repayLoan', amount: 500 })
+    expect(s.player.loanBalance).toBe(500)
+    s = applyAction(s, { type: 'endWeek' })
+    expect(s.player.loanBalance).toBe(510) // 500 * 1.02
+    expect(s.player.loanWeeksBehind).toBe(0)
+    expect(s.player.creditScore).toBeGreaterThan(50)
+  })
+
+  it('garnishes wages after enough consecutive missed weeks', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'bank' })
+    s = applyAction(s, { type: 'takeLoan', amount: 500 })
+    for (let i = 0; i < 3; i++) {
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    }
+    expect(s.player.garnished).toBe(true)
+
+    s = applyAction(s, { type: 'travel', to: 'employment' })
+    s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
+    s = applyAction(s, { type: 'travel', to: 'burgers' })
+    const cashBefore = s.player.cash
+    const balanceBefore = s.player.loanBalance
+    s = applyAction(s, { type: 'work', hours: 10 })
+    expect(s.player.loanBalance).toBeLessThan(balanceBefore)
+    expect(s.player.cash).toBeGreaterThan(cashBefore) // still got a cut, just not all of it
+    expect(s.player.loanPaidThisWeek).toBe(true)
   })
 })
 
