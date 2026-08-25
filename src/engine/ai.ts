@@ -13,6 +13,7 @@ import {
   JOBS,
   RENT,
   TUITION,
+  itemById,
   jobById,
   travelCost,
 } from './data'
@@ -121,10 +122,28 @@ function pursueCareer(state: GameState, key: PlayerKey): boolean {
       return attempt(() => act.buyItem(state, key, outfit.id))
     }
   }
+  if (target.requiresComputer && !act.hasItem(p, 'computer')) {
+    const computer = itemById('computer')
+    if (p.cash >= act.price(state, computer.price) + reserve(state)) {
+      if (!goTo(state, key, 'gadgets')) return false
+      return attempt(() => act.buyItem(state, key, 'computer'))
+    }
+  }
   if (p.education < target.minEducation) {
     return studyOnce(state, key)
   }
   return false
+}
+
+/** Once there's something worth protecting and cash to spare, insure it —
+ * cheaper than risking a burglary replay every uninsured week. */
+function protectValuables(state: GameState, key: PlayerKey): boolean {
+  const p = get(state, key)
+  if (p.items.length === 0 || act.hasItem(p, 'insurance')) return false
+  const insurance = itemById('insurance')
+  if (p.cash < act.price(state, insurance.price) + reserve(state) * 2) return false
+  if (!goTo(state, key, 'bank')) return false
+  return attempt(() => act.buyItem(state, key, 'insurance'))
 }
 
 function studyOnce(state: GameState, key: PlayerKey): boolean {
@@ -195,6 +214,7 @@ export function runAIWeek(state: GameState, key: PlayerKey) {
     if (behindOnEdu && studyOnce(state, key)) continue
     if (behindOnFun && p.cash > reserve(state) * 2 && pursueHappiness(state, key)) continue
     if (behindOnMoney && workShift(state, key, 25)) continue
+    if (protectValuables(state, key)) continue
     if (bankSurplus(state, key)) continue
     // Nothing better to do: top up happiness, then run out the clock working.
     if (pursueHappiness(state, key)) continue

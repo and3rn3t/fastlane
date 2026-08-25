@@ -1,7 +1,7 @@
 // End-of-week processing: upkeep for both players, economy drift, random
 // events, the rival's simulated week, and the victory check.
 
-import { foodShortfall, netWorth, price } from './actions'
+import { foodShortfall, hasItem, netWorth, price } from './actions'
 import {
   DRESS_WEAR_PER_WEEK,
   EVICTION_WEEKS,
@@ -11,6 +11,7 @@ import {
   HEALTH_LOW_THRESHOLD,
   HEALTH_OVERWORK_RATE,
   HEALTH_SICK_THRESHOLD,
+  ITEM_THEFT_CHANCE,
   LOTTERY_WIN_CHANCE,
   MAX_PROMOTIONS,
   OVERWORK_THRESHOLD,
@@ -102,6 +103,29 @@ function careerUpkeep(state: GameState, key: PlayerKey) {
   }
 }
 
+/** Durable goods at an unsecured, uninsured home can be stolen — a roll
+ * independent of the cash robbery in upkeep(), so a broke player can still
+ * lose a TV. Split out to keep upkeep() readable. */
+function burglaryUpkeep(state: GameState, key: PlayerKey) {
+  const p = state[key]
+  const who = p.name
+  const stealable = p.items.filter((id) => id !== 'insurance')
+  if (
+    stealable.length === 0 ||
+    p.apartment === 'secure' ||
+    hasItem(p, 'insurance') ||
+    roll(state) >= ITEM_THEFT_CHANCE
+  ) {
+    return
+  }
+  const stolenId = stealable[rollInt(state, stealable.length)]
+  const item = itemById(stolenId)
+  p.items = p.items.filter((id) => id !== stolenId)
+  if (item.dress !== undefined) p.dress = Math.min(p.dress, 10)
+  p.happiness = Math.max(0, p.happiness - 6)
+  log(state, key, `${who}'s ${item.name} was stolen!`)
+}
+
 function upkeep(state: GameState, key: PlayerKey) {
   const p = state[key]
   const who = p.name
@@ -162,6 +186,8 @@ function upkeep(state: GameState, key: PlayerKey) {
     p.happiness = Math.max(0, p.happiness - 8)
     log(state, key, `${who} was robbed of $${stolen}!`)
   }
+
+  burglaryUpkeep(state, key)
 
   // Lottery draw.
   if (p.lotteryTickets > 0) {

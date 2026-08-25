@@ -38,7 +38,8 @@ export function Help({ onClose }: { onClose: () => void }) {
             <h3>🏦 Savings & the economy</h3>
             <p className="blurb">
               First Bank pays weekly interest on savings — and keeps cash safe from street robbery
-              (carrying over $400 without a secure apartment is risky). Prices and wages drift every
+              (carrying over $400 without a secure apartment is risky). Without a secure apartment
+              or Home Insurance, a burglar can take a durable good too. Prices and wages drift every
               week; watch the headline for hints. Rent unpaid for 3 weeks means eviction.
             </p>
           </section>

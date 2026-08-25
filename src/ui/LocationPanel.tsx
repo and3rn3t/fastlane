@@ -465,12 +465,20 @@ export function LocationPanel({ game }: { game: GameState }) {
       )}
       {loc.id === 'market' && <GroceryAction game={game} />}
       {loc.id === 'university' && <ClassAction game={game} />}
-      {loc.id === 'bank' && <BankActions game={game} />}
+      {loc.id === 'bank' && (
+        <>
+          <BankActions game={game} />
+          <ShopItems game={game} ids={['insurance']} />
+        </>
+      )}
       {loc.id === 'clothing' && (
         <ShopItems game={game} ids={['outfit-casual', 'outfit-business', 'outfit-pro']} />
       )}
       {loc.id === 'gadgets' && (
-        <ShopItems game={game} ids={['fridge', 'tv', 'stereo', 'console', 'bike', 'phone']} />
+        <ShopItems
+          game={game}
+          ids={['fridge', 'tv', 'stereo', 'console', 'bike', 'phone', 'computer']}
+        />
       )}
       {loc.id === 'pawn' && <PawnActions game={game} />}
       {loc.id === 'rentoffice' && <RentActions game={game} />}

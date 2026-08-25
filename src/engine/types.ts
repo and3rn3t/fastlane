@@ -23,6 +23,8 @@ export type ItemId =
   | 'console'
   | 'bike'
   | 'phone'
+  | 'computer'
+  | 'insurance'
 
 export type ApartmentTier = 'none' | 'basic' | 'secure'
 
@@ -45,6 +47,9 @@ export interface JobDef {
   minDress: number
   minEducation: number
   minExperience: number
+  /** Senior white-collar roles need a computer at home, not just the right
+   * dress/education/experience. */
+  requiresComputer?: boolean
 }
 
 export interface ItemDef {

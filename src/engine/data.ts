@@ -40,6 +40,9 @@ export const DOCTOR_PRICE = 45
 export const DOCTOR_TIME = 3
 export const DOCTOR_HEAL = 35
 
+/** Chance per week (no secure apartment, uninsured, owns something stealable). */
+export const ITEM_THEFT_CHANCE = 0.08
+
 /** Consecutive weeks of showing up (working ≥1h) at the same job before it
  * earns the next promotion level. */
 export const PROMOTION_TENURE_WEEKS = 6
@@ -255,6 +258,7 @@ export const JOBS: JobDef[] = [
     minDress: 75,
     minEducation: 14,
     minExperience: 120,
+    requiresComputer: true,
   },
   {
     id: 'branch-manager',
@@ -265,6 +269,7 @@ export const JOBS: JobDef[] = [
     minDress: 85,
     minEducation: 22,
     minExperience: 280,
+    requiresComputer: true,
   },
   // City University
   {
@@ -286,6 +291,7 @@ export const JOBS: JobDef[] = [
     minDress: 60,
     minEducation: 30,
     minExperience: 200,
+    requiresComputer: true,
   },
 ]
 
@@ -358,6 +364,20 @@ export const ITEMS: ItemDef[] = [
     soldAt: 'gadgets',
     price: 190,
     blurb: 'Apply for jobs and pay rent from anywhere.',
+  },
+  {
+    id: 'computer',
+    name: 'Computer',
+    soldAt: 'gadgets',
+    price: 380,
+    blurb: 'Required for senior office roles: Financial Analyst, Branch Manager, Professor.',
+  },
+  {
+    id: 'insurance',
+    name: 'Home Insurance',
+    soldAt: 'bank',
+    price: 150,
+    blurb: "Covers your belongings — a burglar can't take what's insured.",
   },
 ]
 

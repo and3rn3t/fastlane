@@ -190,6 +190,44 @@ describe('end of week', () => {
   })
 })
 
+describe('durable goods', () => {
+  it('gates senior office jobs on owning a computer', () => {
+    const s = applyAction(game(), { type: 'travel', to: 'employment' })
+    expect(() => applyAction(s, { type: 'applyJob', jobId: 'analyst' })).toThrow(/computer/)
+  })
+
+  it('an uninsured item can be stolen from an unsecured home', () => {
+    // Seed found by brute force: bike goes missing on the 4th endWeek.
+    let s = applyAction(game(easyGoals, 2), { type: 'travel', to: 'gadgets' })
+    s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
+    for (let i = 0; i < 4; i++) {
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    }
+    expect(s.player.items).not.toContain('bike')
+    expect(s.lastReport?.entries.some((e) => e.text.includes('stolen'))).toBe(true)
+  })
+
+  it('insurance protects durable goods from that same theft', () => {
+    // Actions never touch the RNG stream (only week.ts's upkeep/personalEvent/
+    // driftEconomy do), so working first to afford both purchases doesn't
+    // change the endWeek-by-endWeek roll sequence from the test above.
+    let s = applyAction(game(easyGoals, 2), { type: 'travel', to: 'employment' })
+    s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
+    s = applyAction(s, { type: 'travel', to: 'burgers' })
+    s = applyAction(s, { type: 'work', hours: 40 })
+    s = applyAction(s, { type: 'travel', to: 'gadgets' })
+    s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
+    s = applyAction(s, { type: 'travel', to: 'bank' })
+    s = applyAction(s, { type: 'buyItem', itemId: 'insurance' })
+    for (let i = 0; i < 4; i++) {
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    }
+    expect(s.player.items).toContain('bike')
+  })
+})
+
 describe('health', () => {
   it('overworking past 40h/week drains health', () => {
     let s = applyAction(game(), { type: 'travel', to: 'employment' })

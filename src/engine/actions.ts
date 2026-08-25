@@ -93,6 +93,7 @@ export function qualifiesFor(p: PlayerState, jobId: string): { ok: boolean; reas
   if (p.education < job.minEducation) reasons.push(`needs ${job.minEducation} classes`)
   if (p.dress < job.minDress) reasons.push(`needs dress ${job.minDress}`)
   if (p.experience < job.minExperience) reasons.push(`needs ${job.minExperience}h experience`)
+  if (job.requiresComputer && !hasItem(p, 'computer')) reasons.push('needs a computer')
   return { ok: reasons.length === 0, reasons }
 }
 
