@@ -1,0 +1,13 @@
+{
+  "name": "Fast Lane",
+  "short_name": "Fast Lane",
+  "description": "A modern life-sim board game of jobs, degrees, rent, and getting ahead.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#eef0f4",
+  "theme_color": "#eef0f4",
+  "icons": [
+    { "src": "/apple-touch-icon.png", "sizes": "360x360", "type": "image/png" },
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
