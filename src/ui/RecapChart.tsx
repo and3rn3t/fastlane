@@ -49,6 +49,10 @@ export function RecapChart({
 
   const youPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i)} ${yAt(d.you)}`).join(' ')
   const rileyPath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${xAt(i)} ${yAt(d.riley)}`).join(' ')
+  // A safe overestimate of the polyline's real length (getTotalLength isn't
+  // available before layout), so the stroke-dashoffset draw-in animation
+  // always reveals the whole line regardless of how jagged it is.
+  const maxPathLen = PLOT_W + data.length * PLOT_H
   const last = data[data.length - 1]
   const xTicks = pickIndices(data.length)
   const yTicks = [0, maxY * 0.5, maxY]
@@ -124,8 +128,28 @@ export function RecapChart({
             W{data[i].week}
           </text>
         ))}
-        <path className="recap-line you" d={youPath} />
-        <path className="recap-line riley" d={rileyPath} />
+        <path
+          className="recap-line you recap-line-draw"
+          d={youPath}
+          strokeDasharray={maxPathLen}
+          style={
+            {
+              '--chart-path-len': maxPathLen,
+              animationDelay: '0.1s',
+            } as React.CSSProperties
+          }
+        />
+        <path
+          className="recap-line riley recap-line-draw"
+          d={rileyPath}
+          strokeDasharray={maxPathLen}
+          style={
+            {
+              '--chart-path-len': maxPathLen,
+              animationDelay: '0.3s',
+            } as React.CSSProperties
+          }
+        />
         <circle className="recap-dot you" cx={xAt(data.length - 1)} cy={youDotY} r={4} />
         <circle className="recap-dot riley" cx={xAt(data.length - 1)} cy={rileyDotY} r={4} />
         <text className="recap-endlabel" x={xAt(data.length - 1) + 8} y={youLabelY} dy="0.32em">

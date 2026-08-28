@@ -3,6 +3,7 @@ import type { GameState } from '@/engine'
 import { useGame } from '@/state/GameContext'
 import { shareableResult } from '@/daily'
 import { recordGameResult, type Achievement } from '@/stats'
+import { CopyIcon } from './Icon'
 import { RecapChart } from './RecapChart'
 import { playWin } from './sound'
 
@@ -69,7 +70,13 @@ export function GameOver({ game }: { game: GameState }) {
                 }
               }}
             >
-              {copied ? 'Copied!' : '📋 Copy result'}
+              {copied ? (
+                'Copied!'
+              ) : (
+                <>
+                  <CopyIcon size={14} /> Copy result
+                </>
+              )}
             </button>
           </div>
         )}

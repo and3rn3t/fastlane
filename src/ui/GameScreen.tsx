@@ -3,6 +3,7 @@ import { jobById, netWorth, type GameState, type LocationId, type LogEntry } fro
 import { useGame } from '@/state/GameContext'
 import { Board, DeltaBadge, useDeltaFlash } from './Board'
 import { Help } from './Help'
+import { BackIcon, ExportIcon, HelpIcon, SpeakerIcon, SpeakerMuteIcon } from './Icon'
 import { LocationPanel } from './LocationPanel'
 import { isMuted, playDisaster, setMuted } from './sound'
 import { WeekReportModal } from './WeekReportModal'
@@ -112,10 +113,11 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
           Fast <span>Lane</span>
         </span>
         <div className="topbar-actions">
-          <button onClick={onHelp} title="How to play" aria-label="Help">
-            ❓
+          <button className="icon-btn" onClick={onHelp} title="How to play" aria-label="Help">
+            <HelpIcon />
           </button>
           <button
+            className="icon-btn"
             onClick={() => {
               const next = !muted
               setMuted(next)
@@ -124,28 +126,37 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
             title={muted ? 'Unmute sound' : 'Mute sound'}
             aria-label={muted ? 'Unmute sound' : 'Mute sound'}
           >
-            {muted ? '🔇' : '🔊'}
+            {muted ? <SpeakerMuteIcon /> : <SpeakerIcon />}
           </button>
           <button
+            className="icon-btn"
             onClick={exportSave}
             title="Download a backup of your save"
             aria-label="Export save"
           >
-            💾
+            <ExportIcon />
           </button>
           <button
+            className="menu-btn"
             onClick={() => {
               if (window.confirm('Abandon this game and return to the menu?')) quitToMenu()
             }}
           >
-            Menu
+            <BackIcon size={14} /> Menu
           </button>
         </div>
       </div>
       <div className="topbar-stats">
-        <div className="stat">
+        <div className="stat cash">
           <span className="label">Cash</span>
-          <span className="value">${p.cash.toLocaleString()}</span>
+          <span className="value">
+            ${p.cash.toLocaleString()}
+            {cashDelta !== null && cashDelta > 0 && (
+              <svg className="sparkle" width="9" height="9" viewBox="0 0 8 8" aria-hidden>
+                <path d="M4 0 5 3 8 4 5 5 4 8 3 5 0 4 3 3Z" fill="var(--good)" />
+              </svg>
+            )}
+          </span>
           <DeltaBadge delta={cashDelta} format={(n) => `${n > 0 ? '+' : '-'}$${Math.abs(n)}`} />
         </div>
         <div className="stat">

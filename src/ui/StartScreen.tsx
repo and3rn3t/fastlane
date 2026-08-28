@@ -12,15 +12,47 @@ import {
 import { useGame } from '@/state/GameContext'
 import { dailyChallengeNumber, dailyChallengeOptions } from '@/daily'
 import { ACHIEVEMENTS, loadStats } from '@/stats'
+import {
+  BoltIcon,
+  BriefcaseIcon,
+  DiceIcon,
+  DollarIcon,
+  GradCapIcon,
+  HeartIcon,
+  LockIcon,
+  ScaleIcon,
+  type IconProps,
+} from './Icon'
 
-const RILEY_PROFILES: Array<{ id: AiProfileName; label: string; blurb: string }> = [
-  { id: 'balanced', label: 'Balanced', blurb: 'Plays every goal evenly — the toughest opponent.' },
-  { id: 'hustler', label: 'Hustler', blurb: 'Works every spare hour, chases money above all.' },
-  { id: 'scholar', label: 'Scholar', blurb: 'Studies whenever there is cash to spare.' },
+const RILEY_PROFILES: Array<{
+  id: AiProfileName
+  label: string
+  blurb: string
+  Icon: (props: IconProps) => React.JSX.Element
+}> = [
+  {
+    id: 'balanced',
+    label: 'Balanced',
+    blurb: 'Plays every goal evenly — the toughest opponent.',
+    Icon: ScaleIcon,
+  },
+  {
+    id: 'hustler',
+    label: 'Hustler',
+    blurb: 'Works every spare hour, chases money above all.',
+    Icon: BoltIcon,
+  },
+  {
+    id: 'scholar',
+    label: 'Scholar',
+    blurb: 'Studies whenever there is cash to spare.',
+    Icon: GradCapIcon,
+  },
   {
     id: 'gambler',
     label: 'Gambler',
     blurb: 'Bets surplus cash at the casino instead of banking it.',
+    Icon: DiceIcon,
   },
 ]
 
@@ -37,6 +69,8 @@ const RULE_OPTIONS: Array<{ id: RulePresetName; label: string; blurb: string }> 
 interface SliderRow {
   key: keyof Goals
   label: string
+  Icon: (props: IconProps) => React.JSX.Element
+  category: 'wealth' | 'happy' | 'edu' | 'career'
   targets: readonly number[]
   format: (v: number) => string
 }
@@ -44,23 +78,36 @@ interface SliderRow {
 const ROWS: SliderRow[] = [
   {
     key: 'wealth',
-    label: '💵 Wealth',
+    label: 'Wealth',
+    Icon: DollarIcon,
+    category: 'wealth',
     targets: WEALTH_TARGETS,
     format: (v) => `$${v.toLocaleString()}`,
   },
   {
     key: 'happiness',
-    label: '😊 Happiness',
+    label: 'Happiness',
+    Icon: HeartIcon,
+    category: 'happy',
     targets: HAPPINESS_TARGETS,
     format: (v) => `${v}/100`,
   },
   {
     key: 'education',
-    label: '🎓 Education',
+    label: 'Education',
+    Icon: GradCapIcon,
+    category: 'edu',
     targets: EDUCATION_TARGETS,
     format: (v) => `${v} classes`,
   },
-  { key: 'career', label: '💼 Career', targets: CAREER_TARGETS, format: (v) => `${v} prestige` },
+  {
+    key: 'career',
+    label: 'Career',
+    Icon: BriefcaseIcon,
+    category: 'career',
+    targets: CAREER_TARGETS,
+    format: (v) => `${v} prestige`,
+  },
 ]
 
 const PRESETS: Record<string, Record<keyof Goals, number>> = {
@@ -141,7 +188,7 @@ export function StartScreen() {
                   title={a.description}
                 >
                   <span className="name">
-                    {unlocked ? '🏆' : '🔒'} {a.name}
+                    {unlocked ? '🏆' : <LockIcon size={12} />} {a.name}
                   </span>
                   <span className="desc">{a.description}</span>
                 </div>
@@ -174,13 +221,21 @@ export function StartScreen() {
 
       {ROWS.map((row) => (
         <div className="goal-row" key={row.key}>
-          <span>{row.label}</span>
+          <span className={`goal-row-label cat-${row.category}`}>
+            <row.Icon size={15} /> {row.label}
+          </span>
           <input
             type="range"
+            className={`cat-${row.category}`}
             min={1}
             max={10}
             value={levels[row.key]}
             aria-label={`${row.label} goal`}
+            style={
+              {
+                '--fill-pct': `${((levels[row.key] - 1) / 9) * 100}%`,
+              } as React.CSSProperties
+            }
             onChange={(e) => setLevels({ ...levels, [row.key]: Number(e.target.value) })}
           />
           <span className="target">{row.format(row.targets[levels[row.key] - 1])}</span>
@@ -214,7 +269,7 @@ export function StartScreen() {
               aria-pressed={rileyProfile === prof.id}
               onClick={() => setRileyProfile(prof.id)}
             >
-              {prof.label}
+              <prof.Icon size={14} /> {prof.label}
             </button>
           ))}
         </div>

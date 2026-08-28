@@ -8,7 +8,8 @@ import {
   type LocationId,
 } from '@/engine'
 import { useGame } from '@/state/GameContext'
-import { LOCATION_ICONS } from './icons'
+import { BriefcaseIcon, DollarIcon, GradCapIcon, HeartIcon } from './Icon'
+import { LOCATION_CATEGORY, LOCATION_ICONS } from './icons'
 import { playMove } from './sound'
 
 // Loop index → cell in a 4×5 grid (4 cols, 5 rows — an extra row rather than
@@ -35,11 +36,15 @@ const PERIMETER: Array<[row: number, col: number]> = [
 ]
 
 const TRACKS = [
-  { key: 'wealth', label: '💵 Wealth' },
-  { key: 'happiness', label: '😊 Happy' },
-  { key: 'education', label: '🎓 Education' },
-  { key: 'career', label: '💼 Career' },
+  { key: 'wealth', label: 'Wealth', Icon: DollarIcon, category: 'wealth' },
+  { key: 'happiness', label: 'Happy', Icon: HeartIcon, category: 'happy' },
+  { key: 'education', label: 'Education', Icon: GradCapIcon, category: 'edu' },
+  { key: 'career', label: 'Career', Icon: BriefcaseIcon, category: 'career' },
 ] as const
+
+/** Circumference of the time-left ring gauge (r=19, matching the SVG below). */
+const RING_RADIUS = 19
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS
 
 /** Flashes a floating +/-N whenever `value` changes, for a beat, then clears. */
 export function useDeltaFlash(value: number) {
@@ -75,14 +80,38 @@ function CenterPanel({ game }: { game: GameState }) {
   const rival = goalProgress(game.riley, game.goals)
   const timeDelta = useDeltaFlash(game.player.timeLeft)
 
+  const ringOffset = RING_CIRCUMFERENCE * (1 - game.player.timeLeft / 60)
+
   return (
     <div className="board-center">
       <div className="week-line">
-        <h3>Week {game.week}</h3>
-        <span className="time-left" title="Time remaining this week">
-          ⏱ {game.player.timeLeft}h
-          <DeltaBadge delta={timeDelta} format={(n) => `${n > 0 ? '+' : ''}${n}h`} />
-        </span>
+        <svg className="time-ring" width="46" height="46" viewBox="0 0 46 46" aria-hidden>
+          <defs>
+            <linearGradient id="time-ring-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="var(--accent)" />
+              <stop offset="100%" stopColor="var(--cat-happy)" />
+            </linearGradient>
+          </defs>
+          <circle cx="23" cy="23" r={RING_RADIUS} fill="none" className="time-ring-track" />
+          <circle
+            cx="23"
+            cy="23"
+            r={RING_RADIUS}
+            fill="none"
+            className="time-ring-fill"
+            strokeDasharray={RING_CIRCUMFERENCE}
+            strokeDashoffset={ringOffset}
+            transform="rotate(-90 23 23)"
+            style={{ '--ring-circumference': RING_CIRCUMFERENCE } as React.CSSProperties}
+          />
+        </svg>
+        <div className="week-line-text">
+          <h3>Week {game.week}</h3>
+          <span className="time-left" title="Time remaining this week">
+            {game.player.timeLeft}h left
+            <DeltaBadge delta={timeDelta} format={(n) => `${n > 0 ? '+' : ''}${n}h`} />
+          </span>
+        </div>
       </div>
       <div className="bar-cols">
         <span />
@@ -92,9 +121,16 @@ function CenterPanel({ game }: { game: GameState }) {
       <div className="progress-pair">
         {TRACKS.map((t) => (
           <div className="row" key={t.key}>
-            <span>{t.label}</span>
+            <span>
+              <t.Icon size={13} className="track-icon" /> {t.label}
+            </span>
             <div className="bar">
-              <div style={{ width: `${Math.round(mine[t.key] * 100)}%` }} />
+              <div
+                style={{
+                  width: `${Math.round(mine[t.key] * 100)}%`,
+                  background: `var(--cat-${t.category})`,
+                }}
+              />
             </div>
             <div className="bar rival">
               <div style={{ width: `${Math.round(rival[t.key] * 100)}%` }} />
@@ -195,6 +231,8 @@ export function Board({
         const [row, col] = PERIMETER[loc.loopIndex]
         const here = p.location === loc.id
         const cost = travelCost(p.location, loc.id, bike)
+        const TileIcon = LOCATION_ICONS[loc.id]
+        const category = LOCATION_CATEGORY[loc.id]
         return (
           <button
             key={loc.id}
@@ -202,6 +240,7 @@ export function Board({
               tileRefs.current[loc.id] = el
             }}
             className={`tile${here ? ' here' : ''}`}
+            data-category={category ?? undefined}
             style={{ gridRow: row, gridColumn: col }}
             disabled={here || cost > p.timeLeft}
             onClick={() => {
@@ -211,7 +250,7 @@ export function Board({
             title={here ? 'You are here' : `Travel: ${cost}h`}
           >
             <span className="icon" aria-hidden>
-              {LOCATION_ICONS[loc.id]}
+              <TileIcon size={20} />
             </span>
             <span className="name">{loc.name}</span>
             <span className="cost">{here ? 'You are here' : `${cost}h away`}</span>

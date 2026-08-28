@@ -30,8 +30,63 @@ import {
   type ItemId,
 } from '@/engine'
 import { useGame } from '@/state/GameContext'
+import {
+  BankIcon,
+  BriefcaseIcon,
+  ChevronDownIcon,
+  DollarIcon,
+  HomeIcon,
+  LockIcon,
+  ShieldIcon,
+} from './Icon'
 import { LOCATION_ICONS } from './icons'
 import { playPayday, playPurchase } from './sound'
+
+/** A tap-friendly −/+ control replacing a raw range slider for small bounded
+ * quantities (hours, units) — the underlying state/dispatch is untouched,
+ * only the input control changes. */
+function Stepper({
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+  label,
+  suffix,
+}: {
+  value: number
+  min: number
+  max: number
+  step?: number
+  onChange: (next: number) => void
+  label: string
+  suffix?: string
+}) {
+  return (
+    <div className="stepper">
+      <button
+        type="button"
+        aria-label={`Decrease ${label}`}
+        disabled={value <= min}
+        onClick={() => onChange(Math.max(min, value - step))}
+      >
+        −
+      </button>
+      <span className="stepper-val">
+        {value}
+        {suffix}
+      </span>
+      <button
+        type="button"
+        aria-label={`Increase ${label}`}
+        disabled={value >= max}
+        onClick={() => onChange(Math.min(max, value + step))}
+      >
+        +
+      </button>
+    </div>
+  )
+}
 
 function WorkAction({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
@@ -59,13 +114,13 @@ function WorkAction({ game }: { game: GameState }) {
             : `Next promotion in ${Math.max(1, weeksToPromotion)} week${weeksToPromotion === 1 ? '' : 's'} of showing up`}
         </span>
       </span>
-      <input
-        type="range"
+      <Stepper
+        value={clamped}
         min={1}
         max={Math.max(1, max)}
-        value={clamped}
-        aria-label="Hours to work"
-        onChange={(e) => setHours(Number(e.target.value))}
+        onChange={setHours}
+        label="hours to work"
+        suffix="h"
       />
       <button
         className="primary"
@@ -103,7 +158,11 @@ function JobBoard({ game }: { game: GameState }) {
                 {job.minDress > 0 && ` · dress ${job.minDress}`}
                 {job.minExperience > 0 && ` · ${job.minExperience}h exp`}
               </div>
-              {!qual.ok && <div className="locked">🔒 {qual.reasons.join(', ')}</div>}
+              {!qual.ok && (
+                <div className="locked">
+                  <LockIcon size={12} /> {qual.reasons.join(', ')}
+                </div>
+              )}
             </div>
             <button
               disabled={!qual.ok || isCurrent}
@@ -136,14 +195,12 @@ function GroceryAction({ game }: { game: GameState }) {
           Stored: {p.groceries}/{cap} {hasItem(p, 'fridge') ? '(fridge)' : '(no fridge)'}
         </span>
       </span>
-      <input
-        type="range"
+      <Stepper
+        value={clamped}
         min={1}
         max={Math.max(1, room)}
-        value={clamped}
-        aria-label="Grocery units"
-        onChange={(e) => setUnits(Number(e.target.value))}
-        disabled={room < 1}
+        onChange={setUnits}
+        label="grocery units"
       />
       <button
         className="primary"
@@ -364,14 +421,13 @@ function HomeActions({ game }: { game: GameState }) {
         <br />
         <span className="desc">Pantry: {p.groceries} food units stored</span>
       </span>
-      <input
-        type="range"
+      <Stepper
+        value={clamped}
         min={1}
         max={Math.max(1, Math.min(relaxLeft, p.timeLeft))}
-        value={clamped}
-        aria-label="Hours to relax"
-        onChange={(e) => setHours(Number(e.target.value))}
-        disabled={relaxLeft < 1}
+        onChange={setHours}
+        label="hours to relax"
+        suffix="h"
       />
       <button
         disabled={relaxLeft < 1 || p.timeLeft < 1}
@@ -523,37 +579,100 @@ function DoctorAction({ game }: { game: GameState }) {
   )
 }
 
+/** A titled, icon-headed card grouping related action rows — the
+ * grouped-list pattern that replaces a flat stack of action rows at
+ * locations with more than one kind of thing to do here. */
+function ActionGroup({
+  label,
+  icon,
+  children,
+}: {
+  label: string
+  icon: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <div className="action-group">
+      <span className="section-label">
+        {icon} {label}
+      </span>
+      <div className="action-group-body">{children}</div>
+    </div>
+  )
+}
+
+/** Same card, but collapsed behind a <details> disclosure triangle — for
+ * the location with the most stacked sub-panels (Bank), so the less-common
+ * action isn't competing for space with the common one by default. Native
+ * <details>/<summary> gets keyboard/AT support for free. */
+function CollapsibleActionGroup({
+  label,
+  icon,
+  children,
+}: {
+  label: string
+  icon: React.ReactNode
+  children: React.ReactNode
+}) {
+  return (
+    <details className="action-group">
+      <summary className="section-label">
+        {icon} {label}
+        <ChevronDownIcon size={13} className="disclosure-chevron" />
+      </summary>
+      <div className="action-group-body">{children}</div>
+    </details>
+  )
+}
+
 export function LocationPanel({ game }: { game: GameState }) {
   const loc = LOCATIONS[game.player.location]
+  const LocIcon = LOCATION_ICONS[loc.id]
   return (
     <div className="panel sheet">
       <h2>
-        <span aria-hidden>{LOCATION_ICONS[loc.id]}</span> {loc.name}
+        <span aria-hidden>
+          <LocIcon size={20} />
+        </span>{' '}
+        {loc.name}
       </h2>
       <p className="blurb">{loc.blurb}</p>
       <WorkAction game={game} />
-      {loc.id === 'home' && <HomeActions game={game} />}
+      {loc.id === 'home' && (
+        <ActionGroup label="Home" icon={<HomeIcon size={15} />}>
+          <HomeActions game={game} />
+        </ActionGroup>
+      )}
       {loc.id === 'home' && hasItem(game.player, 'phone') && (
-        <>
-          <p className="blurb">📱 Browsing job listings on your phone:</p>
+        <ActionGroup label="Job listings (on your phone)" icon={<BriefcaseIcon size={15} />}>
           <JobBoard game={game} />
-        </>
+        </ActionGroup>
       )}
       {loc.id === 'employment' && <JobBoard game={game} />}
       {loc.id === 'burgers' && <MealAction game={game} />}
       {loc.id === 'megamart' && (
         <>
-          <GroceryAction game={game} />
-          <LotteryAction game={game} />
+          <ActionGroup label="Groceries" icon={<DollarIcon size={15} />}>
+            <GroceryAction game={game} />
+          </ActionGroup>
+          <ActionGroup label="Lottery" icon={<DollarIcon size={15} />}>
+            <LotteryAction game={game} />
+          </ActionGroup>
         </>
       )}
       {loc.id === 'market' && <GroceryAction game={game} />}
       {loc.id === 'university' && <ClassAction game={game} />}
       {loc.id === 'bank' && (
         <>
-          <BankActions game={game} />
-          <LoanActions game={game} />
-          <ShopItems game={game} ids={['insurance']} />
+          <ActionGroup label="Savings" icon={<BankIcon size={15} />}>
+            <BankActions game={game} />
+          </ActionGroup>
+          <CollapsibleActionGroup label="Loans" icon={<DollarIcon size={15} />}>
+            <LoanActions game={game} />
+          </CollapsibleActionGroup>
+          <ActionGroup label="Protection" icon={<ShieldIcon size={15} />}>
+            <ShopItems game={game} ids={['insurance']} />
+          </ActionGroup>
         </>
       )}
       {loc.id === 'clothing' && (
