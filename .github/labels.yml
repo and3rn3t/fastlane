@@ -8,6 +8,14 @@
   color: 'd73a4a'
   description: Something isn't working
 
+- name: chore
+  color: 'fef2c0'
+  description: Routine maintenance with no user-facing behavior change
+
+- name: breaking
+  color: 'b60205'
+  description: Breaking change — triggers a major version bump in release notes
+
 - name: feature
   color: '0e8a16'
   description: New feature request
@@ -41,6 +49,10 @@
   description: Dependency updates
 
 # ---- Status ----
+
+- name: skip-changelog
+  color: 'ededed'
+  description: Excluded from the drafted release notes
 
 - name: needs-triage
   color: 'fbca04'

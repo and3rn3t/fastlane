@@ -1,26 +1,72 @@
 name-template: 'v$RESOLVED_VERSION'
 tag-template: 'v$RESOLVED_VERSION'
 
+# Matches on conventional-commit PR titles (this repo's actual convention —
+# feat:, fix:, chore(deps):, ci:, etc.) as the primary signal, with labels
+# as a secondary/manual-override path. The old label-only version of this
+# config silently relied on labels ('chore', 'fix', 'bugfix', 'breaking')
+# that nothing in .github/labeler.yml or .github/labels.yml ever actually
+# applies to a PR — so most changes fell through uncategorized. Conventional
+# matching doesn't depend on label automation working.
 categories:
-  - title: '🚀 Features'
-    labels: ['feature', 'enhancement']
-  - title: '🐛 Bug Fixes'
-    labels: ['fix', 'bugfix', 'bug']
-  - title: '🔒 Security'
-    labels: ['security']
-  - title: '🧰 Maintenance'
-    labels: ['chore', 'dependencies', 'ci']
-  - title: '📝 Documentation'
-    labels: ['documentation', 'docs']
+  - title: '💥 Breaking Changes'
+    semver-increment: 'major'
+    when:
+      - conventional:
+          breaking: true
+      - label: 'breaking'
 
-version-resolver:
-  major:
-    labels: ['breaking']
-  minor:
-    labels: ['feature', 'enhancement']
-  patch:
-    labels: ['fix', 'bugfix', 'bug', 'chore', 'dependencies', 'security', 'docs']
-  default: patch
+  - title: '🚀 Features'
+    semver-increment: 'minor'
+    when:
+      - conventional:
+          type: 'feat'
+      - labels:
+          - 'feature'
+          - 'enhancement'
+
+  - title: '🐛 Bug Fixes'
+    when:
+      - conventional:
+          type: 'fix'
+      - labels:
+          - 'fix'
+          - 'bugfix'
+          - 'bug'
+
+  - title: '🔒 Security'
+    when:
+      - label: 'security'
+
+  - title: '⬆️ Dependencies'
+    collapse-after: 5
+    when:
+      - label: 'dependencies'
+
+  - title: '🧰 Maintenance'
+    when:
+      - conventional:
+          types: ['chore', 'ci', 'build', 'refactor', 'style', 'test']
+      - labels:
+          - 'chore'
+          - 'ci'
+
+  - title: '📝 Documentation'
+    when:
+      - conventional:
+          type: 'docs'
+      - labels:
+          - 'documentation'
+          - 'docs'
+
+  - type: 'pre-exclude'
+    when:
+      label: 'skip-changelog'
+
+  # Fallback so every PR still resolves to at least a patch bump even when
+  # it matches no category above (an unconventional title, no label).
+  - type: 'version-resolver'
+    semver-increment: 'patch'
 
 template: |
   ## What's Changed
