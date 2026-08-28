@@ -17,9 +17,13 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+  deployments: write
+
 jobs:
   deploy:
-    uses: and3rn3t/.github/.github/workflows/reusable-cloudflare-pages-deploy.yml@main
+    uses: and3rn3t/.github/.github/workflows/reusable-cloudflare-pages-deploy.yml@v1
     with:
       project-name: fastlane
       package-manager: pnpm
