@@ -1,39 +1,28 @@
+# Build + deploy to Cloudflare Pages via the shared reusable workflow
+# (and3rn3t/.github) — production deploy on push to main, preview deploy on
+# PRs (skipped for Dependabot/Renovate PRs, which don't get repo secrets).
+# See reusable-cloudflare-pages-deploy.yml for what this does; repo-specific
+# extras (a PR comment, a one-time `pages project create` step) belong in a
+# follow-up job here that `needs: deploy`, not in the reusable workflow.
 name: Deploy
 
 on:
   push:
     branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: false
-
-permissions:
-  contents: read
-  deployments: write
+  cancel-in-progress: true
 
 jobs:
   deploy:
-    name: Deploy to Cloudflare Pages
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
-      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-        env:
-          HUSKY: 0
-      - name: Build
-        run: pnpm build
-      - name: Deploy
-        uses: cloudflare/wrangler-action@9acf94ace14e7dc412b076f2c5c20b8ce93c79cd # v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy --branch=main
+    uses: and3rn3t/.github/.github/workflows/reusable-cloudflare-pages-deploy.yml@main
+    with:
+      project-name: fastlane
+      package-manager: pnpm
+    secrets:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
