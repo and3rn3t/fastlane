@@ -17,7 +17,9 @@ type SheetState = 'peek' | 'expanded'
 
 const DESKTOP_BREAKPOINT_PX = 900
 
-const PEEK_ACTIONS: Partial<Record<LocationId, (p: { game: GameState }) => React.JSX.Element | null>> = {
+const PEEK_ACTIONS: Partial<
+  Record<LocationId, (p: { game: GameState }) => React.JSX.Element | null>
+> = {
   home: HomeActions,
   burgers: MealAction,
   market: GroceryAction,
@@ -34,7 +36,9 @@ const PEEK_ACTIONS: Partial<Record<LocationId, (p: { game: GameState }) => React
  * design target. */
 export function LocationSheet({ game }: { game: GameState }) {
   const [sheetState, setSheetState] = useState<SheetState>(() =>
-    typeof window !== 'undefined' && window.innerWidth >= DESKTOP_BREAKPOINT_PX ? 'expanded' : 'peek'
+    typeof window !== 'undefined' && window.innerWidth >= DESKTOP_BREAKPOINT_PX
+      ? 'expanded'
+      : 'peek'
   )
   const prevLocationRef = useRef(game.player.location)
 

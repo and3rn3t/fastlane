@@ -3,7 +3,14 @@ import { jobById, netWorth, type GameState, type LocationId, type LogEntry } fro
 import { useGame } from '@/state/GameContext'
 import { Board, DeltaBadge, useDeltaFlash } from './Board'
 import { Help } from './Help'
-import { BackIcon, ChevronDownIcon, ExportIcon, HelpIcon, SpeakerIcon, SpeakerMuteIcon } from './Icon'
+import {
+  BackIcon,
+  ChevronDownIcon,
+  ExportIcon,
+  HelpIcon,
+  SpeakerIcon,
+  SpeakerMuteIcon,
+} from './Icon'
 import { LocationSheet } from './LocationSheet'
 import { isMuted, playDisaster, setMuted } from './sound'
 import { WeekReportModal } from './WeekReportModal'
