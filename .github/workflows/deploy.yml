@@ -1,9 +1,15 @@
 # Build + deploy to Cloudflare Pages via the shared reusable workflow
 # (and3rn3t/.github) — production deploy on push to main, preview deploy on
 # PRs (skipped for Dependabot/Renovate PRs, which don't get repo secrets).
-# See reusable-cloudflare-pages-deploy.yml for what this does; repo-specific
-# extras (a PR comment, a one-time `pages project create` step) belong in a
-# follow-up job here that `needs: deploy`, not in the reusable workflow.
+# `deploy` needs: quality, so a build that fails lint/type-check/tests never
+# ships — the reusable deploy workflow's own build step only fails on things
+# that break Vite's bundler (esbuild doesn't type-check), so without this
+# gate a red CI run would not have blocked production.
+#
+# See reusable-cloudflare-pages-deploy.yml and reusable-node-verify.yml for
+# what each does; repo-specific extras (a PR comment, a one-time `pages
+# project create` step) belong in a follow-up job here that `needs: deploy`,
+# not in either reusable workflow.
 name: Deploy
 
 on:
@@ -13,20 +19,32 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# No concurrency block here on purpose: the reusable workflow below already
-# declares concurrency on group `${{ github.workflow }}-${{ github.ref }}`,
-# which — for a reusable-workflow call — resolves to this same caller's
-# name+ref. Adding an identical block at this level makes the run wait on
-# its own concurrency slot (a real deadlock GitHub detects and cancels the
-# run for); neither of the two other repos actually running this reusable
-# workflow (huggingface, telescope) declare one here either.
+# No concurrency block here on purpose: both reusable workflows below already
+# declare their own concurrency group (reusable-node-verify.yml's includes
+# `inputs.command` specifically so multiple calls from one caller don't
+# collide; reusable-cloudflare-pages-deploy.yml's is
+# `${{ github.workflow }}-${{ github.ref }}`, which for a reusable-workflow
+# call resolves to THIS caller's own name+ref). Adding an identical block at
+# this level makes the run wait on a concurrency slot it already holds — a
+# real deadlock GitHub detects and cancels the run for. Neither huggingface
+# nor telescope (the only other repos running these reusable workflows)
+# declare one here either.
 
 permissions:
   contents: read
   deployments: write
 
 jobs:
+  quality:
+    name: Quality gate
+    uses: and3rn3t/.github/.github/workflows/reusable-node-verify.yml@v1
+    with:
+      package-manager: pnpm
+      command: pnpm lint && pnpm type-check && pnpm format:check && pnpm test
+
   deploy:
+    name: Deploy
+    needs: quality
     uses: and3rn3t/.github/.github/workflows/reusable-cloudflare-pages-deploy.yml@v1
     with:
       project-name: fastlane
