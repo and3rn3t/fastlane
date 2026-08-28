@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { GameState } from '@/engine'
 import { useGame } from '@/state/GameContext'
+import { shareableResult } from '@/daily'
 import { recordGameResult, type Achievement } from '@/stats'
 import { RecapChart } from './RecapChart'
 import { playWin } from './sound'
@@ -9,6 +10,7 @@ export function GameOver({ game }: { game: GameState }) {
   const { quitToMenu } = useGame()
   const playerWon = game.winner === 'player'
   const [newlyUnlocked, setNewlyUnlocked] = useState<Achievement[]>([])
+  const [copied, setCopied] = useState(false)
   // Guards against StrictMode's dev-only double effect invocation: without
   // it, the second call correctly dedupes on rngSeed and returns an empty
   // list, which then overwrites the first (correct) result in state.
@@ -50,6 +52,25 @@ export function GameOver({ game }: { game: GameState }) {
                 🏆 Achievement unlocked: <strong>{a.name}</strong> — {a.description}
               </p>
             ))}
+          </div>
+        )}
+        {game.isDailyChallenge && (
+          <div className="daily-share">
+            <pre className="share-result">{shareableResult(game)}</pre>
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(shareableResult(game))
+                  setCopied(true)
+                  setTimeout(() => setCopied(false), 2000)
+                } catch {
+                  // Clipboard permission denied or unavailable — the text is
+                  // still visible above to select and copy by hand.
+                }
+              }}
+            >
+              {copied ? 'Copied!' : '📋 Copy result'}
+            </button>
           </div>
         )}
         {game.history.length > 0 && (

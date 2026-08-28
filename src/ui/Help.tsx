@@ -80,6 +80,13 @@ export function Help({ onClose }: { onClose: () => void }) {
               your first game.
             </p>
           </section>
+          <section>
+            <h3>🗓️ Daily Challenge</h3>
+            <p className="blurb">
+              Same seed, same goals, same rules, same Riley for everyone each day — only your play
+              differs. Win or lose, share a Wordle-style emoji grid of how far each goal got.
+            </p>
+          </section>
         </div>
         <button className="primary" onClick={onClose}>
           Got it

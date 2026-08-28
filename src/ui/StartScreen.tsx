@@ -10,6 +10,7 @@ import {
   type RulePresetName,
 } from '@/engine'
 import { useGame } from '@/state/GameContext'
+import { dailyChallengeNumber, dailyChallengeOptions } from '@/daily'
 import { ACHIEVEMENTS, loadStats } from '@/stats'
 
 const RILEY_PROFILES: Array<{ id: AiProfileName; label: string; blurb: string }> = [
@@ -104,6 +105,23 @@ export function StartScreen() {
           Sixty hours a week. Rent is due, the fridge is empty, and Riley is already at work. Hit
           all four life goals before they do.
         </p>
+      </div>
+
+      <div className="daily-challenge">
+        <span className="grow">
+          🗓️ Daily Challenge #{dailyChallengeNumber()}
+          <br />
+          <span className="desc">
+            Same seed, same goals, same rules for everyone today — Standard difficulty, Balanced
+            Riley.
+          </span>
+        </span>
+        <button
+          className="primary"
+          onClick={() => startGame(dailyChallengeOptions(name.trim() || 'You'))}
+        >
+          Play today's challenge
+        </button>
       </div>
 
       {stats.gamesPlayed > 0 && (

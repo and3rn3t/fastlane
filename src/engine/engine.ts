@@ -53,6 +53,7 @@ export interface NewGameOptions {
   seed?: number
   rileyProfile?: AiProfileName
   rules?: RulesConfig
+  isDailyChallenge?: boolean
 }
 
 export function newGame(opts: NewGameOptions): GameState {
@@ -74,6 +75,7 @@ export function newGame(opts: NewGameOptions): GameState {
     riley: newPlayer('Riley', true, rules.startingCash),
     rileyProfile: opts.rileyProfile ?? 'balanced',
     rules,
+    isDailyChallenge: opts.isDailyChallenge ?? false,
     headline: 'A new life in the fast lane begins.',
     log: [],
     lastReport: null,

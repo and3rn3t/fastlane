@@ -99,6 +99,10 @@ function isPlausibleSave(data: unknown): data is Record<string, unknown> {
  * 5 → 6: Rule presets added `GameState.rules`. A save from before that was
  * necessarily playing under the only rules that existed then, so it
  * defaults to RULE_PRESETS.classic — those exact values, not a guess.
+ *
+ * 6 → 7: Daily challenge added `GameState.isDailyChallenge`. A save from
+ * before that feature existed was never started from it, so it defaults to
+ * false — a real fact, not a guess.
  */
 function upgradePlayerToV2(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
@@ -161,6 +165,10 @@ const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<strin
     ...save,
     rules:
       typeof save.rules === 'object' && save.rules !== null ? save.rules : RULE_PRESETS.classic,
+  }),
+  6: (save) => ({
+    ...save,
+    isDailyChallenge: typeof save.isDailyChallenge === 'boolean' ? save.isDailyChallenge : false,
   }),
 }
 

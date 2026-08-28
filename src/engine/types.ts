@@ -176,7 +176,7 @@ export interface WeekSnapshot {
 /** Bump on any GameState/PlayerState shape change and add a migration step in
  * state/GameContext.tsx's MIGRATIONS map — see that file for the full scheme.
  * The engine owns this number since it owns what the shape actually is. */
-export const SAVE_VERSION = 6
+export const SAVE_VERSION = 7
 
 /** Named weight presets for Riley's AI policy (ai.ts's AI_PROFILES) — a
  * game-level setting, not per-player state, since it configures how Riley's
@@ -208,6 +208,10 @@ export interface GameState {
   riley: PlayerState
   rileyProfile: AiProfileName
   rules: RulesConfig
+  /** True for a game started from the Daily Challenge button — a fixed,
+   * date-derived seed/goals/rules/profile so every player's run that day is
+   * directly comparable. Drives GameOver's shareable emoji result grid. */
+  isDailyChallenge: boolean
   headline: string
   log: LogEntry[]
   lastReport: WeekReport | null
