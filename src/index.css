@@ -92,6 +92,7 @@ button {
   min-height: 44px;
   cursor: pointer;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
   transition:
     filter 120ms,
     transform 120ms;
@@ -291,7 +292,11 @@ input[type='range'] {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  background: color-mix(in srgb, var(--card) 78%, transparent);
+  /* 85% (not the prior 78%) so Safari 26's toolbar-tint sampling — it reads
+   * the background-color/backdrop-filter of full-width sticky/fixed edge
+   * elements instead of the theme-color meta tag — picks up an intentional
+   * tint rather than a near-transparent one. */
+  background: color-mix(in srgb, var(--card) 85%, transparent);
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-radius: var(--radius);
@@ -432,6 +437,44 @@ input[type='range'] {
   .topbar-stats {
     -webkit-mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
     mask-image: linear-gradient(to right, black calc(100% - 28px), transparent 100%);
+  }
+
+  /* Progressive enhancement (Safari 26+/Chromium 115+): the static fade
+   * above always implies "more to scroll," even once the strip is fully
+   * scrolled. Where scroll-driven animations exist, tie the fade to actual
+   * scroll position instead so it disappears at the end. Falls back to the
+   * always-on static fade everywhere else — no regression, just unfaded a
+   * little later than ideal on browsers without this feature. */
+  @supports (animation-timeline: scroll(inline)) {
+    @property --scroll-fade {
+      syntax: '<number>';
+      inherits: false;
+      initial-value: 1;
+    }
+
+    .topbar-stats {
+      animation: topbar-stats-fade linear both;
+      animation-timeline: scroll(inline);
+      -webkit-mask-image: linear-gradient(
+        to right,
+        black calc(100% - 28px),
+        rgb(0 0 0 / var(--scroll-fade)) 100%
+      );
+      mask-image: linear-gradient(
+        to right,
+        black calc(100% - 28px),
+        rgb(0 0 0 / var(--scroll-fade)) 100%
+      );
+    }
+
+    @keyframes topbar-stats-fade {
+      from {
+        --scroll-fade: 1;
+      }
+      to {
+        --scroll-fade: 0;
+      }
+    }
   }
 
   .game-layout {
@@ -1098,7 +1141,8 @@ details.action-group[open] .disclosure-chevron {
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     box-shadow: 0 -8px 24px rgb(16 24 40 / 0.12);
-    padding: 1.1rem 1rem max(1rem, calc(env(safe-area-inset-bottom) + 0.75rem));
+    padding: 1.1rem max(1rem, env(safe-area-inset-right))
+      max(1rem, calc(env(safe-area-inset-bottom) + 0.75rem)) max(1rem, env(safe-area-inset-left));
   }
 
   .drag-pill {
@@ -1229,7 +1273,8 @@ details.action-group[open] .disclosure-chevron {
     max-width: 100%;
     max-height: 88vh;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    padding: 1.15rem 1.25rem max(1.25rem, calc(env(safe-area-inset-bottom) + 1rem));
+    padding: 1.15rem max(1.25rem, env(safe-area-inset-right))
+      max(1.25rem, calc(env(safe-area-inset-bottom) + 1rem)) max(1.25rem, env(safe-area-inset-left));
     background: color-mix(in srgb, var(--card) 92%, transparent);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);

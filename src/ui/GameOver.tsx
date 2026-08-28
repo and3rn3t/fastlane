@@ -60,8 +60,23 @@ export function GameOver({ game }: { game: GameState }) {
             <pre className="share-result">{shareableResult(game)}</pre>
             <button
               onClick={async () => {
+                const text = shareableResult(game)
+                // Prefer the native share sheet (Messages/Mail/etc.) where
+                // available — iOS Safari supports Web Share but not the
+                // Clipboard-write permission prompt UX as cleanly. Fall back
+                // to clipboard-copy, same as before, everywhere else.
+                if (navigator.share) {
+                  try {
+                    await navigator.share({ title: 'Fast Lane', text })
+                    return
+                  } catch (err) {
+                    if (err instanceof Error && err.name === 'AbortError') return
+                    // Any other failure (unsupported data, etc.) — fall
+                    // through to clipboard-copy below.
+                  }
+                }
                 try {
-                  await navigator.clipboard.writeText(shareableResult(game))
+                  await navigator.clipboard.writeText(text)
                   setCopied(true)
                   setTimeout(() => setCopied(false), 2000)
                 } catch {
