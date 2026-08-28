@@ -13,9 +13,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+# No concurrency block here on purpose: the reusable workflow below already
+# declares concurrency on group `${{ github.workflow }}-${{ github.ref }}`,
+# which — for a reusable-workflow call — resolves to this same caller's
+# name+ref. Adding an identical block at this level makes the run wait on
+# its own concurrency slot (a real deadlock GitHub detects and cancels the
+# run for); neither of the two other repos actually running this reusable
+# workflow (huggingface, telescope) declare one here either.
 
 permissions:
   contents: read
