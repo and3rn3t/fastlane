@@ -39,7 +39,6 @@ import {
   LockIcon,
   ShieldIcon,
 } from './Icon'
-import { LOCATION_ICONS } from './icons'
 import { playPayday, playPurchase } from './sound'
 
 /** A tap-friendly −/+ control replacing a raw range slider for small bounded
@@ -88,7 +87,7 @@ function Stepper({
   )
 }
 
-function WorkAction({ game }: { game: GameState }) {
+export function WorkAction({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
   const p = game.player
   const [hours, setHours] = useState(8)
@@ -177,7 +176,7 @@ function JobBoard({ game }: { game: GameState }) {
   )
 }
 
-function GroceryAction({ game }: { game: GameState }) {
+export function GroceryAction({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
   const p = game.player
   const unitBase = p.location === 'megamart' ? GROCERY_PRICE_MEGAMART : GROCERY_PRICE_MARKET
@@ -400,7 +399,7 @@ function PawnActions({ game }: { game: GameState }) {
   )
 }
 
-function HomeActions({ game }: { game: GameState }) {
+export function HomeActions({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
   const p = game.player
   const relaxLeft = RELAX_CAP - p.relaxedThisWeek
@@ -439,7 +438,7 @@ function HomeActions({ game }: { game: GameState }) {
   )
 }
 
-function MealAction({ game }: { game: GameState }) {
+export function MealAction({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
   return (
     <div className="action-row">
@@ -495,7 +494,7 @@ function LotteryAction({ game }: { game: GameState }) {
   )
 }
 
-function CasinoAction({ game }: { game: GameState }) {
+export function CasinoAction({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
   const p = game.player
   const [bet, setBet] = useState(CASINO_MIN_BET)
@@ -533,7 +532,7 @@ function CasinoAction({ game }: { game: GameState }) {
   )
 }
 
-function ClassAction({ game }: { game: GameState }) {
+export function ClassAction({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
   return (
     <div className="action-row">
@@ -555,7 +554,7 @@ function ClassAction({ game }: { game: GameState }) {
   )
 }
 
-function DoctorAction({ game }: { game: GameState }) {
+export function DoctorAction({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
   const p = game.player
   return (
@@ -625,18 +624,10 @@ function CollapsibleActionGroup({
   )
 }
 
-export function LocationPanel({ game }: { game: GameState }) {
+export function LocationPanelBody({ game }: { game: GameState }) {
   const loc = LOCATIONS[game.player.location]
-  const LocIcon = LOCATION_ICONS[loc.id]
   return (
-    <div className="panel sheet">
-      <h2>
-        <span aria-hidden>
-          <LocIcon size={20} />
-        </span>{' '}
-        {loc.name}
-      </h2>
-      <p className="blurb">{loc.blurb}</p>
+    <>
       <WorkAction game={game} />
       {loc.id === 'home' && (
         <ActionGroup label="Home" icon={<HomeIcon size={15} />}>
@@ -688,6 +679,6 @@ export function LocationPanel({ game }: { game: GameState }) {
       {loc.id === 'rentoffice' && <RentActions game={game} />}
       {loc.id === 'clinic' && <DoctorAction game={game} />}
       {loc.id === 'casino' && <CasinoAction game={game} />}
-    </div>
+    </>
   )
 }

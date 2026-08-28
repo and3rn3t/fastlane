@@ -3,8 +3,8 @@ import { jobById, netWorth, type GameState, type LocationId, type LogEntry } fro
 import { useGame } from '@/state/GameContext'
 import { Board, DeltaBadge, useDeltaFlash } from './Board'
 import { Help } from './Help'
-import { BackIcon, ExportIcon, HelpIcon, SpeakerIcon, SpeakerMuteIcon } from './Icon'
-import { LocationPanel } from './LocationPanel'
+import { BackIcon, ChevronDownIcon, ExportIcon, HelpIcon, SpeakerIcon, SpeakerMuteIcon } from './Icon'
+import { LocationSheet } from './LocationSheet'
 import { isMuted, playDisaster, setMuted } from './sound'
 import { WeekReportModal } from './WeekReportModal'
 
@@ -137,12 +137,14 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
             <ExportIcon />
           </button>
           <button
-            className="menu-btn"
+            className="icon-btn"
             onClick={() => {
               if (window.confirm('Abandon this game and return to the menu?')) quitToMenu()
             }}
+            title="Quit to menu"
+            aria-label="Menu"
           >
-            <BackIcon size={14} /> Menu
+            <BackIcon size={16} />
           </button>
         </div>
       </div>
@@ -159,34 +161,34 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
           </span>
           <DeltaBadge delta={cashDelta} format={(n) => `${n > 0 ? '+' : '-'}$${Math.abs(n)}`} />
         </div>
-        <div className="stat">
+        <div className="stat chip">
           <span className="label">Net worth</span>
           <span className="value">${netWorth(p).toLocaleString()}</span>
         </div>
-        <div className="stat">
+        <div className="stat chip">
           <span className="label">Job</span>
           <span className="value">{job ? job.title : '—'}</span>
         </div>
-        <div className="stat">
+        <div className="stat chip">
           <span className="label">Dress</span>
           <span className={`value${p.dress < 10 ? ' low' : ''}`}>{p.dress}</span>
         </div>
-        <div className="stat">
+        <div className="stat chip">
           <span className="label">Health</span>
           <span className={`value${p.health < 40 ? ' low' : ''}`}>{p.health}</span>
         </div>
-        <div className="stat">
+        <div className="stat chip">
           <span className="label">Food</span>
           <span className={`value${p.fed + p.groceries < 6 ? ' low' : ''}`}>
             {Math.min(6, p.fed + p.groceries)}/6
           </span>
         </div>
-        <div className="stat">
+        <div className="stat chip">
           <span className="label">Rent due</span>
           <span className={`value${p.rentDue > 0 ? ' low' : ''}`}>${p.rentDue}</span>
         </div>
         {p.loanBalance > 0 && (
-          <div className="stat">
+          <div className="stat chip">
             <span className="label">Loan</span>
             <span className={`value${p.garnished ? ' low' : ''}`}>
               ${p.loanBalance.toLocaleString()}
@@ -204,8 +206,11 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
 function EventLog({ game }: { game: GameState }) {
   const recent = game.log.slice(-30).reverse()
   return (
-    <div className="panel">
-      <h2>📋 This life so far</h2>
+    <details className="panel">
+      <summary>
+        📋 This life so far
+        <ChevronDownIcon size={13} className="disclosure-chevron" />
+      </summary>
       <div className="log">
         {recent.length === 0 && <span className="desc">Nothing yet — get out there.</span>}
         {recent.map((e, i) => (
@@ -215,7 +220,7 @@ function EventLog({ game }: { game: GameState }) {
           </div>
         ))}
       </div>
-    </div>
+    </details>
   )
 }
 
@@ -229,7 +234,7 @@ export function GameScreen({ game }: { game: GameState }) {
       <div className="game-layout">
         <Board game={game} rileyLocation={replay.location} />
         <div className="side">
-          <LocationPanel game={game} />
+          <LocationSheet game={game} />
           <EventLog game={game} />
         </div>
       </div>

@@ -253,7 +253,6 @@ export function Board({
               <TileIcon size={20} />
             </span>
             <span className="name">{loc.name}</span>
-            <span className="cost">{here ? 'You are here' : `${cost}h away`}</span>
           </button>
         )
       })}
