@@ -397,6 +397,34 @@ describe('determinism', () => {
   })
 })
 
+describe('state immutability', () => {
+  it("does not mutate the input state's log/history when applying an action", () => {
+    const s0 = game()
+    const logLenBefore = s0.log.length
+    const historyLenBefore = s0.history.length
+    const s1 = applyAction(s0, { type: 'travel', to: 'university' })
+    expect(s0.log).toHaveLength(logLenBefore)
+    expect(s0.history).toHaveLength(historyLenBefore)
+    expect(s1.log).toHaveLength(logLenBefore + 1)
+    expect(s1).not.toBe(s0)
+    expect(s1.log).not.toBe(s0.log)
+  })
+
+  it('never trims the log/history over a long game (achievements scan the full log)', () => {
+    let s = game()
+    let weeks = 0
+    while (s.phase !== 'over' && weeks < 60) {
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+      weeks += 1
+    }
+    expect(s.log.length).toBeGreaterThan(60)
+    expect(s.log[0].week).toBe(1)
+    expect(s.history.length).toBeGreaterThan(0)
+    expect(s.history[0].week).toBe(1)
+  })
+})
+
 describe('Riley AI', () => {
   it('makes real progress in the first weeks', () => {
     let s = game()

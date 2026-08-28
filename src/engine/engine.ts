@@ -88,7 +88,17 @@ export function newGame(opts: NewGameOptions): GameState {
  * user-readable message) if the move is invalid; the input state is untouched.
  */
 export function applyAction(state: GameState, action: GameAction): GameState {
-  const draft = structuredClone(state)
+  // `log`/`history` are append-only (only ever `.push()`ed, never mutated
+  // after) and unbounded over a save's lifetime, so structuredClone-ing them
+  // on every dispatch dominates the clone cost for a long game. A shallow
+  // array copy is exactly as safe here and far cheaper; everything else
+  // still goes through the full deep clone below.
+  const { log, history, ...rest } = state
+  const draft: GameState = {
+    ...structuredClone(rest),
+    log: log.slice(),
+    history: history.slice(),
+  }
   switch (action.type) {
     case 'travel':
       act.travel(draft, 'player', action.to)
