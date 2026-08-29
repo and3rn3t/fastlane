@@ -389,8 +389,7 @@ const LAST_RESORT_WORK_UTILITY = 0.05
 function buildCandidates(state: GameState, key: PlayerKey, profile: AiProfile): Candidate[] {
   const p = get(state, key)
   const progress = goalProgress(p, state.goals)
-  const urgency = (goal: keyof Goals) =>
-    Math.max(0, 1 - progress[goal]) * profile.goalWeights[goal]
+  const urgency = (goal: keyof Goals) => Math.max(0, 1 - progress[goal]) * profile.goalWeights[goal]
 
   const candidates: Candidate[] = [
     { utility: SURVIVAL_UTILITY, attempt: () => ensureFood(state, key) },
@@ -467,7 +466,11 @@ function buildCandidates(state: GameState, key: PlayerKey, profile: AiProfile): 
  * is provably monotonic: a Riley choosing among fewer options can never do
  * better in expectation than one choosing among all of them, regardless of
  * how well-tuned the ranking is. */
-function considerForAttempt(ranked: Candidate[], state: GameState, profile: AiProfile): Candidate[] {
+function considerForAttempt(
+  ranked: Candidate[],
+  state: GameState,
+  profile: AiProfile
+): Candidate[] {
   const dropChance = Math.max(0, Math.min(0.6, 1 - profile.skillLevel))
   if (dropChance === 0) return ranked
   return ranked.filter((c) => c.utility >= SURVIVAL_UTILITY || roll(state) >= dropChance)
