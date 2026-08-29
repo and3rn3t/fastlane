@@ -1,5 +1,6 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
 import { SAVE_KEY } from '@/state/GameContext'
+import { reportError } from '@/telemetry'
 
 interface Props {
   children: ReactNode
@@ -25,6 +26,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: unknown, info: ErrorInfo) {
     console.error('Fast Lane crashed:', error, info.componentStack)
+    reportError(error, 'error-boundary')
   }
 
   handleDownload = () => {

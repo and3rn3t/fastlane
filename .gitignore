@@ -10,6 +10,7 @@ dist/
 build/
 out/
 *.egg-info/
+.wrangler/
 
 # Environment
 .env
