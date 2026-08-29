@@ -48,9 +48,11 @@ export function LocationSheet({ game }: { game: GameState }) {
     if (locationChanged) {
       setSheetState('expanded')
     } else if (game.log.length !== prevLogLengthRef.current) {
-      // An action was taken at the same location — collapse back to peek,
-      // same idiom as an iOS sheet dismissing once its job is done.
-      setSheetState((s) => (s === 'expanded' ? 'peek' : s))
+      // An action was taken at the same location — collapse back to peek on
+      // mobile only; on desktop the panel stays expanded.
+      if (window.innerWidth < DESKTOP_BREAKPOINT_PX) {
+        setSheetState((s) => (s === 'expanded' ? 'peek' : s))
+      }
     }
     prevLocationRef.current = game.player.location
     prevLogLengthRef.current = game.log.length
