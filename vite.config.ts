@@ -1,7 +1,7 @@
-/// <reference types="vitest/config" />
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { configDefaults } from 'vitest/config'
 import path from 'node:path'
 
 export default defineConfig({
@@ -25,6 +25,9 @@ export default defineConfig({
     environment: 'jsdom',
     globals: false,
     setupFiles: [],
+    // e2e/ holds Playwright specs, run via `pnpm test:e2e`, not vitest — its
+    // own test() throws if vitest tries to execute it.
+    exclude: [...configDefaults.exclude, 'e2e/**'],
     coverage: {
       provider: 'v8',
       include: ['src/**'],
