@@ -438,7 +438,11 @@ describe('event chains', () => {
 
   it('an inheritance chain stays pending for one week, then pays out on the second', () => {
     let s = game()
-    s.rules.eventFrequency = 0
+    // Reassign, don't mutate — s.rules defaults to the shared RULE_PRESETS.classic
+    // object (newGame() doesn't clone it until the first applyAction), so
+    // `s.rules.eventFrequency = 0` would zero it for every later test in this
+    // file too, silencing personal events file-wide instead of just here.
+    s.rules = { ...s.rules, eventFrequency: 0 }
     s.player.activeEvents = [{ chainId: 'inheritance', stage: 0, weeksInStage: 0 }]
 
     const cashBeforeDelayWeek = s.player.cash
