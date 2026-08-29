@@ -153,9 +153,7 @@ function upgradePlayerToV5(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
   const p = player as Record<string, unknown>
   const rawSkills =
-    typeof p.skills === 'object' && p.skills !== null
-      ? (p.skills as Record<string, unknown>)
-      : {}
+    typeof p.skills === 'object' && p.skills !== null ? (p.skills as Record<string, unknown>) : {}
   const clampSkill = (value: unknown) =>
     typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0
   return {
