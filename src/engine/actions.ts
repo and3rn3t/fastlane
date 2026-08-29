@@ -68,6 +68,19 @@ export function hasItem(p: PlayerState, id: ItemId): boolean {
   return p.items.includes(id)
 }
 
+// Every action function below mutates a PlayerState by property assignment
+// (`p.cash = ...`) or whole-field reassignment (`p.items =
+// p.items.filter(...)`) — never in-place mutation of a nested array/object.
+// So a one-level-deep shallow copy per array/record field is exactly as safe
+// as a full deep clone here and far cheaper: PlayerState is a flat record of
+// primitives plus `items` (array). If a future field holds a nested
+// array/object of its own, it needs the same `.slice()`/spread treatment
+// here, or this stops being safe. Used by engine.ts's applyAction (the real
+// per-dispatch clone) and by ai.ts (scratch copies for scoring candidates).
+export function clonePlayer(p: PlayerState): PlayerState {
+  return { ...p, items: p.items.slice() }
+}
+
 export function groceryCap(p: PlayerState): number {
   return hasItem(p, 'fridge') ? GROCERY_CAP_FRIDGE : GROCERY_CAP_BASE
 }

@@ -7,6 +7,7 @@ import {
   WEALTH_TARGETS,
   type AiProfileName,
   type Goals,
+  type RileyDifficulty,
   type RulePresetName,
 } from '@/engine'
 import { useGame } from '@/state/GameContext'
@@ -66,6 +67,17 @@ const RULE_OPTIONS: Array<{ id: RulePresetName; label: string; blurb: string }> 
   { id: 'zen', label: 'Zen', blurb: 'More starting cash, calmer events, a gentler economy.' },
 ]
 
+// 'hard' is a real, save-compatible RileyDifficulty (see ai.ts's
+// DIFFICULTY_SKILL) but isn't offered here yet — it currently plays
+// identically to Normal (see ai.ts's note on why a genuine "plays better
+// than best-first" edge needs real lookahead, out of scope for now), and
+// offering a selectable option with no actual effect would just be
+// confusing. Add it here once ai.ts gives it a real edge.
+const DIFFICULTY_OPTIONS: Array<{ id: RileyDifficulty; label: string; blurb: string }> = [
+  { id: 'easy', label: 'Easy', blurb: 'Riley overlooks good moves more often — a gentler race.' },
+  { id: 'normal', label: 'Normal', blurb: 'Riley plays every turn as well as it can.' },
+]
+
 interface SliderRow {
   key: keyof Goals
   label: string
@@ -122,6 +134,7 @@ export function StartScreen() {
   const [name, setName] = useState('')
   const [levels, setLevels] = useState<Record<keyof Goals, number>>(PRESETS.Standard)
   const [rileyProfile, setRileyProfile] = useState<AiProfileName>('balanced')
+  const [rileyDifficulty, setRileyDifficulty] = useState<RileyDifficulty>('normal')
   const [rulePreset, setRulePreset] = useState<RulePresetName>('classic')
   const [importError, setImportError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -276,6 +289,25 @@ export function StartScreen() {
         <p className="blurb">{RILEY_PROFILES.find((prof) => prof.id === rileyProfile)!.blurb}</p>
       </div>
 
+      <div>
+        <span>Riley's difficulty</span>
+        <div className="presets">
+          {DIFFICULTY_OPTIONS.map((diff) => (
+            <button
+              key={diff.id}
+              className={rileyDifficulty === diff.id ? 'primary' : ''}
+              aria-pressed={rileyDifficulty === diff.id}
+              onClick={() => setRileyDifficulty(diff.id)}
+            >
+              {diff.label}
+            </button>
+          ))}
+        </div>
+        <p className="blurb">
+          {DIFFICULTY_OPTIONS.find((diff) => diff.id === rileyDifficulty)!.blurb}
+        </p>
+      </div>
+
       <div className="start-actions">
         <button
           className="primary"
@@ -284,6 +316,7 @@ export function StartScreen() {
               playerName: name.trim() || 'You',
               goals,
               rileyProfile,
+              rileyDifficulty,
               rules: RULE_PRESETS[rulePreset],
             })
           }
