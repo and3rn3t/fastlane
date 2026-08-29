@@ -41,13 +41,20 @@ export function LocationSheet({ game }: { game: GameState }) {
       : 'peek'
   )
   const prevLocationRef = useRef(game.player.location)
+  const prevLogLengthRef = useRef(game.log.length)
 
   useEffect(() => {
-    if (prevLocationRef.current !== game.player.location) {
+    const locationChanged = prevLocationRef.current !== game.player.location
+    if (locationChanged) {
       setSheetState('expanded')
+    } else if (game.log.length !== prevLogLengthRef.current) {
+      // An action was taken at the same location — collapse back to peek,
+      // same idiom as an iOS sheet dismissing once its job is done.
+      setSheetState((s) => (s === 'expanded' ? 'peek' : s))
     }
     prevLocationRef.current = game.player.location
-  }, [game.player.location])
+    prevLogLengthRef.current = game.log.length
+  }, [game.player.location, game.log.length])
 
   const loc = LOCATIONS[game.player.location]
   const p = game.player
