@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { jobById, netWorth, type GameState, type LocationId, type LogEntry } from '@/engine'
 import { useGame } from '@/state/GameContext'
 import { Board, DeltaBadge, useDeltaFlash } from './Board'
@@ -13,7 +13,12 @@ import {
 } from './Icon'
 import { LocationSheet } from './LocationSheet'
 import { isMuted, playDisaster, setMuted } from './sound'
-import { WeekReportModal } from './WeekReportModal'
+
+// Lazy: keeps the report-modal code out of the initial bundle; cached after
+// the first week transition fetches it, so later weeks show it instantly.
+const WeekReportModal = lazy(() =>
+  import('./WeekReportModal').then((m) => ({ default: m.WeekReportModal }))
+)
 
 const REPLAY_STEP_MS = 650
 const HELP_SEEN_KEY = 'fastlane-help-seen'
@@ -253,7 +258,11 @@ export function GameScreen({ game }: { game: GameState }) {
           </div>
         </div>
       )}
-      {game.phase === 'weekReport' && replay.done && <WeekReportModal game={game} />}
+      {game.phase === 'weekReport' && replay.done && (
+        <Suspense fallback={null}>
+          <WeekReportModal game={game} />
+        </Suspense>
+      )}
       {helpOpen && <Help onClose={() => setHelpOpen(false)} />}
     </div>
   )

@@ -37,7 +37,7 @@ describe('App', () => {
     expect(screen.getByText(/Worked \d+h as Fry Cook/)).toBeTruthy()
   })
 
-  it("ends the week, plays Riley's turn back, and shows the report", () => {
+  it("ends the week, plays Riley's turn back, and shows the report", async () => {
     renderApp()
     fireEvent.click(screen.getByText(/Start new game/))
     // Dismiss the auto-opened Help dialog first so it doesn't shadow the report below.
@@ -47,7 +47,9 @@ describe('App', () => {
     // same as a player would.
     expect(screen.getByRole('button', { name: /Skip/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Skip/ }))
-    expect(screen.getByRole('dialog', { name: /Week 1 report/i })).toBeTruthy()
+    // WeekReportModal is lazy-loaded (Wave 5 perf item) — findByRole awaits
+    // the dynamic import resolving instead of assuming it's already mounted.
+    expect(await screen.findByRole('dialog', { name: /Week 1 report/i })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Start week 2/ }))
     expect(screen.getByText(/Week 2/)).toBeTruthy()
   })
