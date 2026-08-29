@@ -152,12 +152,19 @@ function upgradePlayerToV4(player: unknown): unknown {
 function upgradePlayerToV5(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
   const p = player as Record<string, unknown>
+  const rawSkills =
+    typeof p.skills === 'object' && p.skills !== null
+      ? (p.skills as Record<string, unknown>)
+      : {}
+  const clampSkill = (value: unknown) =>
+    typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0
   return {
     ...p,
-    skills:
-      typeof p.skills === 'object' && p.skills !== null
-        ? p.skills
-        : { sales: 0, trades: 0, tech: 0 },
+    skills: {
+      sales: clampSkill(rawSkills.sales),
+      trades: clampSkill(rawSkills.trades),
+      tech: clampSkill(rawSkills.tech),
+    },
     investments: typeof p.investments === 'number' ? p.investments : 0,
     activeEvents: Array.isArray(p.activeEvents) ? p.activeEvents : [],
   }

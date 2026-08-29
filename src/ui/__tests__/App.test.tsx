@@ -377,7 +377,7 @@ describe('save migration', () => {
     expect(upgraded.rileyDifficulty).toBe('normal')
   })
 
-  it('upgrades a v8 (pre-skills/investing/event-chains) save, defaulting the new fields', () => {
+  it('upgrades a v8 save, normalizing skills and defaulting new fields', () => {
     const v8 = {
       version: 8,
       week: 11,
@@ -386,7 +386,10 @@ describe('save migration', () => {
       winner: null,
       goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
       economy: { priceIndex: 1, wageIndex: 1, interestRate: 0.005, lotteryJackpot: 500 },
-      player: legacyPlayer('V8Player', 77),
+      player: {
+        ...legacyPlayer('V8Player', 77),
+        skills: { sales: 'oops', trades: 180, tech: -3 },
+      },
       riley: legacyPlayer('Riley', 300),
       rileyProfile: 'hustler',
       rileyDifficulty: 'easy',
@@ -406,7 +409,7 @@ describe('save migration', () => {
     expect(upgraded.version).toBe(9)
     expect(upgraded.rileyDifficulty).toBe('easy') // untouched by this migration
     expect(upgraded.economy.marketIndex).toBe(1)
-    expect(upgraded.player.skills).toEqual({ sales: 0, trades: 0, tech: 0 })
+    expect(upgraded.player.skills).toEqual({ sales: 0, trades: 100, tech: 0 })
     expect(upgraded.player.investments).toBe(0)
     expect(upgraded.player.activeEvents).toEqual([])
   })

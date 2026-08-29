@@ -18,6 +18,7 @@ import {
   RELAX_CAP,
   RENT,
   SKILLS,
+  SKILL_TRAIN_TIME,
   SKILL_TRAIN_PRICE,
   TUITION,
   groceryCap,
@@ -300,6 +301,10 @@ function InvestActions({ game }: { game: GameState }) {
   const value = Math.round(p.investments * game.economy.marketIndex)
   const [investAmount, setInvestAmount] = useState(100)
   const [sellAmount, setSellAmount] = useState(100)
+  const toNonNegativeInt = (raw: string) => {
+    const parsed = Math.floor(Number(raw))
+    return Number.isFinite(parsed) ? Math.max(0, parsed) : 0
+  }
   return (
     <div className="action-row">
       <span className="grow">
@@ -317,7 +322,7 @@ function InvestActions({ game }: { game: GameState }) {
         min={1}
         value={investAmount}
         aria-label="Invest amount"
-        onChange={(e) => setInvestAmount(Math.max(0, Math.floor(Number(e.target.value))))}
+        onChange={(e) => setInvestAmount(toNonNegativeInt(e.target.value))}
       />
       <button
         disabled={investAmount < 1 || investAmount > p.cash}
@@ -332,7 +337,7 @@ function InvestActions({ game }: { game: GameState }) {
         min={1}
         value={sellAmount}
         aria-label="Sell amount"
-        onChange={(e) => setSellAmount(Math.max(0, Math.floor(Number(e.target.value))))}
+        onChange={(e) => setSellAmount(toNonNegativeInt(e.target.value))}
       />
       <button
         disabled={sellAmount < 1 || sellAmount > value}
@@ -638,7 +643,9 @@ export function SkillTrainingAction({ game }: { game: GameState }) {
               dispatchGame({ type: 'trainSkill', skillId: skill.id })
             }}
           >
-            {p.skills[skill.id] >= 100 ? 'Maxed' : `Train (${price(game, SKILL_TRAIN_PRICE)}, 6h)`}
+            {p.skills[skill.id] >= 100
+              ? 'Maxed'
+              : `Train (${price(game, SKILL_TRAIN_PRICE)}, ${SKILL_TRAIN_TIME}h)`}
           </button>
         </div>
       ))}
