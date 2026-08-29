@@ -18,8 +18,11 @@ function ErrorToast() {
   }, [error])
   if (!error) return null
   return (
-    <div className="toast" role="alert" onClick={clearError}>
-      {error}
+    <div className="toast" role="alert">
+      <span>{error}</span>
+      <button type="button" className="toast-dismiss" onClick={clearError} aria-label="Dismiss">
+        ✕
+      </button>
     </div>
   )
 }

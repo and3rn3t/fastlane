@@ -57,7 +57,7 @@ export class ErrorBoundary extends Component<Props, State> {
   render() {
     if (!this.state.hasError) return this.props.children
     return (
-      <div className="app">
+      <main className="app">
         <div className="start gameover">
           <h1>💥 Something broke</h1>
           <p className="tagline">
@@ -72,7 +72,7 @@ export class ErrorBoundary extends Component<Props, State> {
             </button>
           </div>
         </div>
-      </div>
+      </main>
     )
   }
 }

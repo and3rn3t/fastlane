@@ -21,8 +21,10 @@ test('start a new game, work a shift, end the week, and reload keeps the save', 
   await page.getByRole('button', { name: /^Work \d+h/ }).click()
   // The work result lands in the "This life so far" log, a native <details>
   // collapsed by default — open it, same as a player would, before checking.
+  // Scoped to .log since the same text is also mirrored into a visually-hidden
+  // aria-live announcer for screen readers (not visible, so not this check's target).
   await page.getByText('This life so far').click()
-  await expect(page.getByText(/Worked \d+h as Fry Cook/)).toBeVisible()
+  await expect(page.locator('.log').getByText(/Worked \d+h as Fry Cook/)).toBeVisible()
 
   await page.getByRole('button', { name: /End week/ }).click()
   const skip = page.getByRole('button', { name: /Skip/ })

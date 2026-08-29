@@ -5,8 +5,8 @@
   --ink: #1a2233;
   --ink-soft: #5b6577;
   --line: #dde1e8;
-  --accent: #4f6df5;
-  --accent-rgb: 79 109 245;
+  --accent: #4968f5;
+  --accent-rgb: 73 104 245;
   --accent-ink: #ffffff;
   --good: #2fa36b;
   --warn: #d9822b;
@@ -37,8 +37,8 @@
     --ink: #e8ebf2;
     --ink-soft: #9aa4b5;
     --line: #313848;
-    --accent: #6d87ff;
-    --accent-rgb: 109 135 255;
+    --accent: #4566ff;
+    --accent-rgb: 69 102 255;
     --shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 4px 14px rgb(0 0 0 / 0.3);
     /* Re-picked (not an automatic flip of the light pair) — #d9822b fails the
      * dark-mode OKLCH lightness band against the card surface; #cc7a1f passes. */
@@ -101,6 +101,13 @@ button {
   transition:
     filter 120ms,
     transform 120ms;
+}
+
+/* Keyboard-only focus indicator — deliberately :focus-visible, not :focus,
+   so it doesn't flash on every mouse/touch click, only real keyboard nav. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 button:hover:not(:disabled) {
@@ -1335,17 +1342,33 @@ details.action-group[open] .disclosure-chevron {
 }
 
 .toast {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   position: fixed;
   bottom: max(1.2rem, calc(env(safe-area-inset-bottom) + 0.8rem));
   left: 50%;
   transform: translateX(-50%);
   background: var(--bad);
   color: white;
-  padding: 0.6rem 1.1rem;
+  padding: 0.6rem 0.6rem 0.6rem 1.1rem;
   border-radius: 10px;
   box-shadow: var(--shadow);
   z-index: 20;
-  cursor: pointer;
+}
+
+.toast-dismiss {
+  flex-shrink: 0;
+  width: 44px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  border-radius: 50%;
+}
+
+.toast-dismiss:hover:not(:disabled) {
+  background: rgb(255 255 255 / 15%);
 }
 
 .gameover {

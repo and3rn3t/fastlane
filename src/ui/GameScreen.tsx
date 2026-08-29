@@ -217,22 +217,30 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
 
 function EventLog({ game }: { game: GameState }) {
   const recent = game.log.slice(-30).reverse()
+  const latest = recent[0]
   return (
-    <details className="panel">
-      <summary>
-        📋 This life so far
-        <ChevronDownIcon size={13} className="disclosure-chevron" />
-      </summary>
-      <div className="log">
-        {recent.length === 0 && <span className="desc">Nothing yet — get out there.</span>}
-        {recent.map((e, i) => (
-          <div className="entry" key={`${game.log.length - i}`}>
-            <span className="who">W{e.week}</span>
-            <span>{e.text}</span>
-          </div>
-        ))}
+    <>
+      {/* Announces just the newest line, not the whole (re-ordering) list below —
+          re-reading up to 30 entries on every single action would be unusable. */}
+      <div aria-live="polite" className="sr-only">
+        {latest?.text}
       </div>
-    </details>
+      <details className="panel">
+        <summary>
+          📋 This life so far
+          <ChevronDownIcon size={13} className="disclosure-chevron" />
+        </summary>
+        <div className="log">
+          {recent.length === 0 && <span className="desc">Nothing yet — get out there.</span>}
+          {recent.map((e, i) => (
+            <div className="entry" key={`${game.log.length - i}`}>
+              <span className="who">W{e.week}</span>
+              <span>{e.text}</span>
+            </div>
+          ))}
+        </div>
+      </details>
+    </>
   )
 }
 
@@ -241,7 +249,7 @@ export function GameScreen({ game }: { game: GameState }) {
   const [helpOpen, setHelpOpen] = useAutoHelp()
   useDisasterSound(game)
   return (
-    <div className="app">
+    <main className="app">
       <TopBar game={game} onHelp={() => setHelpOpen(true)} />
       <div className="game-layout">
         <Board game={game} rileyLocation={replay.location} />
@@ -264,6 +272,6 @@ export function GameScreen({ game }: { game: GameState }) {
         </Suspense>
       )}
       {helpOpen && <Help onClose={() => setHelpOpen(false)} />}
-    </div>
+    </main>
   )
 }
