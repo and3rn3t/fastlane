@@ -149,7 +149,7 @@ function upgradePlayerToV4(player: unknown): unknown {
   }
 }
 
-function upgradePlayerToV5(player: unknown): unknown {
+function upgradePlayerToV9(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
   const p = player as Record<string, unknown>
   const rawSkills =
@@ -213,8 +213,8 @@ const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<strin
   }),
   8: (save) => ({
     ...save,
-    player: upgradePlayerToV5(save.player),
-    riley: upgradePlayerToV5(save.riley),
+    player: upgradePlayerToV9(save.player),
+    riley: upgradePlayerToV9(save.riley),
     economy: upgradeEconomyToV9(save.economy),
   }),
 }
