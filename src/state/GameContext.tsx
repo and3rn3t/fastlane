@@ -103,6 +103,11 @@ function isPlausibleSave(data: unknown): data is Record<string, unknown> {
  * 6 → 7: Daily challenge added `GameState.isDailyChallenge`. A save from
  * before that feature existed was never started from it, so it defaults to
  * false — a real fact, not a guess.
+ *
+ * 7 → 8: A Riley difficulty control (orthogonal to playstyle profile) added
+ * `GameState.rileyDifficulty`. A save from before that control existed was
+ * necessarily playing at the only skill level that existed then, so it
+ * defaults to 'normal' — the skill level every profile already played at.
  */
 function upgradePlayerToV2(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
@@ -169,6 +174,10 @@ const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<strin
   6: (save) => ({
     ...save,
     isDailyChallenge: typeof save.isDailyChallenge === 'boolean' ? save.isDailyChallenge : false,
+  }),
+  7: (save) => ({
+    ...save,
+    rileyDifficulty: typeof save.rileyDifficulty === 'string' ? save.rileyDifficulty : 'normal',
   }),
 }
 

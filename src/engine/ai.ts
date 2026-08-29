@@ -1,14 +1,28 @@
-// The AI policy — a priority-driven agent using the exact same action
+// The AI policy — a utility-scored agent using the exact same action
 // functions (and therefore rules) as the human player. Runs Riley's turn in
 // the real game; parameterized by PlayerKey (rather than hardcoded to
 // 'riley') so scripts/sim.ts can also run it for 'player' in an AI-vs-AI
 // balance simulation, with zero behavior change for the real game.
 //
-// AI_PROFILES layers named weight presets on top of that shared policy —
-// same decision tree, different thresholds (and, for Gambler, one extra
-// branch). 'balanced' reproduces the original single-policy behavior
-// exactly (all multipliers neutral, no eager study, no gambling), so it's
-// the only profile the sim's baseline and an unmigrated save assume.
+// Each turn, a set of candidate actions (the same domain-specific helpers as
+// before: ensureFood, pursueCareer, studyOnce, etc.) is scored by how urgent
+// the goal it serves is — `weight * (1 - goalProgress)`, recomputed fresh
+// every turn — then attempted in ranked order, falling through to the next
+// on an EngineError, exactly like the old fixed-order fallthrough did. This
+// is what lets Riley trade education/happiness/wealth off against each
+// other within a turn instead of always trying one flavor of action before
+// the other regardless of which is actually further behind. Career and
+// (for Scholar/Gambler) education/gambling sit outside that pure-urgency
+// scoring on their own fixed-ish tiers instead — see CAREER_LEVERAGE_BONUS,
+// EAGER_STUDY_UTILITY, and GAMBLE_UTILITY's comments for why each needed
+// its own carve-out rather than fitting the general urgency formula.
+//
+// AI_PROFILES layers named presets on top of that shared policy: goalWeights
+// and the studyEagerly/gambles flags give each profile its flavor (Scholar
+// studies proactively, Hustler leans on wealth, Gambler stakes surplus at
+// the casino), while skillLevel is a second, orthogonal axis — how well
+// Riley plays at all, independent of style — driven by the difficulty
+// setting via DIFFICULTY_SKILL rather than baked into a profile's identity.
 
 import * as act from './actions'
 import { EngineError } from './actions'
@@ -25,8 +39,18 @@ import {
   jobById,
   travelCost,
 } from './data'
-import { careerScore } from './week'
-import type { AiProfileName, GameState, ItemId, JobDef, LocationId, PlayerKey } from './types'
+import { roll } from './rng'
+import { careerScore, goalProgress } from './week'
+import type {
+  AiProfileName,
+  GameState,
+  Goals,
+  ItemId,
+  JobDef,
+  LocationId,
+  PlayerKey,
+  RileyDifficulty,
+} from './types'
 
 export interface AiProfile {
   name: string
@@ -34,10 +58,26 @@ export interface AiProfile {
   reserveMultiplier: number
   /** Extra hours layered onto both work-shift priority caps. */
   extraWorkHours: number
-  /** Studies proactively once affordable, not just when behind a job's requirement. */
-  studyEagerly: boolean
   /** Stakes a cut of spare cash at the casino instead of banking all of it. */
   gambles: boolean
+  /** How eagerly a gambling profile stakes wealth-urgency at the casino. */
+  gambleFactor: number
+  /** Studies proactively whenever cash allows, not just when it's the
+   * cheapest blocker on the next job (pursueCareer already does that for
+   * everyone) — a separate fixed tier rather than a goalWeights.education
+   * bump, since career's own leverage bonus (see CAREER_LEVERAGE_BONUS)
+   * would otherwise swamp any education weight high enough to matter. */
+  studyEagerly: boolean
+  /** How well Riley plays, independent of style — 1 (Normal) and above
+   * (Hard) both mean best-first play considering every candidate each turn;
+   * below 1 (Easy) means considering only a random subset each turn (see
+   * considerForAttempt) — provably no better than Normal in expectation,
+   * since it's choosing among strictly fewer options. Set from
+   * DIFFICULTY_SKILL by the caller (engine.ts), not fixed per profile. */
+  skillLevel: number
+  /** How urgently each goal is pursued, relative to the others — the knob
+   * that gives each profile its flavor. */
+  goalWeights: Record<keyof Goals, number>
 }
 
 export const AI_PROFILES: Record<AiProfileName, AiProfile> = {
@@ -45,30 +85,52 @@ export const AI_PROFILES: Record<AiProfileName, AiProfile> = {
     name: 'Balanced',
     reserveMultiplier: 1,
     extraWorkHours: 0,
-    studyEagerly: false,
     gambles: false,
+    gambleFactor: 0,
+    skillLevel: 1,
+    studyEagerly: false,
+    goalWeights: { wealth: 1, happiness: 1, education: 1, career: 1 },
   },
   hustler: {
     name: 'Hustler',
     reserveMultiplier: 0.6,
     extraWorkHours: 10,
-    studyEagerly: false,
     gambles: false,
+    gambleFactor: 0,
+    skillLevel: 1,
+    studyEagerly: false,
+    goalWeights: { wealth: 1.6, happiness: 0.8, education: 0.8, career: 1 },
   },
   scholar: {
     name: 'Scholar',
     reserveMultiplier: 1,
     extraWorkHours: 0,
-    studyEagerly: true,
     gambles: false,
+    gambleFactor: 0,
+    skillLevel: 1,
+    studyEagerly: true,
+    goalWeights: { wealth: 1, happiness: 1, education: 1.8, career: 1 },
   },
   gambler: {
     name: 'Gambler',
     reserveMultiplier: 1,
     extraWorkHours: 0,
-    studyEagerly: false,
     gambles: true,
+    gambleFactor: 1.5,
+    skillLevel: 1,
+    studyEagerly: false,
+    goalWeights: { wealth: 1.3, happiness: 1, education: 1, career: 1 },
   },
+}
+
+/** StartScreen difficulty control → AiProfile.skillLevel. Orthogonal to
+ * which named profile (style) is picked — see AiProfile.skillLevel. A save
+ * from before difficulty existed defaults to 'normal' (skillLevel 1), which
+ * plays identically to how every profile already behaved. */
+export const DIFFICULTY_SKILL: Record<RileyDifficulty, number> = {
+  easy: 0.6,
+  normal: 1,
+  hard: 1.3,
 }
 
 function get(state: GameState, key: PlayerKey) {
@@ -79,6 +141,17 @@ function get(state: GameState, key: PlayerKey) {
 function reserve(state: GameState, profile: AiProfile): number {
   return act.price(state, RENT.basic) * profile.reserveMultiplier + 60
 }
+
+// Above-Normal skill (Hard) intentionally has no extra lever beyond zero
+// mistakes/full consideration (see considerForAttempt) — two things were
+// tried and both measurably backfired: tightening the cash reserve made the
+// guaranteed-work tier fire less often (Easy beat Hard 60.7% to 28.3%), and
+// working extra hours per shift pushed weekly totals over OVERWORK_THRESHOLD
+// more often, trading wage for health/happiness costs that ate the gain
+// (confirmed: Hard overworked 11/30 weeks vs. Normal's 6/30 on the same
+// seed, and *lost* to Normal). Best-first play with the full candidate list
+// already plays about as well as this policy can without a genuine
+// multi-turn lookahead, which is out of scope for this pass — see the plan.
 
 function attempt(fn: () => void): boolean {
   try {
@@ -158,9 +231,21 @@ function pursueCareer(state: GameState, key: PlayerKey, profile: AiProfile): boo
   const p = get(state, key)
   const better = bestQualifiedJob(state, key)
   if (better) {
+    // Already qualified — free to take (a couple hours, no cash), so grab
+    // it regardless of whether the career goal is already met.
     if (!act.hasItem(p, 'phone') && !goTo(state, key, 'employment')) return false
     return attempt(() => act.applyJob(state, key, better.id))
   }
+  // Past this point, climbing further means *spending* cash/time (an
+  // outfit, a computer, tuition) to chase a job Riley doesn't yet qualify
+  // for. JOBS' ladder runs well past any realistic goal (Professor is
+  // prestige 88), and this function has no notion of "enough" on its own —
+  // without this check Riley keeps pouring cash into prestige long after
+  // the actual career goal is satisfied, starving the wealth goal for no
+  // in-game reason. Confirmed by measurement: this was the main reason a
+  // worse-playing (mistake-prone) Riley was *beating* a mistake-free one —
+  // the mistakes accidentally skipped this waste.
+  if (careerScore(p) >= state.goals.career) return false
   const target = nextTargetJob(state, key)
   if (!target) return false
   // Clear the cheapest blocker: dress first (one purchase), then education.
@@ -216,7 +301,6 @@ function workShift(state: GameState, key: PlayerKey, maxHours: number): boolean 
 
 function pursueHappiness(state: GameState, key: PlayerKey, profile: AiProfile): boolean {
   const p = get(state, key)
-  if (p.happiness >= state.goals.happiness) return false
   const fun: ItemId[] = ['tv', 'stereo', 'console']
   const toBuy = fun.find((id) => !act.hasItem(p, id))
   if (toBuy) {
@@ -241,12 +325,11 @@ function bankSurplus(state: GameState, key: PlayerKey, profile: AiProfile): bool
   return attempt(() => act.deposit(state, key, Math.round(surplus)))
 }
 
-/** Gambler only: stakes a fifth of genuine surplus at the casino instead of
+/** Gambler only: stakes a cut of genuine surplus at the casino instead of
  * banking all of it. Doesn't decide *whether* to gamble via an extra RNG
  * roll — only the spin's outcome consumes one, via the normal playCasino
  * action — so this stays deterministic given the profile and state. */
 function gambleAtCasino(state: GameState, key: PlayerKey, profile: AiProfile): boolean {
-  if (!profile.gambles) return false
   const p = get(state, key)
   const surplus = p.cash - reserve(state, profile) * 3
   if (surplus < CASINO_MIN_BET) return false
@@ -255,11 +338,146 @@ function gambleAtCasino(state: GameState, key: PlayerKey, profile: AiProfile): b
   return attempt(() => act.playCasino(state, key, bet))
 }
 
+interface Candidate {
+  utility: number
+  attempt: () => boolean
+}
+
+// Fixed-tier utilities, well above anything goal-urgency scoring can
+// produce (urgency tops out around goalWeights' magnitude, ~2) — these
+// three keep the old guarantee of never starving, sleeping rough, or
+// ignoring a sickness regardless of how the goal-weighted tiers below rank.
+const SURVIVAL_UTILITY = 1000
+// Keeping a working float takes priority over any single goal, but not over
+// literal survival — matches "keep a working float before anything else"
+// from the original fixed order.
+const RESERVE_WORK_UTILITY = 500
+// Climbing the career ladder (the next outfit, then the next job) is a
+// compounding investment, not a one-shot goal contribution: a wage jump
+// pays off on every future work hour, not just this turn's. A pure
+// same-turn goalProgress score can't see that leverage — early on, career
+// progress moves in big discrete jumps (one hire) while wealth/education
+// progress creep, so career's *urgency* looks unremarkable even though
+// it's almost always the best use of a turn. A flat bonus added on top of
+// urgency('career') (not a standalone tier miles above everything else —
+// that made every other goal-weighted candidate moot, since ~2 can never
+// beat ~50, defeating the whole point of comparable-scale scoring) gives
+// career a first-among-equals edge on ties without hard-locking it in.
+// Confirmed by measurement: without any bonus, Riley gets its first job
+// and then never job-hops again, since wealth/education urgency out-ranks
+// it every turn once career's own urgency dips below theirs.
+const CAREER_LEVERAGE_BONUS = 3
+// Scholar-only: ranked below career (so job-hopping still wins whenever
+// pursueCareer has something to do) but above every other goal-weighted
+// candidate's realistic range, so a Scholar profile studies proactively on
+// the turns career doesn't need — matches the StartScreen's "studies
+// whenever there is cash to spare."
+const EAGER_STUDY_UTILITY = 2
+const PROTECT_VALUABLES_UTILITY = 0.3
+// Between protectValuables and bankSurplus — see the GAMBLE_UTILITY usage
+// site below for why this has to be a small fixed tier rather than scored
+// off wealth-urgency.
+const GAMBLE_UTILITY = 0.2
+const BANK_SURPLUS_UTILITY = 0.1
+// Absolute last resort: idle time has no value, so grinding out the clock
+// beats doing nothing once every goal-directed and housekeeping candidate
+// above has failed or is inapplicable.
+const LAST_RESORT_WORK_UTILITY = 0.05
+
+/** Builds this turn's ranked candidates. Recomputed every iteration since
+ * each attempted action changes the state the next one scores against. */
+function buildCandidates(state: GameState, key: PlayerKey, profile: AiProfile): Candidate[] {
+  const p = get(state, key)
+  const progress = goalProgress(p, state.goals)
+  const urgency = (goal: keyof Goals) =>
+    Math.max(0, 1 - progress[goal]) * profile.goalWeights[goal]
+
+  const candidates: Candidate[] = [
+    { utility: SURVIVAL_UTILITY, attempt: () => ensureFood(state, key) },
+    { utility: SURVIVAL_UTILITY, attempt: () => ensureHousing(state, key) },
+    { utility: SURVIVAL_UTILITY, attempt: () => ensureHealth(state, key, profile) },
+    { utility: urgency('education'), attempt: () => studyOnce(state, key, profile) },
+    {
+      utility: urgency('career') + CAREER_LEVERAGE_BONUS,
+      attempt: () => pursueCareer(state, key, profile),
+    },
+    { utility: urgency('happiness'), attempt: () => pursueHappiness(state, key, profile) },
+    {
+      utility: urgency('wealth'),
+      attempt: () => workShift(state, key, 25 + profile.extraWorkHours),
+    },
+    { utility: PROTECT_VALUABLES_UTILITY, attempt: () => protectValuables(state, key, profile) },
+    { utility: BANK_SURPLUS_UTILITY, attempt: () => bankSurplus(state, key, profile) },
+    {
+      utility: LAST_RESORT_WORK_UTILITY,
+      attempt: () => workShift(state, key, p.timeLeft),
+    },
+  ]
+
+  if (p.cash < reserve(state, profile)) {
+    candidates.push({
+      utility: RESERVE_WORK_UTILITY,
+      attempt: () => workShift(state, key, 20 + profile.extraWorkHours),
+    })
+  }
+  // Same "wealth goal already met" gate as gambling below, and for the same
+  // reason: eager study has no natural stopping point (studyOnce keeps
+  // adding classes forever once affordable, long past any job's actual
+  // requirement — confirmed at career=88/Professor, education=35 against a
+  // goal of 12). Ungated, it competes with wealth-work on every turn cash
+  // allows, not just once wealth is secured, so Scholar never accumulates
+  // net worth and never wins. The old fixed order avoided this by accident:
+  // its wealth-push-work check came first and stayed true almost the whole
+  // game, so eager study rarely got a turn before wealth was already done.
+  if (profile.studyEagerly && progress.wealth >= 1) {
+    candidates.push({ utility: EAGER_STUDY_UTILITY, attempt: () => studyOnce(state, key, profile) })
+  }
+  // Gated on the wealth goal being fully met (progress === 1, i.e.
+  // netWorth >= goals.wealth) rather than merely "high" — a fixed utility
+  // competing against *shrinking* wealth-urgency would start outranking
+  // work well before the goal was actually reached (measured: progress
+  // >77%), and unlike a one-shot purchase, gambling has no natural brake:
+  // a loss barely dents progress when the goal is in the thousands, so it
+  // kept winning the ranking turn after turn — measured at ~25 spins/game
+  // instead of the old code's ~1.4, cratering Gambler's win rate to ~1%.
+  // Tying it to the exact same "goal already met" condition the old
+  // behindOnMoney flag used restores that natural brake: a loss can drop
+  // net worth back under the goal, which zeroes wealth-work's urgency gap
+  // and sends Riley back to work instead of spinning again.
+  if (profile.gambles && progress.wealth >= 1) {
+    candidates.push({
+      utility: GAMBLE_UTILITY * profile.gambleFactor,
+      attempt: () => gambleAtCasino(state, key, profile),
+    })
+  }
+
+  return candidates
+}
+
+/** Below-Normal skill considers a random subset of this turn's candidates
+ * instead of all of them — survival (food/housing/health) is always kept,
+ * so a worse Riley still never starves, but everything else has a per-turn
+ * chance of being overlooked. Tried and reverted a version that instead
+ * *reordered* the ranked list (swap the top two on a "mistake"): almost
+ * every candidate action in this game is a real, beneficial move — a work
+ * shift, a class, a purchase — so demoting the "best" one to try the
+ * second-best often wasn't actually worse, and could even come out ahead
+ * when the ranking itself over- or under-weighted something (confirmed by
+ * measurement: reordering made Easy *beat* Hard). Dropping options instead
+ * is provably monotonic: a Riley choosing among fewer options can never do
+ * better in expectation than one choosing among all of them, regardless of
+ * how well-tuned the ranking is. */
+function considerForAttempt(ranked: Candidate[], state: GameState, profile: AiProfile): Candidate[] {
+  const dropChance = Math.max(0, Math.min(0.6, 1 - profile.skillLevel))
+  if (dropChance === 0) return ranked
+  return ranked.filter((c) => c.utility >= SURVIVAL_UTILITY || roll(state) >= dropChance)
+}
+
 /** Plays out one player's week using the AI policy. Called by the reducer
  * for 'riley' before end-of-week upkeep in the real game; scripts/sim.ts
  * also calls it for 'player' to run AI-vs-AI balance simulations. Defaults
- * to the Balanced profile, which reproduces the original single-policy
- * behavior exactly. */
+ * to the Balanced profile at Normal skill, which plays best-first with no
+ * injected mistakes. */
 export function runAIWeek(
   state: GameState,
   key: PlayerKey,
@@ -269,41 +487,15 @@ export function runAIWeek(
   let guard = 0
   while (p.timeLeft > 0 && guard < 80) {
     guard += 1
-    const g = state.goals
-
-    if (ensureFood(state, key)) continue
-    if (ensureHousing(state, key)) continue
-    if (ensureHealth(state, key, profile)) continue
-    if (pursueCareer(state, key, profile)) continue
-
-    const behindOnMoney = act.netWorth(p) < g.wealth
-    const behindOnEdu = p.education < g.education
-    const behindOnFun = p.happiness < g.happiness
-    const workCap = 20 + profile.extraWorkHours
-    const pushCap = 25 + profile.extraWorkHours
-
-    // Keep a working float before anything else.
-    if (p.cash < reserve(state, profile) && workShift(state, key, workCap)) continue
-    if (behindOnEdu && studyOnce(state, key, profile)) continue
-    if (
-      behindOnFun &&
-      p.cash > reserve(state, profile) * 2 &&
-      pursueHappiness(state, key, profile)
-    ) {
-      continue
+    const candidates = considerForAttempt(buildCandidates(state, key, profile), state, profile)
+    const ranked = [...candidates].sort((a, b) => b.utility - a.utility)
+    let advanced = false
+    for (const candidate of ranked) {
+      if (candidate.attempt()) {
+        advanced = true
+        break
+      }
     }
-    if (behindOnMoney && workShift(state, key, pushCap)) continue
-    if (protectValuables(state, key, profile)) continue
-    // Scholar only: reinvests genuine surplus into more classes instead of
-    // banking it, rather than studying before securing income — that
-    // ordering change is what separates "studies proactively" from "goes
-    // broke chasing tuition," which an earlier top-priority version did.
-    if (profile.studyEagerly && studyOnce(state, key, profile)) continue
-    if (gambleAtCasino(state, key, profile)) continue
-    if (bankSurplus(state, key, profile)) continue
-    // Nothing better to do: top up happiness, then run out the clock working.
-    if (pursueHappiness(state, key, profile)) continue
-    if (workShift(state, key, p.timeLeft)) continue
-    break
+    if (!advanced) break
   }
 }

@@ -198,11 +198,13 @@ describe('durable goods', () => {
   })
 
   it('an uninsured item can be stolen from an unsecured home', () => {
-    // Seed found by brute force: bike goes missing on the 6th endWeek. (This
-    // shifted from the 4th once Casino was added — Casino's new travel
-    // distances change Riley's AI decisions, which shifts how many RNG
-    // rolls Riley's own upkeep consumes, which shifts the shared rngSeed
-    // stream the player's own rolls draw from later in the same week.)
+    // Seed found by brute force: bike goes missing on the 6th endWeek.
+    // burglaryUpkeep's roll() is only spent when Riley actually owns a
+    // stealable item that week, so any change to *when* Riley buys things
+    // shifts how many rolls Riley's own upkeep consumes, which shifts the
+    // shared rngSeed stream the player's own rolls draw from later in the
+    // same week — expect this count to drift again after any future AI
+    // change; re-run a brute-force search rather than guessing.
     let s = applyAction(game(easyGoals, 2), { type: 'travel', to: 'gadgets' })
     s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
     for (let i = 0; i < 6; i++) {
@@ -410,6 +412,19 @@ describe('state immutability', () => {
     expect(s1.log).not.toBe(s0.log)
   })
 
+  it('copies the acting player without deep-cloning the other (structural sharing)', () => {
+    const s0 = game()
+    const s1 = applyAction(s0, { type: 'travel', to: 'university' })
+    // The acted-on player is a genuine copy...
+    expect(s1.player).not.toBe(s0.player)
+    expect(s1.player.items).not.toBe(s0.player.items)
+    // ...but untouched fields on the other player are still structurally
+    // shared, proving this is a targeted shallow copy, not a reintroduced
+    // structuredClone — a correctness-only test could pass even if the
+    // deep clone came back, since deep-cloned values are still deep-equal.
+    expect(s1.riley.items).toBe(s0.riley.items)
+  })
+
   it('never trims the log/history over a long game (achievements scan the full log)', () => {
     let s = game()
     let weeks = 0
@@ -479,8 +494,8 @@ describe('AI personalities', () => {
 
   it('Gambler visits the casino; Balanced never does', () => {
     // Seed found by brute force: Gambler plays the wheel at least once by week 25.
-    const gambler = run(1, 'gambler', 25)
-    const balanced = run(1, 'balanced', 25)
+    const gambler = run(0, 'gambler', 25)
+    const balanced = run(0, 'balanced', 25)
     const gambledAtAll = (s: GameState) =>
       s.log.some((e) => e.actor === 'riley' && e.text.includes('wheel'))
     expect(gambledAtAll(gambler)).toBe(true)
@@ -520,7 +535,20 @@ describe('rule presets', () => {
   it('Brutal produces more personal events than Zen, aggregated across seeds', () => {
     // A single-seed comparison would be fragile (see the Casino RNG-sharing
     // note above) — this aggregates over many seeds/weeks instead, the same
-    // approach pnpm sim uses for balance signals.
+    // approach pnpm sim uses for balance signals. Counts only entries that
+    // match one of personalEvent()'s own message patterns (week.ts) rather
+    // than raw log growth — total log growth is dominated by however many
+    // actions Riley's AI happens to take that week, which is a moving
+    // target independent of eventFrequency and would make this test flaky
+    // across AI policy changes.
+    const PERSONAL_EVENT_MARKERS = [
+      'found $',
+      "doctor's bill",
+      'bonus at work',
+      'ran into an old friend',
+      'got sick and lost',
+      'felt a cold coming on',
+    ]
     function countPersonalEvents(rules: typeof RULE_PRESETS.classic): number {
       let total = 0
       for (let seed = 0; seed < 20; seed++) {
@@ -528,7 +556,9 @@ describe('rule presets', () => {
         for (let w = 0; w < 10 && s.phase !== 'over'; w++) {
           const before = s.log.length
           s = applyAction(s, { type: 'endWeek' })
-          total += s.log.length - before
+          total += s.log
+            .slice(before)
+            .filter((e) => PERSONAL_EVENT_MARKERS.some((m) => e.text.includes(m))).length
           if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
         }
       }

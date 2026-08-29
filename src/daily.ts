@@ -50,6 +50,7 @@ export function dailyChallengeOptions(playerName: string, date: Date = new Date(
     goals: DAILY_GOALS,
     seed: dailyChallengeSeed(date),
     rileyProfile: 'balanced',
+    rileyDifficulty: 'normal',
     rules: RULE_PRESETS.classic,
     isDailyChallenge: true,
   }

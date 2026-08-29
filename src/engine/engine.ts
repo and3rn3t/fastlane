@@ -1,7 +1,7 @@
 // Reducer entry point: creates games and applies actions immutably.
 
 import * as act from './actions'
-import { AI_PROFILES, runAIWeek } from './ai'
+import { AI_PROFILES, DIFFICULTY_SKILL, runAIWeek } from './ai'
 import { CREDIT_SCORE_START, HEALTH_START, RULE_PRESETS, WEEK_TIME } from './data'
 import { endWeek } from './week'
 import {
@@ -11,6 +11,7 @@ import {
   type GameState,
   type Goals,
   type PlayerState,
+  type RileyDifficulty,
   type RulesConfig,
 } from './types'
 
@@ -52,6 +53,7 @@ export interface NewGameOptions {
   goals: Goals
   seed?: number
   rileyProfile?: AiProfileName
+  rileyDifficulty?: RileyDifficulty
   rules?: RulesConfig
   isDailyChallenge?: boolean
 }
@@ -74,6 +76,7 @@ export function newGame(opts: NewGameOptions): GameState {
     player: newPlayer(opts.playerName || 'You', false, rules.startingCash),
     riley: newPlayer('Riley', true, rules.startingCash),
     rileyProfile: opts.rileyProfile ?? 'balanced',
+    rileyDifficulty: opts.rileyDifficulty ?? 'normal',
     rules,
     isDailyChallenge: opts.isDailyChallenge ?? false,
     headline: 'A new life in the fast lane begins.',
@@ -89,15 +92,29 @@ export function newGame(opts: NewGameOptions): GameState {
  */
 export function applyAction(state: GameState, action: GameAction): GameState {
   // `log`/`history` are append-only (only ever `.push()`ed, never mutated
-  // after) and unbounded over a save's lifetime, so structuredClone-ing them
-  // on every dispatch dominates the clone cost for a long game. A shallow
-  // array copy is exactly as safe here and far cheaper; everything else
-  // still goes through the full deep clone below.
-  const { log, history, ...rest } = state
+  // after) and unbounded over a save's lifetime, so a full deep clone of them
+  // dominates the clone cost for a long game — a shallow array copy is
+  // exactly as safe and far cheaper. The rest of GameState is small and
+  // flat enough (see clonePlayer's comment) that structuredClone's generic
+  // recursive walk buys nothing over explicit shallow copies per field,
+  // and costs real time since this runs on every single dispatched action,
+  // not once per week.
+  // Every action type below mutates only `state.player` — 'endWeek' is the
+  // sole exception, since it's the only case that touches 'riley' (via
+  // runAIWeek + endWeek's own upkeep for both sides). So riley only needs a
+  // real copy on that one action type; everything else can keep sharing the
+  // old riley object outright. If a future action type ever needs to touch
+  // riley directly, it must clone it here too, or this silently shares
+  // mutable state.
   const draft: GameState = {
-    ...structuredClone(rest),
-    log: log.slice(),
-    history: history.slice(),
+    ...state,
+    goals: { ...state.goals },
+    economy: { ...state.economy },
+    rules: { ...state.rules },
+    player: act.clonePlayer(state.player),
+    riley: action.type === 'endWeek' ? act.clonePlayer(state.riley) : state.riley,
+    log: state.log.slice(),
+    history: state.history.slice(),
   }
   switch (action.type) {
     case 'travel':
@@ -162,7 +179,11 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       // used to compute this internally, after runAIWeek had already logged
       // Riley's whole week, so lastReport.entries never actually contained it.
       const logStart = draft.log.length
-      runAIWeek(draft, 'riley', AI_PROFILES[draft.rileyProfile])
+      const profile = {
+        ...AI_PROFILES[draft.rileyProfile],
+        skillLevel: DIFFICULTY_SKILL[draft.rileyDifficulty],
+      }
+      runAIWeek(draft, 'riley', profile)
       endWeek(draft, logStart)
       break
     }

@@ -176,12 +176,18 @@ export interface WeekSnapshot {
 /** Bump on any GameState/PlayerState shape change and add a migration step in
  * state/GameContext.tsx's MIGRATIONS map — see that file for the full scheme.
  * The engine owns this number since it owns what the shape actually is. */
-export const SAVE_VERSION = 7
+export const SAVE_VERSION = 8
 
 /** Named weight presets for Riley's AI policy (ai.ts's AI_PROFILES) — a
  * game-level setting, not per-player state, since it configures how Riley's
  * turn is decided rather than anything about a player's progress. */
 export type AiProfileName = 'balanced' | 'hustler' | 'scholar' | 'gambler'
+
+/** StartScreen difficulty control, orthogonal to `AiProfileName` — profile
+ * is Riley's style, difficulty is how well Riley plays regardless of style
+ * (see ai.ts's AiProfile.skillLevel and DIFFICULTY_SKILL). A game-level
+ * setting for the same reason AiProfileName is. */
+export type RileyDifficulty = 'easy' | 'normal' | 'hard'
 
 /** Tunable knobs behind the StartScreen's Classic/Brutal/Zen presets
  * (data.ts's RULE_PRESETS) — the resolved values live on GameState, not a
@@ -207,6 +213,7 @@ export interface GameState {
   player: PlayerState
   riley: PlayerState
   rileyProfile: AiProfileName
+  rileyDifficulty: RileyDifficulty
   rules: RulesConfig
   /** True for a game started from the Daily Challenge button — a fixed,
    * date-derived seed/goals/rules/profile so every player's run that day is
