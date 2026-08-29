@@ -33,7 +33,7 @@ describe('stats', () => {
     })
   })
 
-  it('accumulates incident counts across games, from the player\'s own log entries only', () => {
+  it("accumulates incident counts across games, from the player's own log entries only", () => {
     recordGameResult(
       game(1, {
         winner: 'riley',
