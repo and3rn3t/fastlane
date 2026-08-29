@@ -163,15 +163,15 @@ function upgradePlayerToV5(player: unknown): unknown {
       trades: clampSkill(rawSkills.trades),
       tech: clampSkill(rawSkills.tech),
     },
-    investments: typeof p.investments === 'number' ? p.investments : 0,
-    activeEvents: Array.isArray(p.activeEvents) ? p.activeEvents : [],
+    investments: 0,
+    activeEvents: [],
   }
 }
 
 function upgradeEconomyToV9(economy: unknown): unknown {
   if (typeof economy !== 'object' || economy === null) return economy
   const e = economy as Record<string, unknown>
-  return { ...e, marketIndex: typeof e.marketIndex === 'number' ? e.marketIndex : 1 }
+  return { ...e, marketIndex: 1 }
 }
 
 const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<string, unknown>> = {

@@ -208,7 +208,7 @@ export function trainSkill(state: GameState, key: PlayerKey, skillId: SkillId) {
   spendTime(p, SKILL_TRAIN_TIME)
   spendCash(p, price(state, SKILL_TRAIN_PRICE))
   p.skills[skillId] = Math.min(100, p.skills[skillId] + SKILL_TRAIN_GAIN)
-  log(state, key, `Trained ${skillId} (${Math.round(p.skills[skillId])} now)`)
+  log(state, key, `Trained ${skillId} (${Math.floor(p.skills[skillId])} now)`)
 }
 
 export function buyMeal(state: GameState, key: PlayerKey) {

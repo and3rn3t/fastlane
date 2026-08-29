@@ -632,7 +632,7 @@ export function SkillTrainingAction({ game }: { game: GameState }) {
       {SKILLS.map((skill) => (
         <div className="action-row" key={skill.id}>
           <span className="grow">
-            <strong>{skill.name}</strong> — {Math.round(p.skills[skill.id])}/100
+            <strong>{skill.name}</strong> — {Math.floor(p.skills[skill.id])}/100
             <br />
             <span className="desc">{skill.blurb}</span>
           </span>

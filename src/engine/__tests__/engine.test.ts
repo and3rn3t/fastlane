@@ -436,24 +436,29 @@ describe('event chains', () => {
     expect(sawResolution).toBe(true)
   })
 
-  it('an inheritance chain pays out only after its delay, aggregated across seeds', () => {
-    let sawStart = false
-    let sawPayout = false
-    for (let seed = 0; seed < 30 && !(sawStart && sawPayout); seed++) {
-      let s = game(easyGoals, seed)
-      for (let w = 0; w < 20 && s.phase !== 'over'; w++) {
-        s = applyAction(s, { type: 'endWeek' })
-        if (s.lastReport?.entries.some((e) => e.text.includes('left them something'))) {
-          sawStart = true
-        }
-        if (s.lastReport?.entries.some((e) => e.text.includes('inheritance came through'))) {
-          sawPayout = true
-        }
-        if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
-      }
-    }
-    expect(sawStart).toBe(true)
-    expect(sawPayout).toBe(true)
+  it('an inheritance chain stays pending for one week, then pays out on the second', () => {
+    let s = game()
+    s.rules.eventFrequency = 0
+    s.player.activeEvents = [{ chainId: 'inheritance', stage: 0, weeksInStage: 0 }]
+
+    const cashBeforeDelayWeek = s.player.cash
+    s = applyAction(s, { type: 'endWeek' })
+
+    expect(s.lastReport?.entries.some((e) => e.text.includes('inheritance came through'))).toBe(
+      false
+    )
+    expect(s.player.cash).toBe(cashBeforeDelayWeek)
+    expect(s.player.activeEvents).toEqual([{ chainId: 'inheritance', stage: 0, weeksInStage: 1 }])
+
+    s = applyAction(s, { type: 'dismissReport' })
+    const cashBeforePayoutWeek = s.player.cash
+    s = applyAction(s, { type: 'endWeek' })
+
+    expect(s.lastReport?.entries.some((e) => e.text.includes('inheritance came through'))).toBe(
+      true
+    )
+    expect(s.player.cash).toBeGreaterThan(cashBeforePayoutWeek)
+    expect(s.player.activeEvents).toEqual([])
   })
 
   it('a layoff chain waives dress and experience requirements (sympathy hire)', () => {
