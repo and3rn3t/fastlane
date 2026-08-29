@@ -45,6 +45,9 @@ function newPlayer(name: string, isAI: boolean, startingCash: number): PlayerSta
     creditScore: CREDIT_SCORE_START,
     garnished: false,
     loanPaidThisWeek: false,
+    skills: { sales: 0, trades: 0, tech: 0 },
+    investments: 0,
+    activeEvents: [],
   }
 }
 
@@ -72,6 +75,7 @@ export function newGame(opts: NewGameOptions): GameState {
       wageIndex: 1,
       interestRate: 0.005,
       lotteryJackpot: 500,
+      marketIndex: 1,
     },
     player: newPlayer(opts.playerName || 'You', false, rules.startingCash),
     riley: newPlayer('Riley', true, rules.startingCash),
@@ -132,6 +136,9 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'takeClass':
       act.takeClass(draft, 'player')
       break
+    case 'trainSkill':
+      act.trainSkill(draft, 'player', action.skillId)
+      break
     case 'buyItem':
       act.buyItem(draft, 'player', action.itemId)
       break
@@ -149,6 +156,12 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       break
     case 'withdraw':
       act.withdraw(draft, 'player', action.amount)
+      break
+    case 'invest':
+      act.invest(draft, 'player', action.amount)
+      break
+    case 'divest':
+      act.divest(draft, 'player', action.units)
       break
     case 'payRent':
       act.payRent(draft, 'player')

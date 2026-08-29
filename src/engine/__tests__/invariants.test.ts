@@ -106,7 +106,9 @@ describe('invariant: net worth', () => {
           s = tryApply(s, action)
           for (const key of ['player', 'riley'] as const) {
             const p = s[key]
-            expect(netWorth(p)).toBe(Math.round(p.cash + p.savings - p.loanBalance))
+            expect(netWorth(p, s.economy.marketIndex)).toBe(
+              Math.round(p.cash + p.savings - p.loanBalance + p.investments * s.economy.marketIndex)
+            )
           }
         }
       })
@@ -162,6 +164,13 @@ function randomPlayerArb(): fc.Arbitrary<PlayerState> {
     creditScore: fc.integer({ min: 0, max: 100 }),
     garnished: fc.boolean(),
     loanPaidThisWeek: fc.constant(false),
+    skills: fc.record({
+      sales: fc.integer({ min: 0, max: 100 }),
+      trades: fc.integer({ min: 0, max: 100 }),
+      tech: fc.integer({ min: 0, max: 100 }),
+    }),
+    investments: fc.integer({ min: 0, max: 2000 }),
+    activeEvents: fc.constant([]),
   })
 }
 

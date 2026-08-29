@@ -13,10 +13,16 @@ import {
   HEALTH_LOW_THRESHOLD,
   HEALTH_OVERWORK_RATE,
   HEALTH_SICK_THRESHOLD,
+  INHERITANCE_DELAY_WEEKS,
+  INHERITANCE_MIN,
+  INHERITANCE_RANGE,
   ITEM_THEFT_CHANCE,
+  LAYOFF_SYMPATHY_WEEKS,
   LOAN_INTEREST_RATE,
   LOAN_MISSED_WEEKS_FOR_GARNISHMENT,
   LOTTERY_WIN_CHANCE,
+  MARKET_INDEX_MAX,
+  MARKET_INDEX_MIN,
   MAX_PROMOTIONS,
   OVERWORK_THRESHOLD,
   PROMOTION_PRESTIGE_BONUS,
@@ -27,7 +33,7 @@ import {
   jobById,
 } from './data'
 import { roll, rollInt } from './rng'
-import type { GameState, Goals, PlayerKey, PlayerState } from './types'
+import type { ActiveEvent, GameState, Goals, PlayerKey, PlayerState } from './types'
 
 function log(state: GameState, actor: PlayerKey | 'world', text: string) {
   state.log.push({ week: state.week, actor, text })
@@ -38,9 +44,9 @@ export function careerScore(p: PlayerState): number {
   return Math.min(100, jobById(p.jobId).prestige + p.promotionLevel * PROMOTION_PRESTIGE_BONUS)
 }
 
-export function meetsGoals(p: PlayerState, goals: Goals): boolean {
+export function meetsGoals(p: PlayerState, goals: Goals, marketIndex: number): boolean {
   return (
-    netWorth(p) >= goals.wealth &&
+    netWorth(p, marketIndex) >= goals.wealth &&
     p.happiness >= goals.happiness &&
     p.education >= goals.education &&
     careerScore(p) >= goals.career
@@ -48,9 +54,9 @@ export function meetsGoals(p: PlayerState, goals: Goals): boolean {
 }
 
 /** Fraction of the way to victory, 0–1, for progress bars and AI planning. */
-export function goalProgress(p: PlayerState, goals: Goals) {
+export function goalProgress(p: PlayerState, goals: Goals, marketIndex: number) {
   return {
-    wealth: Math.min(1, netWorth(p) / goals.wealth),
+    wealth: Math.min(1, netWorth(p, marketIndex) / goals.wealth),
     happiness: Math.min(1, p.happiness / goals.happiness),
     education: Math.min(1, p.education / goals.education),
     career: Math.min(1, careerScore(p) / goals.career),
@@ -254,6 +260,7 @@ const HEADLINES: Array<{
   priceDelta?: number
   wageDelta?: number
   interestDelta?: number
+  marketDelta?: number
 }> = [
   { text: 'Steady week in the city.' },
   { text: 'Inflation ticks up — prices rise.', priceDelta: 0.05 },
@@ -262,13 +269,22 @@ const HEADLINES: Array<{
   { text: 'Layoffs downtown — wages soften.', wageDelta: -0.04 },
   { text: 'Fed hikes rates — savers rejoice.', interestDelta: 0.002 },
   { text: 'Rates cut — savings earn less.', interestDelta: -0.002 },
+  { text: 'Stocks rally on strong earnings.', marketDelta: 0.06 },
+  { text: 'Market selloff spooks investors.', marketDelta: -0.06 },
 ]
+
+/** True if a player is already mid-chain for the given chain — chains don't
+ * stack (no double-layoff), so a case that would start one falls through to
+ * a no-op instead when it's already active. */
+function hasActiveChain(p: PlayerState, chainId: ActiveEvent['chainId']): boolean {
+  return p.activeEvents.some((e) => e.chainId === chainId)
+}
 
 function personalEvent(state: GameState, key: PlayerKey) {
   const p = state[key]
   const triggerChance = Math.min(0.9, 0.35 * state.rules.eventFrequency)
   if (roll(state) >= triggerChance) return
-  const which = rollInt(state, 5)
+  const which = rollInt(state, 7)
   switch (which) {
     case 0: {
       const found = 10 + rollInt(state, 40)
@@ -309,7 +325,57 @@ function personalEvent(state: GameState, key: PlayerKey) {
       }
       break
     }
+    case 5: {
+      // A one-shot roll (like the rest of this switch) starts a multi-week
+      // story instead of resolving immediately — see resolveActiveEvents.
+      if (p.jobId && !hasActiveChain(p, 'layoff')) {
+        const job = jobById(p.jobId)
+        p.jobId = null
+        p.jobTenureWeeks = 0
+        p.promotionLevel = 0
+        p.activeEvents.push({ chainId: 'layoff', stage: 0, weeksInStage: 0 })
+        log(state, key, `${p.name} was laid off from ${job.title}!`)
+      }
+      break
+    }
+    case 6: {
+      if (!hasActiveChain(p, 'inheritance')) {
+        p.activeEvents.push({ chainId: 'inheritance', stage: 0, weeksInStage: 0 })
+        log(state, key, `${p.name} heard a distant relative left them something in their will.`)
+      }
+      break
+    }
   }
+}
+
+/** Advances every in-progress chain by one week, resolving (and removing)
+ * the ones that have reached their conclusion. Called from endWeek right
+ * after upkeep, before this week's personalEvent can start a new one. */
+function resolveActiveEvents(state: GameState, key: PlayerKey) {
+  const p = state[key]
+  if (p.activeEvents.length === 0) return
+  const remaining: ActiveEvent[] = []
+  for (const ev of p.activeEvents) {
+    const weeksInStage = ev.weeksInStage + 1
+    if (ev.chainId === 'layoff') {
+      // Resolves either once re-employed or after enough weeks of sympathy
+      // hiring eligibility (see qualifiesFor) — whichever comes first.
+      if (p.jobId !== null || weeksInStage >= LAYOFF_SYMPATHY_WEEKS) {
+        log(state, key, `${p.name}'s rough patch since the layoff has passed.`)
+        continue
+      }
+      remaining.push({ ...ev, weeksInStage })
+    } else if (ev.chainId === 'inheritance') {
+      if (weeksInStage >= INHERITANCE_DELAY_WEEKS) {
+        const amount = INHERITANCE_MIN + rollInt(state, INHERITANCE_RANGE)
+        p.cash += amount
+        log(state, key, `${p.name}'s inheritance came through: $${amount}!`)
+        continue
+      }
+      remaining.push({ ...ev, weeksInStage })
+    }
+  }
+  p.activeEvents = remaining
 }
 
 function driftEconomy(state: GameState) {
@@ -323,10 +389,15 @@ function driftEconomy(state: GameState) {
       Math.min(0.012, state.economy.interestRate + headline.interestDelta * v)
     )
   }
+  if (headline.marketDelta) state.economy.marketIndex *= 1 + headline.marketDelta * v
   state.headline = headline.text
   // Clamp so a long game can't run away.
   state.economy.priceIndex = Math.min(1.6, Math.max(0.7, state.economy.priceIndex))
   state.economy.wageIndex = Math.min(1.6, Math.max(0.7, state.economy.wageIndex))
+  state.economy.marketIndex = Math.min(
+    MARKET_INDEX_MAX,
+    Math.max(MARKET_INDEX_MIN, state.economy.marketIndex)
+  )
   state.economy.lotteryJackpot = Math.round(state.economy.lotteryJackpot * 1.1)
   log(state, 'world', headline.text)
 }
@@ -342,12 +413,17 @@ function driftEconomy(state: GameState) {
 export function endWeek(state: GameState, logStart: number) {
   upkeep(state, 'player')
   upkeep(state, 'riley')
+  // Advance existing chains before this week's personalEvent can start a new
+  // one, so a chain that just started doesn't also get processed same week.
+  resolveActiveEvents(state, 'player')
+  resolveActiveEvents(state, 'riley')
   personalEvent(state, 'player')
   personalEvent(state, 'riley')
   driftEconomy(state)
 
-  const playerWins = meetsGoals(state.player, state.goals)
-  const rileyWins = meetsGoals(state.riley, state.goals)
+  const marketIndex = state.economy.marketIndex
+  const playerWins = meetsGoals(state.player, state.goals, marketIndex)
+  const rileyWins = meetsGoals(state.riley, state.goals, marketIndex)
   if (playerWins || rileyWins) {
     state.phase = 'over'
     // Ties go to the human — Riley has enough advantages.
@@ -363,9 +439,9 @@ export function endWeek(state: GameState, logStart: number) {
   }
   state.history.push({
     week: state.week,
-    playerNetWorth: netWorth(state.player),
+    playerNetWorth: netWorth(state.player, marketIndex),
     playerCareer: careerScore(state.player),
-    rileyNetWorth: netWorth(state.riley),
+    rileyNetWorth: netWorth(state.riley, marketIndex),
     rileyCareer: careerScore(state.riley),
   })
   state.week += 1

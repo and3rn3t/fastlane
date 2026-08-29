@@ -28,6 +28,14 @@ const MAX_WEEKS = 60
 interface SimResult {
   winner: 'player' | 'riley' | 'none'
   weeks: number
+  // Phase 2 system usage, read off Riley's final state — a stable win rate
+  // with these all at zero would mean the AI integration silently failed
+  // even though the top-line numbers look fine. See main()'s report.
+  rileyMaxSkill: number
+  rileyTotalSkill: number
+  rileyInvestmentValue: number
+  rileyLayoffs: number
+  rileyInheritances: number
 }
 
 function runOneGame(seed: number, rileyProfile: AiProfileName): SimResult {
@@ -42,11 +50,32 @@ function runOneGame(seed: number, rileyProfile: AiProfileName): SimResult {
     runAIWeek(state, 'player', AI_PROFILES.balanced)
     state = applyAction(state, { type: 'endWeek' })
     if (state.phase === 'over') {
-      return { winner: state.winner ?? 'none', weeks: state.week - 1 }
+      return { winner: state.winner ?? 'none', weeks: state.week - 1, ...rileySystemUsage(state) }
     }
     state = applyAction(state, { type: 'dismissReport' })
   }
-  return { winner: 'none', weeks: MAX_WEEKS }
+  return { winner: 'none', weeks: MAX_WEEKS, ...rileySystemUsage(state) }
+}
+
+function rileySystemUsage(
+  state: GameState
+): Pick<
+  SimResult,
+  | 'rileyMaxSkill'
+  | 'rileyTotalSkill'
+  | 'rileyInvestmentValue'
+  | 'rileyLayoffs'
+  | 'rileyInheritances'
+> {
+  const skills = Object.values(state.riley.skills)
+  const rileyLog = state.log.filter((e) => e.actor === 'riley')
+  return {
+    rileyMaxSkill: Math.max(...skills),
+    rileyTotalSkill: skills.reduce((a, b) => a + b, 0),
+    rileyInvestmentValue: Math.round(state.riley.investments * state.economy.marketIndex),
+    rileyLayoffs: rileyLog.filter((e) => e.text.includes('was laid off')).length,
+    rileyInheritances: rileyLog.filter((e) => e.text.includes('inheritance came through')).length,
+  }
 }
 
 function average(nums: number[]): number {
@@ -95,6 +124,22 @@ function main() {
       `⚠ More than 10% of games hit the ${MAX_WEEKS}-week cap with no winner — that's worth a look.`
     )
   }
+
+  // Usage, not outcome: a stable win rate above with zero skill/investment/
+  // chain activity would mean the AI integration silently regressed even
+  // though the top-line numbers still look fine.
+  const gamesWithSkillGain = results.filter((r) => r.rileyMaxSkill > 0).length
+  const gamesWithInvestments = results.filter((r) => r.rileyInvestmentValue > 0).length
+  console.log(`Riley system usage (this profile):`)
+  console.log(
+    `  Skills — any gain: ${pct(gamesWithSkillGain)}, avg max: ${average(results.map((r) => r.rileyMaxSkill)).toFixed(1)}, avg total: ${average(results.map((r) => r.rileyTotalSkill)).toFixed(1)}`
+  )
+  console.log(
+    `  Investments — held at game end: ${pct(gamesWithInvestments)}, avg value: $${average(results.map((r) => r.rileyInvestmentValue)).toFixed(0)}`
+  )
+  console.log(
+    `  Event chains — avg layoffs: ${average(results.map((r) => r.rileyLayoffs)).toFixed(2)}, avg inheritances: ${average(results.map((r) => r.rileyInheritances)).toFixed(2)}`
+  )
 }
 
 main()

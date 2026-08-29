@@ -29,6 +29,13 @@ export type ItemId =
 
 export type ApartmentTier = 'none' | 'basic' | 'secure'
 
+/** A small, closed set of specializations — not a generic skill tree. Each
+ * rises passively from working a job that trains it (JobDef.trainsSkill) or
+ * directly via the trainSkill action, and gates a handful of top-tier jobs
+ * (JobDef.minSkills) so which employer you grind at actually matters beyond
+ * just "more experience." */
+export type SkillId = 'sales' | 'trades' | 'tech'
+
 export interface LocationDef {
   id: LocationId
   name: string
@@ -51,6 +58,11 @@ export interface JobDef {
   /** Senior white-collar roles need a computer at home, not just the right
    * dress/education/experience. */
   requiresComputer?: boolean
+  /** The skill this job builds while working it (see work() in actions.ts). */
+  trainsSkill?: SkillId
+  /** Skill floors this job additionally requires, on top of dress/education/
+   * experience — makes the ladder branch by specialization, not just grind. */
+  minSkills?: Partial<Record<SkillId, number>>
 }
 
 export interface ItemDef {
@@ -132,6 +144,27 @@ export interface PlayerState {
   /** Whether any loan payment (voluntary or garnished) landed this week —
    * read by upkeep, reset with the rest of the weekly state. */
   loanPaidThisWeek: boolean
+  /** 0–100 per skill — see SkillId. Always all three keys present (unlike
+   * JobDef.minSkills' Partial), so callers never need an existence check. */
+  skills: Record<SkillId, number>
+  /** Units held, not dollars — mark-to-market via Economy.marketIndex, so
+   * netWorth() reflects the current value without an explicit divest. */
+  investments: number
+  /** In-progress event chains (see week.ts's personalEvent/resolveActiveEvents) —
+   * a laid-off player or one expecting an inheritance carries this forward
+   * week to week instead of the effect resolving in a single one-shot roll. */
+  activeEvents: ActiveEvent[]
+}
+
+/** One entry per event chain currently playing out for a player. `stage`
+ * indexes which point in the chain's story it's at; `weeksInStage` drives
+ * how long it's been there, so resolveActiveEvents knows when to advance or
+ * resolve it. Kept intentionally small — 2-3 chains, 2-3 stages each — not a
+ * general narrative-scripting system. */
+export interface ActiveEvent {
+  chainId: 'layoff' | 'inheritance'
+  stage: number
+  weeksInStage: number
 }
 
 export interface Economy {
@@ -142,6 +175,11 @@ export interface Economy {
   /** Weekly interest rate on savings, e.g. 0.005. */
   interestRate: number
   lotteryJackpot: number
+  /** Mark-to-market value of one investment unit — drifts in driftEconomy()
+   * same as priceIndex/wageIndex, clamped wider (MARKET_INDEX_MIN/MAX in
+   * data.ts) since investing is meant to carry more real risk/reward than
+   * the price/wage indices' background noise. */
+  marketIndex: number
 }
 
 export interface LogEntry {
@@ -176,7 +214,7 @@ export interface WeekSnapshot {
 /** Bump on any GameState/PlayerState shape change and add a migration step in
  * state/GameContext.tsx's MIGRATIONS map — see that file for the full scheme.
  * The engine owns this number since it owns what the shape actually is. */
-export const SAVE_VERSION = 8
+export const SAVE_VERSION = 9
 
 /** Named weight presets for Riley's AI policy (ai.ts's AI_PROFILES) — a
  * game-level setting, not per-player state, since it configures how Riley's
@@ -233,6 +271,9 @@ export type GameAction =
   | { type: 'applyJob'; jobId: string }
   | { type: 'quitJob' }
   | { type: 'takeClass' }
+  | { type: 'trainSkill'; skillId: SkillId }
+  | { type: 'invest'; amount: number }
+  | { type: 'divest'; units: number }
   | { type: 'buyItem'; itemId: ItemId }
   | { type: 'buyMeal' }
   | { type: 'buyGroceries'; units: number }

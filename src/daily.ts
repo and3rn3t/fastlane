@@ -70,7 +70,7 @@ const GOAL_ROWS: Array<{ key: keyof Goals; emoji: string }> = [
  * only a real daily-challenge one.
  */
 export function shareableResult(game: GameState, date: Date = new Date()): string {
-  const progress = goalProgress(game.player, game.goals)
+  const progress = goalProgress(game.player, game.goals, game.economy.marketIndex)
   const rows = GOAL_ROWS.map((row) => {
     const filled = Math.round(progress[row.key] * 5)
     return `${row.emoji} ${'🟩'.repeat(filled)}${'⬛'.repeat(5 - filled)}`

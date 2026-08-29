@@ -1,7 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { AI_PROFILES } from '../ai'
-import { EngineError, netWorth, wagePerHour } from '../actions'
-import { FOOD_NEEDED, RULE_PRESETS, WEEK_TIME, maxLoan, travelCost } from '../data'
+import { AI_PROFILES, DIFFICULTY_SKILL, runAIWeek } from '../ai'
+import { EngineError, netWorth, qualifiesFor, wagePerHour } from '../actions'
+import {
+  FOOD_NEEDED,
+  MARKET_INDEX_MAX,
+  MARKET_INDEX_MIN,
+  RULE_PRESETS,
+  SKILL_GAIN_PER_HOUR,
+  SKILL_TRAIN_GAIN,
+  SKILL_TRAIN_PRICE,
+  WEEK_TIME,
+  maxLoan,
+  travelCost,
+} from '../data'
 import { applyAction, newGame } from '../engine'
 import { careerScore, meetsGoals } from '../week'
 import type { GameState, Goals } from '../types'
@@ -148,6 +159,50 @@ describe('university', () => {
   })
 })
 
+describe('skills', () => {
+  it('gains the workplace skill from working a job that trains it', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'employment' })
+    s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' }) // Burger Barn trains sales
+    s = applyAction(s, { type: 'travel', to: 'burgers' })
+    s = applyAction(s, { type: 'work', hours: 10 })
+    expect(s.player.skills.sales).toBeCloseTo(10 * SKILL_GAIN_PER_HOUR)
+    expect(s.player.skills.trades).toBe(0)
+    expect(s.player.skills.tech).toBe(0)
+  })
+
+  it('trainSkill spends cash and time at City University to raise a skill directly', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'university' })
+    const cash = s.player.cash
+    s = applyAction(s, { type: 'trainSkill', skillId: 'tech' })
+    expect(s.player.skills.tech).toBe(SKILL_TRAIN_GAIN)
+    expect(s.player.cash).toBe(cash - SKILL_TRAIN_PRICE)
+  })
+
+  it('gates a senior job on a minimum skill, on top of dress/education/experience', () => {
+    const s = applyAction(game(), { type: 'travel', to: 'employment' })
+    expect(() => applyAction(s, { type: 'applyJob', jobId: 'store-manager' })).toThrow(
+      /sales skill/
+    )
+  })
+
+  it('qualifiesFor passes once the required skill is met', () => {
+    const s = game()
+    const readyOtherwise = {
+      ...s.player,
+      dress: 100,
+      education: 100,
+      experience: 1000,
+    }
+    expect(qualifiesFor(readyOtherwise, 'store-manager').ok).toBe(false)
+    expect(
+      qualifiesFor(
+        { ...readyOtherwise, skills: { ...readyOtherwise.skills, sales: 40 } },
+        'store-manager'
+      ).ok
+    ).toBe(true)
+  })
+})
+
 describe('end of week', () => {
   it('accrues rent and evicts after three unpaid weeks', () => {
     let s = applyAction(game(), { type: 'travel', to: 'rentoffice' })
@@ -263,12 +318,12 @@ describe('loans', () => {
   it('borrows up to the credit limit and adds it to cash, not net worth', () => {
     let s = applyAction(game(), { type: 'travel', to: 'bank' })
     const cashBefore = s.player.cash
-    const netWorthBefore = netWorth(s.player)
+    const netWorthBefore = netWorth(s.player, s.economy.marketIndex)
     s = applyAction(s, { type: 'takeLoan', amount: 300 })
     expect(s.player.cash).toBe(cashBefore + 300)
     expect(s.player.loanBalance).toBe(300)
     // Borrowing is a wash on net worth — cash up, debt up by the same amount.
-    expect(netWorth(s.player)).toBe(netWorthBefore)
+    expect(netWorth(s.player, s.economy.marketIndex)).toBe(netWorthBefore)
 
     const limit = maxLoan(s.player.creditScore)
     expect(() => applyAction(s, { type: 'takeLoan', amount: limit })).toThrow(/limit/)
@@ -312,6 +367,117 @@ describe('loans', () => {
     expect(s.player.loanBalance).toBeLessThan(balanceBefore)
     expect(s.player.cash).toBeGreaterThan(cashBefore) // still got a cut, just not all of it
     expect(s.player.loanPaidThisWeek).toBe(true)
+  })
+})
+
+describe('investing', () => {
+  it('invest converts cash to units at the current market index', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'bank' })
+    const cash = s.player.cash
+    s = applyAction(s, { type: 'invest', amount: 200 })
+    expect(s.player.cash).toBe(cash - 200)
+    expect(s.player.investments).toBeCloseTo(200 / s.economy.marketIndex)
+  })
+
+  it('divest converts units back to cash at the current market index', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'bank' })
+    s = applyAction(s, { type: 'invest', amount: 200 })
+    const units = s.player.investments
+    const cashAfterInvest = s.player.cash
+    s = applyAction(s, { type: 'divest', units })
+    expect(s.player.investments).toBe(0)
+    expect(s.player.cash).toBe(cashAfterInvest + Math.round(units * s.economy.marketIndex))
+  })
+
+  it("netWorth folds investments into the player's wealth at the current market index", () => {
+    let s = applyAction(game(), { type: 'travel', to: 'bank' })
+    s = applyAction(s, { type: 'invest', amount: 200 })
+    const p = s.player
+    expect(netWorth(p, s.economy.marketIndex)).toBe(
+      Math.round(p.cash + p.savings - p.loanBalance + p.investments * s.economy.marketIndex)
+    )
+  })
+
+  it('rejects investing/divesting away from the bank or beyond what is held', () => {
+    const s = game()
+    expect(() => applyAction(s, { type: 'invest', amount: 100 })).toThrow(/First Bank/)
+    let atBank = applyAction(s, { type: 'travel', to: 'bank' })
+    atBank = applyAction(atBank, { type: 'invest', amount: 100 })
+    expect(() =>
+      applyAction(atBank, { type: 'divest', units: atBank.player.investments + 1 })
+    ).toThrow(EngineError)
+  })
+
+  it('market index drifts but always stays within its clamp', () => {
+    let s = game()
+    for (let w = 0; w < 30 && s.phase !== 'over'; w++) {
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+      expect(s.economy.marketIndex).toBeGreaterThanOrEqual(MARKET_INDEX_MIN)
+      expect(s.economy.marketIndex).toBeLessThanOrEqual(MARKET_INDEX_MAX)
+    }
+  })
+})
+
+describe('event chains', () => {
+  it('a layoff clears the job and eventually resolves, aggregated across seeds', () => {
+    let sawLayoff = false
+    let sawResolution = false
+    for (let seed = 0; seed < 30 && !(sawLayoff && sawResolution); seed++) {
+      let s = game(easyGoals, seed)
+      for (let w = 0; w < 20 && s.phase !== 'over'; w++) {
+        s = applyAction(s, { type: 'endWeek' })
+        if (s.lastReport?.entries.some((e) => e.text.includes('was laid off'))) sawLayoff = true
+        if (s.lastReport?.entries.some((e) => e.text.includes('rough patch'))) sawResolution = true
+        if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+      }
+    }
+    expect(sawLayoff).toBe(true)
+    expect(sawResolution).toBe(true)
+  })
+
+  it('an inheritance chain stays pending for one week, then pays out on the second', () => {
+    let s = game()
+    // Reassign, don't mutate — s.rules defaults to the shared RULE_PRESETS.classic
+    // object (newGame() doesn't clone it until the first applyAction), so
+    // `s.rules.eventFrequency = 0` would zero it for every later test in this
+    // file too, silencing personal events file-wide instead of just here.
+    s.rules = { ...s.rules, eventFrequency: 0 }
+    s.player.activeEvents = [{ chainId: 'inheritance', stage: 0, weeksInStage: 0 }]
+
+    const cashBeforeDelayWeek = s.player.cash
+    s = applyAction(s, { type: 'endWeek' })
+
+    expect(s.lastReport?.entries.some((e) => e.text.includes('inheritance came through'))).toBe(
+      false
+    )
+    expect(s.player.cash).toBe(cashBeforeDelayWeek)
+    expect(s.player.activeEvents).toEqual([{ chainId: 'inheritance', stage: 0, weeksInStage: 1 }])
+
+    s = applyAction(s, { type: 'dismissReport' })
+    const cashBeforePayoutWeek = s.player.cash
+    s = applyAction(s, { type: 'endWeek' })
+
+    expect(s.lastReport?.entries.some((e) => e.text.includes('inheritance came through'))).toBe(
+      true
+    )
+    expect(s.player.cash).toBeGreaterThan(cashBeforePayoutWeek)
+    expect(s.player.activeEvents).toEqual([])
+  })
+
+  it('a layoff chain waives dress and experience requirements (sympathy hire)', () => {
+    const s = game()
+    const laidOff = {
+      ...s.player,
+      education: 5,
+      dress: 0,
+      experience: 0,
+      activeEvents: [{ chainId: 'layoff' as const, stage: 0, weeksInStage: 0 }],
+    }
+    // cashier: minDress 25, minEducation 2, minExperience 20 — only the
+    // waived two would otherwise block a dress-0/experience-0 player.
+    expect(qualifiesFor(laidOff, 'cashier').ok).toBe(true)
+    expect(qualifiesFor({ ...laidOff, activeEvents: [] }, 'cashier').ok).toBe(false)
   })
 })
 
@@ -371,11 +537,12 @@ describe('health', () => {
 describe('victory', () => {
   it('meetsGoals checks all four tracks', () => {
     const s = game()
-    expect(meetsGoals(s.player, trivialGoals)).toBe(true) // start state satisfies trivial goals
-    expect(meetsGoals(s.player, { ...trivialGoals, wealth: 10_000 })).toBe(false)
-    expect(meetsGoals(s.player, { ...trivialGoals, education: 1 })).toBe(false)
-    expect(meetsGoals(s.player, { ...trivialGoals, career: 5 })).toBe(false)
-    expect(meetsGoals(s.player, { ...trivialGoals, happiness: 90 })).toBe(false)
+    const mi = s.economy.marketIndex
+    expect(meetsGoals(s.player, trivialGoals, mi)).toBe(true) // start state satisfies trivial goals
+    expect(meetsGoals(s.player, { ...trivialGoals, wealth: 10_000 }, mi)).toBe(false)
+    expect(meetsGoals(s.player, { ...trivialGoals, education: 1 }, mi)).toBe(false)
+    expect(meetsGoals(s.player, { ...trivialGoals, career: 5 }, mi)).toBe(false)
+    expect(meetsGoals(s.player, { ...trivialGoals, happiness: 90 }, mi)).toBe(false)
   })
 
   it('declares a winner when goals are met at week end', () => {
@@ -463,6 +630,51 @@ describe('Riley AI', () => {
     expect(s.phase).toBe('over')
     expect(s.winner).toBe('riley')
   })
+
+  it('pursueCareer buys a computer to clear a requiresComputer blocker on the next job', () => {
+    // Career goal must be above the current careerScore, or pursueCareer's
+    // own "goal already met, stop chasing prestige" gate returns early
+    // before ever reaching the blocker-clearing logic below.
+    const goals: Goals = { ...easyGoals, career: 50 }
+    const s = newGame({ playerName: 'T', goals, seed: 42 })
+    // Already technician (prestige 35, no computer needed) with everything
+    // analyst (prestige 45, the unique next rung) requires except a
+    // computer — isolates pursueCareer's requiresComputer branch instead of
+    // an earlier, already-qualified rung winning bestQualifiedJob first.
+    s.riley.jobId = 'technician'
+    s.riley.dress = 80
+    s.riley.education = 20
+    s.riley.experience = 150
+    s.riley.cash = 1000
+    runAIWeek(s, 'riley', AI_PROFILES.balanced)
+    expect(s.riley.items).toContain('computer')
+  })
+
+  it('a Gambler with the wealth goal already met but no cash surplus never visits the casino', () => {
+    // wealth met via savings (untouched by spending), cash held far below
+    // reserve×3 so gambleAtCasino's own surplus check can never clear
+    // CASINO_MIN_BET regardless of what else Riley does this turn.
+    const goals: Goals = { wealth: 100, happiness: 55, education: 3, career: 10 }
+    const s = newGame({ playerName: 'T', goals, seed: 1, rileyProfile: 'gambler' })
+    s.riley.savings = 200
+    s.riley.cash = 50
+    runAIWeek(s, 'riley', AI_PROFILES.gambler)
+    expect(s.log.some((e) => e.actor === 'riley' && e.text.includes('wheel'))).toBe(false)
+  })
+
+  it('Easy skill spends extra rolls considering fewer candidates than Normal each turn', () => {
+    // considerForAttempt's random-subset filtering is a real code path with
+    // its own coverage, distinct from the mistake-free Normal/Hard path —
+    // proven by the fact it burns extra rolls off the same seed, which
+    // Normal (dropChance 0) never touches.
+    const goals: Goals = { wealth: 4000, happiness: 70, education: 12, career: 30 }
+    const runWith = (skillLevel: number) => {
+      const s = newGame({ playerName: 'T', goals, seed: 5 })
+      runAIWeek(s, 'riley', { ...AI_PROFILES.balanced, skillLevel })
+      return s.rngSeed
+    }
+    expect(runWith(DIFFICULTY_SKILL.easy)).not.toBe(runWith(DIFFICULTY_SKILL.normal))
+  })
 })
 
 describe('AI personalities', () => {
@@ -548,6 +760,8 @@ describe('rule presets', () => {
       'ran into an old friend',
       'got sick and lost',
       'felt a cold coming on',
+      'was laid off',
+      'left them something in their will',
     ]
     function countPersonalEvents(rules: typeof RULE_PRESETS.classic): number {
       let total = 0
