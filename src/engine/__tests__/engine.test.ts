@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { AI_PROFILES } from '../ai'
+import { AI_PROFILES, DIFFICULTY_SKILL, runAIWeek } from '../ai'
 import { EngineError, netWorth, qualifiesFor, wagePerHour } from '../actions'
 import {
   FOOD_NEEDED,
@@ -620,6 +620,51 @@ describe('Riley AI', () => {
     }
     expect(s.phase).toBe('over')
     expect(s.winner).toBe('riley')
+  })
+
+  it('pursueCareer buys a computer to clear a requiresComputer blocker on the next job', () => {
+    // Career goal must be above the current careerScore, or pursueCareer's
+    // own "goal already met, stop chasing prestige" gate returns early
+    // before ever reaching the blocker-clearing logic below.
+    const goals: Goals = { ...easyGoals, career: 50 }
+    const s = newGame({ playerName: 'T', goals, seed: 42 })
+    // Already technician (prestige 35, no computer needed) with everything
+    // analyst (prestige 45, the unique next rung) requires except a
+    // computer — isolates pursueCareer's requiresComputer branch instead of
+    // an earlier, already-qualified rung winning bestQualifiedJob first.
+    s.riley.jobId = 'technician'
+    s.riley.dress = 80
+    s.riley.education = 20
+    s.riley.experience = 150
+    s.riley.cash = 1000
+    runAIWeek(s, 'riley', AI_PROFILES.balanced)
+    expect(s.riley.items).toContain('computer')
+  })
+
+  it('a Gambler with the wealth goal already met but no cash surplus never visits the casino', () => {
+    // wealth met via savings (untouched by spending), cash held far below
+    // reserve×3 so gambleAtCasino's own surplus check can never clear
+    // CASINO_MIN_BET regardless of what else Riley does this turn.
+    const goals: Goals = { wealth: 100, happiness: 55, education: 3, career: 10 }
+    const s = newGame({ playerName: 'T', goals, seed: 1, rileyProfile: 'gambler' })
+    s.riley.savings = 200
+    s.riley.cash = 50
+    runAIWeek(s, 'riley', AI_PROFILES.gambler)
+    expect(s.log.some((e) => e.actor === 'riley' && e.text.includes('wheel'))).toBe(false)
+  })
+
+  it('Easy skill spends extra rolls considering fewer candidates than Normal each turn', () => {
+    // considerForAttempt's random-subset filtering is a real code path with
+    // its own coverage, distinct from the mistake-free Normal/Hard path —
+    // proven by the fact it burns extra rolls off the same seed, which
+    // Normal (dropChance 0) never touches.
+    const goals: Goals = { wealth: 4000, happiness: 70, education: 12, career: 30 }
+    const runWith = (skillLevel: number) => {
+      const s = newGame({ playerName: 'T', goals, seed: 5 })
+      runAIWeek(s, 'riley', { ...AI_PROFILES.balanced, skillLevel })
+      return s.rngSeed
+    }
+    expect(runWith(DIFFICULTY_SKILL.easy)).not.toBe(runWith(DIFFICULTY_SKILL.normal))
   })
 })
 
