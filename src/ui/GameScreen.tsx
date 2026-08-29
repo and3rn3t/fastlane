@@ -170,7 +170,7 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
         </div>
         <div className="stat chip">
           <span className="label">Net worth</span>
-          <span className="value">${netWorth(p).toLocaleString()}</span>
+          <span className="value">${netWorth(p, game.economy.marketIndex).toLocaleString()}</span>
         </div>
         <div className="stat chip">
           <span className="label">Job</span>

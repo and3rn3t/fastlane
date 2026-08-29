@@ -76,8 +76,8 @@ export function DeltaBadge({
 
 function CenterPanel({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
-  const mine = goalProgress(game.player, game.goals)
-  const rival = goalProgress(game.riley, game.goals)
+  const mine = goalProgress(game.player, game.goals, game.economy.marketIndex)
+  const rival = goalProgress(game.riley, game.goals, game.economy.marketIndex)
   const timeDelta = useDeltaFlash(game.player.timeLeft)
 
   const ringOffset = RING_CIRCUMFERENCE * (1 - game.player.timeLeft / 60)

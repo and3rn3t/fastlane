@@ -1,4 +1,4 @@
-import type { ItemDef, JobDef, LocationDef, LocationId, RulesConfig } from './types'
+import type { ItemDef, JobDef, LocationDef, LocationId, RulesConfig, SkillId } from './types'
 
 export const WEEK_TIME = 60
 export const FOOD_NEEDED = 6
@@ -56,6 +56,27 @@ export const GARNISHMENT_RATE = 0.3
 export function maxLoan(creditScore: number): number {
   return 300 + creditScore * 20
 }
+
+/** Skill points gained per hour worked at a job with a `trainsSkill` — 40h/
+ * week at the right job takes about 8-9 weeks to hit 50, roughly the same
+ * pace as education/experience already progress at. */
+export const SKILL_GAIN_PER_HOUR = 0.15
+/** trainSkill action, at City University — a direct, cash-for-time way to
+ * build a specific skill instead of grinding hours at the right job. */
+export const SKILL_TRAIN_PRICE = 60
+export const SKILL_TRAIN_TIME = 6
+export const SKILL_TRAIN_GAIN = 8
+
+/** Wider than priceIndex/wageIndex's 0.7–1.6 clamp — investing is meant to
+ * carry real risk/reward, not just background economic noise. */
+export const MARKET_INDEX_MIN = 0.5
+export const MARKET_INDEX_MAX = 2
+
+/** Event chain tuning (week.ts's personalEvent/resolveActiveEvents). */
+export const LAYOFF_SYMPATHY_WEEKS = 3
+export const INHERITANCE_DELAY_WEEKS = 2
+export const INHERITANCE_MIN = 200
+export const INHERITANCE_RANGE = 400
 
 export const CASINO_MIN_BET = 10
 export const CASINO_MAX_BET = 500
@@ -161,6 +182,11 @@ export const LOCATIONS: Record<LocationId, LocationDef> = {
 
 export const LOOP_SIZE = 14
 
+// Which skill each employer trains (JobDef.trainsSkill), and the skill floor
+// its top rung additionally demands (JobDef.minSkills) — retail/food service
+// builds sales, the factory builds trades, bank/university build tech. This
+// is what makes the ladder branch by specialization: grinding at MegaMart
+// for a year doesn't help you clear Assembly Works' engineer role.
 export const JOBS: JobDef[] = [
   // Burger Barn
   {
@@ -172,6 +198,7 @@ export const JOBS: JobDef[] = [
     minDress: 10,
     minEducation: 0,
     minExperience: 0,
+    trainsSkill: 'sales',
   },
   {
     id: 'shift-lead',
@@ -182,6 +209,7 @@ export const JOBS: JobDef[] = [
     minDress: 25,
     minEducation: 3,
     minExperience: 40,
+    trainsSkill: 'sales',
   },
   {
     id: 'store-manager',
@@ -192,6 +220,8 @@ export const JOBS: JobDef[] = [
     minDress: 50,
     minEducation: 9,
     minExperience: 120,
+    trainsSkill: 'sales',
+    minSkills: { sales: 40 },
   },
   // MegaMart
   {
@@ -203,6 +233,7 @@ export const JOBS: JobDef[] = [
     minDress: 10,
     minEducation: 0,
     minExperience: 0,
+    trainsSkill: 'sales',
   },
   {
     id: 'cashier',
@@ -213,6 +244,7 @@ export const JOBS: JobDef[] = [
     minDress: 25,
     minEducation: 2,
     minExperience: 20,
+    trainsSkill: 'sales',
   },
   {
     id: 'dept-manager',
@@ -223,6 +255,8 @@ export const JOBS: JobDef[] = [
     minDress: 50,
     minEducation: 8,
     minExperience: 100,
+    trainsSkill: 'sales',
+    minSkills: { sales: 40 },
   },
   // Assembly Works
   {
@@ -234,6 +268,7 @@ export const JOBS: JobDef[] = [
     minDress: 0,
     minEducation: 0,
     minExperience: 0,
+    trainsSkill: 'trades',
   },
   {
     id: 'assembler',
@@ -244,6 +279,7 @@ export const JOBS: JobDef[] = [
     minDress: 10,
     minEducation: 4,
     minExperience: 40,
+    trainsSkill: 'trades',
   },
   {
     id: 'technician',
@@ -254,6 +290,7 @@ export const JOBS: JobDef[] = [
     minDress: 25,
     minEducation: 12,
     minExperience: 120,
+    trainsSkill: 'trades',
   },
   {
     id: 'engineer',
@@ -264,6 +301,8 @@ export const JOBS: JobDef[] = [
     minDress: 50,
     minEducation: 18,
     minExperience: 200,
+    trainsSkill: 'trades',
+    minSkills: { trades: 50 },
   },
   // First Bank
   {
@@ -275,6 +314,7 @@ export const JOBS: JobDef[] = [
     minDress: 60,
     minEducation: 6,
     minExperience: 40,
+    trainsSkill: 'tech',
   },
   {
     id: 'analyst',
@@ -286,6 +326,7 @@ export const JOBS: JobDef[] = [
     minEducation: 14,
     minExperience: 120,
     requiresComputer: true,
+    trainsSkill: 'tech',
   },
   {
     id: 'branch-manager',
@@ -297,6 +338,8 @@ export const JOBS: JobDef[] = [
     minEducation: 22,
     minExperience: 280,
     requiresComputer: true,
+    trainsSkill: 'tech',
+    minSkills: { tech: 50 },
   },
   // City University
   {
@@ -308,6 +351,7 @@ export const JOBS: JobDef[] = [
     minDress: 25,
     minEducation: 10,
     minExperience: 0,
+    trainsSkill: 'tech',
   },
   {
     id: 'professor',
@@ -319,7 +363,15 @@ export const JOBS: JobDef[] = [
     minEducation: 30,
     minExperience: 200,
     requiresComputer: true,
+    trainsSkill: 'tech',
+    minSkills: { tech: 60 },
   },
+]
+
+export const SKILLS: Array<{ id: SkillId; name: string; blurb: string }> = [
+  { id: 'sales', name: 'Sales', blurb: 'Built by working Burger Barn or MegaMart.' },
+  { id: 'trades', name: 'Trades', blurb: 'Built by working Assembly Works.' },
+  { id: 'tech', name: 'Tech', blurb: 'Built by working First Bank or City University.' },
 ]
 
 export const ITEMS: ItemDef[] = [

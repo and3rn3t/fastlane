@@ -26,6 +26,10 @@ import {
   PROMOTION_WAGE_BONUS,
   RELAX_CAP,
   RENT,
+  SKILL_GAIN_PER_HOUR,
+  SKILL_TRAIN_GAIN,
+  SKILL_TRAIN_PRICE,
+  SKILL_TRAIN_TIME,
   TUITION,
   itemById,
   jobById,
@@ -33,7 +37,15 @@ import {
   travelCost,
 } from './data'
 import { roll } from './rng'
-import type { ApartmentTier, GameState, ItemId, LocationId, PlayerKey, PlayerState } from './types'
+import type {
+  ApartmentTier,
+  GameState,
+  ItemId,
+  LocationId,
+  PlayerKey,
+  PlayerState,
+  SkillId,
+} from './types'
 
 export class EngineError extends Error {}
 
@@ -78,7 +90,12 @@ export function hasItem(p: PlayerState, id: ItemId): boolean {
 // here, or this stops being safe. Used by engine.ts's applyAction (the real
 // per-dispatch clone) and by ai.ts (scratch copies for scoring candidates).
 export function clonePlayer(p: PlayerState): PlayerState {
-  return { ...p, items: p.items.slice() }
+  return {
+    ...p,
+    items: p.items.slice(),
+    skills: { ...p.skills },
+    activeEvents: p.activeEvents.slice(),
+  }
 }
 
 export function groceryCap(p: PlayerState): number {
@@ -104,6 +121,10 @@ export function work(state: GameState, key: PlayerKey, hours: number) {
   const pay = Math.round(hours * wagePerHour(state, job.id, p.promotionLevel))
   p.experience += hours
   p.hoursWorkedThisWeek += hours
+  if (job.trainsSkill) {
+    const skillId = job.trainsSkill
+    p.skills[skillId] = Math.min(100, p.skills[skillId] + hours * SKILL_GAIN_PER_HOUR)
+  }
   if (p.garnished && p.loanBalance > 0) {
     const seized = Math.min(Math.round(pay * GARNISHMENT_RATE), p.loanBalance)
     p.cash += pay - seized
@@ -124,10 +145,22 @@ export function work(state: GameState, key: PlayerKey, hours: number) {
 export function qualifiesFor(p: PlayerState, jobId: string): { ok: boolean; reasons: string[] } {
   const job = jobById(jobId)
   const reasons: string[] = []
+  // A layoff chain waives dress/experience (but not education, computer, or
+  // skills) for its duration — a "sympathy hire" recognizing that a good
+  // reference and a clean resume matter more right after a layoff than
+  // whether your suit is sharp or you've clocked enough hours somewhere new.
+  const sympathyHire = p.activeEvents.some((e) => e.chainId === 'layoff')
   if (p.education < job.minEducation) reasons.push(`needs ${job.minEducation} classes`)
-  if (p.dress < job.minDress) reasons.push(`needs dress ${job.minDress}`)
-  if (p.experience < job.minExperience) reasons.push(`needs ${job.minExperience}h experience`)
+  if (!sympathyHire && p.dress < job.minDress) reasons.push(`needs dress ${job.minDress}`)
+  if (!sympathyHire && p.experience < job.minExperience) {
+    reasons.push(`needs ${job.minExperience}h experience`)
+  }
   if (job.requiresComputer && !hasItem(p, 'computer')) reasons.push('needs a computer')
+  if (job.minSkills) {
+    for (const [skillId, needed] of Object.entries(job.minSkills) as Array<[SkillId, number]>) {
+      if (p.skills[skillId] < needed) reasons.push(`needs ${needed} ${skillId} skill`)
+    }
+  }
   return { ok: reasons.length === 0, reasons }
 }
 
@@ -163,6 +196,19 @@ export function takeClass(state: GameState, key: PlayerKey) {
   spendCash(p, price(state, TUITION))
   p.education += 1
   log(state, key, `Completed a class (${p.education} total)`)
+}
+
+/** A direct, cash-for-time way to build a specific skill, at the same
+ * location as takeClass — for someone who wants to clear a job's minSkills
+ * bar without grinding hours at the right employer first. */
+export function trainSkill(state: GameState, key: PlayerKey, skillId: SkillId) {
+  const p = state[key]
+  require_(p.location === 'university', 'Skill training is at City University')
+  require_(p.skills[skillId] < 100, 'Already maxed out')
+  spendTime(p, SKILL_TRAIN_TIME)
+  spendCash(p, price(state, SKILL_TRAIN_PRICE))
+  p.skills[skillId] = Math.min(100, p.skills[skillId] + SKILL_TRAIN_GAIN)
+  log(state, key, `Trained ${skillId} (${Math.round(p.skills[skillId])} now)`)
 }
 
 export function buyMeal(state: GameState, key: PlayerKey) {
@@ -273,6 +319,31 @@ export function withdraw(state: GameState, key: PlayerKey, amount: number) {
   log(state, key, `Withdrew $${amount}`)
 }
 
+/** Buys units at the current mark-to-market price — a real risk/reward
+ * alternative to deposit()'s flat, guaranteed interest. Units, not dollars,
+ * are tracked so a later price move is reflected automatically (see
+ * netWorth()) without the player having to do anything. */
+export function invest(state: GameState, key: PlayerKey, amount: number) {
+  const p = state[key]
+  require_(p.location === 'bank', 'Investing is at First Bank')
+  require_(amount > 0, 'Nothing to invest')
+  spendTime(p, 1)
+  spendCash(p, amount)
+  p.investments += amount / state.economy.marketIndex
+  log(state, key, `Invested $${amount}`)
+}
+
+export function divest(state: GameState, key: PlayerKey, units: number) {
+  const p = state[key]
+  require_(p.location === 'bank', 'Investing is at First Bank')
+  require_(units > 0 && units <= p.investments, 'Invalid amount')
+  spendTime(p, 1)
+  const proceeds = Math.round(units * state.economy.marketIndex)
+  p.investments -= units
+  p.cash += proceeds
+  log(state, key, `Sold investments for $${proceeds}`)
+}
+
 export function payRent(state: GameState, key: PlayerKey) {
   const p = state[key]
   require_(
@@ -355,8 +426,12 @@ export function seeDoctor(state: GameState, key: PlayerKey) {
   log(state, key, `Saw the doctor (+${DOCTOR_HEAL} health)`)
 }
 
-export function netWorth(p: PlayerState): number {
-  return Math.round(p.cash + p.savings - p.loanBalance)
+/** marketIndex is required, not defaulted — every real caller has a
+ * GameState in hand (state.economy.marketIndex), and a silent default of 1
+ * would make it easy to accidentally price investments wrong wherever the
+ * economy's actual index has drifted from 1. */
+export function netWorth(p: PlayerState, marketIndex: number): number {
+  return Math.round(p.cash + p.savings - p.loanBalance + p.investments * marketIndex)
 }
 
 export function foodOnHand(p: PlayerState): number {

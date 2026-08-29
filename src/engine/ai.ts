@@ -34,6 +34,7 @@ import {
   ITEMS,
   JOBS,
   RENT,
+  SKILL_TRAIN_PRICE,
   TUITION,
   itemById,
   jobById,
@@ -50,6 +51,7 @@ import type {
   LocationId,
   PlayerKey,
   RileyDifficulty,
+  SkillId,
 } from './types'
 
 export interface AiProfile {
@@ -268,6 +270,13 @@ function pursueCareer(state: GameState, key: PlayerKey, profile: AiProfile): boo
   if (p.education < target.minEducation) {
     return studyOnce(state, key, profile)
   }
+  if (target.minSkills) {
+    for (const [skillId, needed] of Object.entries(target.minSkills) as Array<[SkillId, number]>) {
+      if (p.skills[skillId] < needed) {
+        return trainSkillOnce(state, key, profile, skillId)
+      }
+    }
+  }
   return false
 }
 
@@ -287,6 +296,21 @@ function studyOnce(state: GameState, key: PlayerKey, profile: AiProfile): boolea
   if (p.cash < act.price(state, TUITION) + reserve(state, profile)) return false
   if (!goTo(state, key, 'university')) return false
   return attempt(() => act.takeClass(state, key))
+}
+
+/** Mirrors studyOnce — used by pursueCareer to clear a target job's
+ * minSkills blocker directly, instead of waiting on the slower passive
+ * gain from working a trainsSkill job. */
+function trainSkillOnce(
+  state: GameState,
+  key: PlayerKey,
+  profile: AiProfile,
+  skillId: SkillId
+): boolean {
+  const p = get(state, key)
+  if (p.cash < act.price(state, SKILL_TRAIN_PRICE) + reserve(state, profile)) return false
+  if (!goTo(state, key, 'university')) return false
+  return attempt(() => act.trainSkill(state, key, skillId))
 }
 
 function workShift(state: GameState, key: PlayerKey, maxHours: number): boolean {
@@ -323,6 +347,19 @@ function bankSurplus(state: GameState, key: PlayerKey, profile: AiProfile): bool
   if (surplus < 200) return false
   if (!goTo(state, key, 'bank')) return false
   return attempt(() => act.deposit(state, key, Math.round(surplus)))
+}
+
+/** Same surplus definition as bankSurplus, competing on utility (see
+ * INVEST_UTILITY) rather than gated behind a profile flag — investing has
+ * real risk (marketIndex can fall), but unlike gambling it's not
+ * negative-EV by design, so every profile is free to use it, just slightly
+ * preferred over the guaranteed-flat-rate alternative when both are live. */
+function investSurplus(state: GameState, key: PlayerKey, profile: AiProfile): boolean {
+  const p = get(state, key)
+  const surplus = p.cash - reserve(state, profile) * 3
+  if (surplus < 200) return false
+  if (!goTo(state, key, 'bank')) return false
+  return attempt(() => act.invest(state, key, Math.round(surplus)))
 }
 
 /** Gambler only: stakes a cut of genuine surplus at the casino instead of
@@ -378,6 +415,10 @@ const PROTECT_VALUABLES_UTILITY = 0.3
 // site below for why this has to be a small fixed tier rather than scored
 // off wealth-urgency.
 const GAMBLE_UTILITY = 0.2
+// Slightly above BANK_SURPLUS_UTILITY — a mild, universal preference for
+// investing over flat-rate savings when both are viable, not a dominant one
+// (see investSurplus's comment).
+const INVEST_UTILITY = 0.12
 const BANK_SURPLUS_UTILITY = 0.1
 // Absolute last resort: idle time has no value, so grinding out the clock
 // beats doing nothing once every goal-directed and housekeeping candidate
@@ -388,7 +429,7 @@ const LAST_RESORT_WORK_UTILITY = 0.05
  * each attempted action changes the state the next one scores against. */
 function buildCandidates(state: GameState, key: PlayerKey, profile: AiProfile): Candidate[] {
   const p = get(state, key)
-  const progress = goalProgress(p, state.goals)
+  const progress = goalProgress(p, state.goals, state.economy.marketIndex)
   const urgency = (goal: keyof Goals) => Math.max(0, 1 - progress[goal]) * profile.goalWeights[goal]
 
   const candidates: Candidate[] = [
@@ -406,6 +447,7 @@ function buildCandidates(state: GameState, key: PlayerKey, profile: AiProfile): 
       attempt: () => workShift(state, key, 25 + profile.extraWorkHours),
     },
     { utility: PROTECT_VALUABLES_UTILITY, attempt: () => protectValuables(state, key, profile) },
+    { utility: INVEST_UTILITY, attempt: () => investSurplus(state, key, profile) },
     { utility: BANK_SURPLUS_UTILITY, attempt: () => bankSurplus(state, key, profile) },
     {
       utility: LAST_RESORT_WORK_UTILITY,

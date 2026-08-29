@@ -17,6 +17,8 @@ import {
   PROMOTION_TENURE_WEEKS,
   RELAX_CAP,
   RENT,
+  SKILLS,
+  SKILL_TRAIN_PRICE,
   TUITION,
   groceryCap,
   hasItem,
@@ -35,6 +37,7 @@ import {
   BriefcaseIcon,
   ChevronDownIcon,
   DollarIcon,
+  GradCapIcon,
   HomeIcon,
   LockIcon,
   ShieldIcon,
@@ -156,6 +159,13 @@ function JobBoard({ game }: { game: GameState }) {
                 {job.minEducation > 0 && ` · ${job.minEducation} classes`}
                 {job.minDress > 0 && ` · dress ${job.minDress}`}
                 {job.minExperience > 0 && ` · ${job.minExperience}h exp`}
+                {job.minSkills &&
+                  Object.entries(job.minSkills).map(([skillId, needed]) => (
+                    <span key={skillId}>
+                      {' '}
+                      · {needed} {skillId} skill
+                    </span>
+                  ))}
               </div>
               {!qual.ok && (
                 <div className="locked">
@@ -279,6 +289,61 @@ function BankActions({ game }: { game: GameState }) {
         onClick={() => dispatchGame({ type: 'withdraw', amount })}
       >
         Withdraw (1h)
+      </button>
+    </div>
+  )
+}
+
+function InvestActions({ game }: { game: GameState }) {
+  const { dispatchGame } = useGame()
+  const p = game.player
+  const value = Math.round(p.investments * game.economy.marketIndex)
+  const [investAmount, setInvestAmount] = useState(100)
+  const [sellAmount, setSellAmount] = useState(100)
+  return (
+    <div className="action-row">
+      <span className="grow">
+        Invested: <strong>${value.toLocaleString()}</strong>
+        <br />
+        <span className="desc">
+          Market index {game.economy.marketIndex.toFixed(2)}× — real risk, real reward, unlike
+          savings
+        </span>
+      </span>
+      <input
+        type="number"
+        inputMode="numeric"
+        enterKeyHint="done"
+        min={1}
+        value={investAmount}
+        aria-label="Invest amount"
+        onChange={(e) => setInvestAmount(Math.max(0, Math.floor(Number(e.target.value))))}
+      />
+      <button
+        disabled={investAmount < 1 || investAmount > p.cash}
+        onClick={() => dispatchGame({ type: 'invest', amount: investAmount })}
+      >
+        Invest (1h)
+      </button>
+      <input
+        type="number"
+        inputMode="numeric"
+        enterKeyHint="done"
+        min={1}
+        value={sellAmount}
+        aria-label="Sell amount"
+        onChange={(e) => setSellAmount(Math.max(0, Math.floor(Number(e.target.value))))}
+      />
+      <button
+        disabled={sellAmount < 1 || sellAmount > value}
+        onClick={() =>
+          dispatchGame({
+            type: 'divest',
+            units: Math.min(p.investments, sellAmount / game.economy.marketIndex),
+          })
+        }
+      >
+        Sell (1h)
       </button>
     </div>
   )
@@ -554,6 +619,33 @@ export function ClassAction({ game }: { game: GameState }) {
   )
 }
 
+export function SkillTrainingAction({ game }: { game: GameState }) {
+  const { dispatchGame } = useGame()
+  const p = game.player
+  return (
+    <>
+      {SKILLS.map((skill) => (
+        <div className="action-row" key={skill.id}>
+          <span className="grow">
+            <strong>{skill.name}</strong> — {Math.round(p.skills[skill.id])}/100
+            <br />
+            <span className="desc">{skill.blurb}</span>
+          </span>
+          <button
+            disabled={p.skills[skill.id] >= 100}
+            onClick={() => {
+              playPurchase()
+              dispatchGame({ type: 'trainSkill', skillId: skill.id })
+            }}
+          >
+            {p.skills[skill.id] >= 100 ? 'Maxed' : `Train (${price(game, SKILL_TRAIN_PRICE)}, 6h)`}
+          </button>
+        </div>
+      ))}
+    </>
+  )
+}
+
 export function DoctorAction({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
   const p = game.player
@@ -652,11 +744,23 @@ export function LocationPanelBody({ game }: { game: GameState }) {
         </>
       )}
       {loc.id === 'market' && <GroceryAction game={game} />}
-      {loc.id === 'university' && <ClassAction game={game} />}
+      {loc.id === 'university' && (
+        <>
+          <ActionGroup label="Classes" icon={<GradCapIcon size={15} />}>
+            <ClassAction game={game} />
+          </ActionGroup>
+          <ActionGroup label="Skill training" icon={<BriefcaseIcon size={15} />}>
+            <SkillTrainingAction game={game} />
+          </ActionGroup>
+        </>
+      )}
       {loc.id === 'bank' && (
         <>
           <ActionGroup label="Savings" icon={<BankIcon size={15} />}>
             <BankActions game={game} />
+          </ActionGroup>
+          <ActionGroup label="Investing" icon={<DollarIcon size={15} />}>
+            <InvestActions game={game} />
           </ActionGroup>
           <CollapsibleActionGroup label="Loans" icon={<DollarIcon size={15} />}>
             <LoanActions game={game} />

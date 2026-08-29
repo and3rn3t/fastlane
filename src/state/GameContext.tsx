@@ -108,6 +108,13 @@ function isPlausibleSave(data: unknown): data is Record<string, unknown> {
  * `GameState.rileyDifficulty`. A save from before that control existed was
  * necessarily playing at the only skill level that existed then, so it
  * defaults to 'normal' — the skill level every profile already played at.
+ *
+ * 8 → 9: Skills, investing, and event chains added `skills`/`investments`/
+ * `activeEvents` per player and `GameState.economy.marketIndex`. A save from
+ * before any of that existed had trained no skills, held no investments, and
+ * had no event chain in progress — `{}`-per-skill 0, `0`, and `[]` are real
+ * facts, not guesses. `marketIndex` defaults to `1`, the same neutral
+ * starting point `priceIndex`/`wageIndex` use.
  */
 function upgradePlayerToV2(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
@@ -140,6 +147,26 @@ function upgradePlayerToV4(player: unknown): unknown {
     garnished: typeof p.garnished === 'boolean' ? p.garnished : false,
     loanPaidThisWeek: typeof p.loanPaidThisWeek === 'boolean' ? p.loanPaidThisWeek : false,
   }
+}
+
+function upgradePlayerToV5(player: unknown): unknown {
+  if (typeof player !== 'object' || player === null) return player
+  const p = player as Record<string, unknown>
+  return {
+    ...p,
+    skills:
+      typeof p.skills === 'object' && p.skills !== null
+        ? p.skills
+        : { sales: 0, trades: 0, tech: 0 },
+    investments: typeof p.investments === 'number' ? p.investments : 0,
+    activeEvents: Array.isArray(p.activeEvents) ? p.activeEvents : [],
+  }
+}
+
+function upgradeEconomyToV9(economy: unknown): unknown {
+  if (typeof economy !== 'object' || economy === null) return economy
+  const e = economy as Record<string, unknown>
+  return { ...e, marketIndex: typeof e.marketIndex === 'number' ? e.marketIndex : 1 }
 }
 
 const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<string, unknown>> = {
@@ -178,6 +205,12 @@ const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<strin
   7: (save) => ({
     ...save,
     rileyDifficulty: typeof save.rileyDifficulty === 'string' ? save.rileyDifficulty : 'normal',
+  }),
+  8: (save) => ({
+    ...save,
+    player: upgradePlayerToV5(save.player),
+    riley: upgradePlayerToV5(save.riley),
+    economy: upgradeEconomyToV9(save.economy),
   }),
 }
 
