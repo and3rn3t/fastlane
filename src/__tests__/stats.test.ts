@@ -24,6 +24,35 @@ describe('stats', () => {
     expect(stats.gamesWon).toBe(0)
     expect(stats.fastestWinWeeks).toBeNull()
     expect(stats.unlockedAchievements).toEqual([])
+    expect(stats.incidents).toEqual({
+      layoffs: 0,
+      thefts: 0,
+      evictions: 0,
+      robberies: 0,
+      garnishments: 0,
+    })
+  })
+
+  it("accumulates incident counts across games, from the player's own log entries only", () => {
+    recordGameResult(
+      game(1, {
+        winner: 'riley',
+        log: [
+          { week: 2, actor: 'player', text: 'You was laid off from Barista!' },
+          { week: 3, actor: 'player', text: "You's Refrigerator was stolen!" },
+          { week: 4, actor: 'riley', text: 'Riley was laid off from Clerk!' },
+        ],
+      })
+    )
+    const { stats } = recordGameResult(
+      game(2, {
+        winner: 'riley',
+        log: [{ week: 5, actor: 'player', text: 'You was laid off from Barista!' }],
+      })
+    )
+    expect(stats.incidents.layoffs).toBe(2)
+    expect(stats.incidents.thefts).toBe(1)
+    expect(stats.incidents.evictions).toBe(0)
   })
 
   it('records a win, a loss, and the fastest win across games', () => {

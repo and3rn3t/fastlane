@@ -41,13 +41,22 @@ export function LocationSheet({ game }: { game: GameState }) {
       : 'peek'
   )
   const prevLocationRef = useRef(game.player.location)
+  const prevLogLengthRef = useRef(game.log.length)
 
   useEffect(() => {
-    if (prevLocationRef.current !== game.player.location) {
+    const locationChanged = prevLocationRef.current !== game.player.location
+    if (locationChanged) {
       setSheetState('expanded')
+    } else if (game.log.length !== prevLogLengthRef.current) {
+      // An action was taken at the same location — collapse back to peek on
+      // mobile only; on desktop the panel stays expanded.
+      if (window.innerWidth < DESKTOP_BREAKPOINT_PX) {
+        setSheetState((s) => (s === 'expanded' ? 'peek' : s))
+      }
     }
     prevLocationRef.current = game.player.location
-  }, [game.player.location])
+    prevLogLengthRef.current = game.log.length
+  }, [game.player.location, game.log.length])
 
   const loc = LOCATIONS[game.player.location]
   const p = game.player

@@ -67,6 +67,11 @@
 html,
 body {
   overscroll-behavior-y: none;
+  /* Without this, Mobile Safari's automatic font-boosting can enlarge text
+   * (and anything sized off it) in narrow columns, overflowing layouts that
+   * measure correctly everywhere else. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
@@ -279,8 +284,19 @@ input[type='range'] {
 
 .start-actions {
   display: flex;
-  gap: 0.75rem;
-  align-items: center;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.start-actions .primary {
+  width: 100%;
+}
+
+.text-action {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  align-self: center;
 }
 
 /* ---------- top bar ---------- */
@@ -1217,6 +1233,12 @@ details.action-group[open] .disclosure-chevron {
   gap: 0.5rem;
 }
 
+.log .entry-notable {
+  border-left: 2px solid var(--bad);
+  padding-left: 0.4rem;
+  font-weight: 600;
+}
+
 .log .who {
   flex-shrink: 0;
   font-weight: 600;
@@ -1234,7 +1256,9 @@ details.action-group[open] .disclosure-chevron {
   justify-content: center;
   padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
     max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
-  z-index: 10;
+  /* Above .replay-overlay (11) and .install-prompt (4) — a deliberately
+   * opened sheet always outranks an auto-playing bar or a passive nudge. */
+  z-index: 13;
   animation: scrim-fade 0.25s ease-out both;
 }
 
@@ -1412,8 +1436,8 @@ details.action-group[open] .disclosure-chevron {
 }
 
 .achievements {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 0.5rem;
 }
 
@@ -1425,7 +1449,6 @@ details.action-group[open] .disclosure-chevron {
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--card-soft);
-  min-width: 140px;
   font-size: 0.78rem;
 }
 
@@ -1464,7 +1487,9 @@ details.action-group[open] .disclosure-chevron {
   padding-left: max(1rem, env(safe-area-inset-left));
   padding-right: max(1rem, env(safe-area-inset-right));
   font-size: 0.85rem;
-  z-index: 15;
+  /* Below .location-sheet (6) and .modal-backdrop (13) — a passive nudge
+   * banner must never paint over an interactive sheet/modal control. */
+  z-index: 4;
 }
 
 .install-prompt button {
@@ -1481,7 +1506,9 @@ details.action-group[open] .disclosure-chevron {
 .replay-overlay {
   position: fixed;
   inset: 0;
-  z-index: 12;
+  /* Below .modal-backdrop (13) — an explicitly opened Help/Week-Report sheet
+   * outranks the auto-playing replay bar if both are ever open at once. */
+  z-index: 11;
   display: flex;
   align-items: flex-end;
 }

@@ -59,6 +59,18 @@ export const ACHIEVEMENTS: Achievement[] = [
   },
 ]
 
+export type IncidentKind = 'layoffs' | 'thefts' | 'evictions' | 'robberies' | 'garnishments'
+
+// Same phrases WeekReportModal.tsx flags as "notable" — the random negative
+// events players most want a running count of across games.
+const INCIDENT_PATTERNS: Record<IncidentKind, string> = {
+  layoffs: 'was laid off',
+  thefts: 'was stolen',
+  evictions: 'was evicted',
+  robberies: 'was robbed of',
+  garnishments: 'wages are being garnished',
+}
+
 export interface LifetimeStats {
   gamesPlayed: number
   gamesWon: number
@@ -68,6 +80,8 @@ export interface LifetimeStats {
   unlockedAchievements: string[]
   /** Dedupe key — the rngSeed of the last game recordGameResult() saw. */
   lastRecordedSeed: number | null
+  /** Lifetime counts of random negative events, for spotting patterns across games. */
+  incidents: Record<IncidentKind, number>
 }
 
 const STATS_KEY = 'fastlane-stats-v1'
@@ -79,6 +93,7 @@ const DEFAULT_STATS: LifetimeStats = {
   fastestWinWeeks: null,
   unlockedAchievements: [],
   lastRecordedSeed: null,
+  incidents: { layoffs: 0, thefts: 0, evictions: 0, robberies: 0, garnishments: 0 },
 }
 
 export function loadStats(): LifetimeStats {
@@ -116,6 +131,12 @@ export function recordGameResult(game: GameState): {
 
   const playerWon = game.winner === 'player'
   const weeksPlayed = game.week - 1
+  const playerLog = game.log.filter((e) => e.actor === 'player')
+  const incidents = { ...stats.incidents }
+  for (const kind of Object.keys(INCIDENT_PATTERNS) as IncidentKind[]) {
+    const pattern = INCIDENT_PATTERNS[kind]
+    incidents[kind] += playerLog.filter((e) => e.text.includes(pattern)).length
+  }
   const next: LifetimeStats = {
     ...stats,
     gamesPlayed: stats.gamesPlayed + 1,
@@ -126,6 +147,7 @@ export function recordGameResult(game: GameState): {
       : stats.fastestWinWeeks,
     lastRecordedSeed: game.rngSeed,
     unlockedAchievements: [...stats.unlockedAchievements],
+    incidents,
   }
 
   const newlyUnlocked: Achievement[] = []
