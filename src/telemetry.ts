@@ -3,6 +3,9 @@ const SESSION_KEY = 'fastlane-telemetry-count'
 const MAX_REPORTS_PER_SESSION = 5
 const MAX_STACK_CHARS = 4000
 
+// In-memory fallback for when sessionStorage is blocked (private mode, ITP, etc.)
+let inMemoryCount = 0
+
 /**
  * Best-effort crash visibility, not a full triage dashboard: posts to a
  * Cloudflare Pages Function that just logs (visible in Workers Logs, see
@@ -15,7 +18,9 @@ export function reportError(error: unknown, context: string): void {
     if (count >= MAX_REPORTS_PER_SESSION) return
     sessionStorage.setItem(SESSION_KEY, String(count + 1))
   } catch {
-    // sessionStorage blocked (private mode, ITP, etc.) — still try to send once.
+    // sessionStorage blocked — use in-memory counter as fallback.
+    if (inMemoryCount >= MAX_REPORTS_PER_SESSION) return
+    inMemoryCount++
   }
 
   const message = error instanceof Error ? error.message : String(error)

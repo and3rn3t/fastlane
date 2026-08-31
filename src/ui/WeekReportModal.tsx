@@ -35,6 +35,7 @@ export function WeekReportModal({ game }: { game: GameState }) {
       <div
         className="modal"
         role="dialog"
+        aria-modal="true"
         aria-label={`Week ${report.week} report`}
         ref={dialogRef}
       >
