@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { jobById, netWorth, type GameState, type LocationId, type LogEntry } from '@/engine'
 import { useGame } from '@/state/GameContext'
 import { Board, DeltaBadge, useDeltaFlash } from './Board'
@@ -13,7 +13,12 @@ import {
 } from './Icon'
 import { LocationSheet } from './LocationSheet'
 import { isMuted, playDisaster, setMuted } from './sound'
-import { WeekReportModal } from './WeekReportModal'
+
+// Lazy: keeps the report-modal code out of the initial bundle; cached after
+// the first week transition fetches it, so later weeks show it instantly.
+const WeekReportModal = lazy(() =>
+  import('./WeekReportModal').then((m) => ({ default: m.WeekReportModal }))
+)
 
 const REPLAY_STEP_MS = 650
 const HELP_SEEN_KEY = 'fastlane-help-seen'
@@ -212,22 +217,30 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
 
 function EventLog({ game }: { game: GameState }) {
   const recent = game.log.slice(-30).reverse()
+  const latest = recent[0]
   return (
-    <details className="panel">
-      <summary>
-        📋 This life so far
-        <ChevronDownIcon size={13} className="disclosure-chevron" />
-      </summary>
-      <div className="log">
-        {recent.length === 0 && <span className="desc">Nothing yet — get out there.</span>}
-        {recent.map((e, i) => (
-          <div className="entry" key={`${game.log.length - i}`}>
-            <span className="who">W{e.week}</span>
-            <span>{e.text}</span>
-          </div>
-        ))}
+    <>
+      {/* Announces just the newest line, not the whole (re-ordering) list below —
+          re-reading up to 30 entries on every single action would be unusable. */}
+      <div aria-live="polite" className="sr-only">
+        {latest?.text}
       </div>
-    </details>
+      <details className="panel">
+        <summary>
+          📋 This life so far
+          <ChevronDownIcon size={13} className="disclosure-chevron" />
+        </summary>
+        <div className="log">
+          {recent.length === 0 && <span className="desc">Nothing yet — get out there.</span>}
+          {recent.map((e, i) => (
+            <div className="entry" key={`${game.log.length - i}`}>
+              <span className="who">W{e.week}</span>
+              <span>{e.text}</span>
+            </div>
+          ))}
+        </div>
+      </details>
+    </>
   )
 }
 
@@ -236,7 +249,7 @@ export function GameScreen({ game }: { game: GameState }) {
   const [helpOpen, setHelpOpen] = useAutoHelp()
   useDisasterSound(game)
   return (
-    <div className="app">
+    <main className="app">
       <TopBar game={game} onHelp={() => setHelpOpen(true)} />
       <div className="game-layout">
         <Board game={game} rileyLocation={replay.location} />
@@ -253,8 +266,12 @@ export function GameScreen({ game }: { game: GameState }) {
           </div>
         </div>
       )}
-      {game.phase === 'weekReport' && replay.done && <WeekReportModal game={game} />}
+      {game.phase === 'weekReport' && replay.done && (
+        <Suspense fallback={null}>
+          <WeekReportModal game={game} />
+        </Suspense>
+      )}
       {helpOpen && <Help onClose={() => setHelpOpen(false)} />}
-    </div>
+    </main>
   )
 }

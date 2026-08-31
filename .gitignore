@@ -10,6 +10,7 @@ dist/
 build/
 out/
 *.egg-info/
+.wrangler/
 
 # Environment
 .env
@@ -32,6 +33,9 @@ coverage/
 htmlcov/
 .pytest_cache/
 .coverage
+test-results/
+playwright-report/
+blob-report/
 
 # Logs
 *.log

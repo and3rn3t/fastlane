@@ -52,3 +52,18 @@ jobs:
     secrets:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  smoke-test:
+    name: Post-deploy smoke test
+    needs: deploy
+    # Only the production deploy path (push to main) serves this URL — a PR
+    # preview deploy goes to a per-branch preview URL the reusable workflow
+    # doesn't expose as an output, so there's nothing fixed to curl there.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Curl production URL
+        run: curl --fail --silent --show-error --retry 5 --retry-delay 5 https://fastlane.andernet.dev/ > /dev/null

@@ -1,6 +1,9 @@
 import { useEffect } from 'react'
+import { useModalDialog } from './useModalDialog'
 
 export function Help({ onClose }: { onClose: () => void }) {
+  const dialogRef = useModalDialog(onClose)
+
   useEffect(() => {
     const prev = document.body.style.overflow
     document.body.style.overflow = 'hidden'
@@ -9,13 +12,21 @@ export function Help({ onClose }: { onClose: () => void }) {
     }
   }, [])
 
+  // Closes only on a click landing directly on the backdrop, not one that
+  // bubbled up from a click inside the dialog — avoids needing a second
+  // stopPropagation-only click handler on the (non-interactive) dialog div.
+  function handleBackdropClick(e: React.MouseEvent<HTMLDivElement>) {
+    if (e.target === e.currentTarget) onClose()
+  }
+
   return (
-    <div className="modal-backdrop" onClick={onClose}>
+    <div className="modal-backdrop" role="presentation" onClick={handleBackdropClick}>
       <div
         className="modal"
         role="dialog"
+        aria-modal="true"
         aria-label="How to play Fast Lane"
-        onClick={(e) => e.stopPropagation()}
+        ref={dialogRef}
       >
         <h2>❓ How to play</h2>
         <div className="help-sections">

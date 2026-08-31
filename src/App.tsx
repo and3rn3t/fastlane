@@ -1,9 +1,12 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { useGame } from '@/state/GameContext'
-import { GameOver } from '@/ui/GameOver'
 import { GameScreen } from '@/ui/GameScreen'
 import { InstallPrompt } from '@/ui/InstallPrompt'
 import { StartScreen } from '@/ui/StartScreen'
+
+// Lazy: pulls in RecapChart's charting code, which no player needs until a
+// game actually ends — keeps it out of the initial bundle.
+const GameOver = lazy(() => import('@/ui/GameOver').then((m) => ({ default: m.GameOver })))
 
 function ErrorToast() {
   const { error, clearError } = useGame()
@@ -15,8 +18,11 @@ function ErrorToast() {
   }, [error])
   if (!error) return null
   return (
-    <div className="toast" role="alert" onClick={clearError}>
-      {error}
+    <div className="toast" role="alert">
+      <span>{error}</span>
+      <button type="button" className="toast-dismiss" onClick={clearError} aria-label="Dismiss">
+        ✕
+      </button>
     </div>
   )
 }
@@ -35,7 +41,13 @@ export default function App() {
       </>
     )
   }
-  if (game.phase === 'over') return <GameOver game={game} />
+  if (game.phase === 'over') {
+    return (
+      <Suspense fallback={null}>
+        <GameOver game={game} />
+      </Suspense>
+    )
+  }
 
   return (
     <>

@@ -165,7 +165,7 @@ export function StartScreen() {
   }
 
   return (
-    <div className="start">
+    <main className="start">
       <div>
         <h1>
           Fast <span>Lane</span>
@@ -368,6 +368,6 @@ export function StartScreen() {
           </div>
         </div>
       )}
-    </div>
+    </main>
   )
 }

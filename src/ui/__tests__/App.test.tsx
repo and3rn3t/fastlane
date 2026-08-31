@@ -34,10 +34,12 @@ describe('App', () => {
     // Commute to Burger Barn and work.
     fireEvent.click(screen.getByRole('button', { name: /Burger Barn/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Work \d+h/ }))
-    expect(screen.getByText(/Worked \d+h as Fry Cook/)).toBeTruthy()
+    // Matches twice on purpose: once in the (collapsed) event log, and once
+    // in the visually-hidden aria-live announcer added for screen readers.
+    expect(screen.getAllByText(/Worked \d+h as Fry Cook/)).toHaveLength(2)
   })
 
-  it("ends the week, plays Riley's turn back, and shows the report", () => {
+  it("ends the week, plays Riley's turn back, and shows the report", async () => {
     renderApp()
     fireEvent.click(screen.getByText(/Start new game/))
     // Dismiss the auto-opened Help dialog first so it doesn't shadow the report below.
@@ -47,7 +49,9 @@ describe('App', () => {
     // same as a player would.
     expect(screen.getByRole('button', { name: /Skip/ })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Skip/ }))
-    expect(screen.getByRole('dialog', { name: /Week 1 report/i })).toBeTruthy()
+    // WeekReportModal is lazy-loaded (Wave 5 perf item) — findByRole awaits
+    // the dynamic import resolving instead of assuming it's already mounted.
+    expect(await screen.findByRole('dialog', { name: /Week 1 report/i })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: /Start week 2/ }))
     expect(screen.getByText(/Week 2/)).toBeTruthy()
   })
@@ -427,6 +431,14 @@ describe('save migration', () => {
     renderApp()
     expect(screen.getByText(/Start new game/)).toBeTruthy()
     expect(screen.getByRole('alert')).toBeTruthy()
+  })
+
+  it('dismisses the error toast via its own button, not just auto-timeout', () => {
+    localStorage.setItem('fastlane-save-v1', '{not valid json')
+    renderApp()
+    expect(screen.getByRole('alert')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Dismiss/ }))
+    expect(screen.queryByRole('alert')).toBeNull()
   })
 
   it('falls back to a fresh game on a save version newer than this build', () => {

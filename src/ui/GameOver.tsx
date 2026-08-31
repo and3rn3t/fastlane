@@ -38,7 +38,7 @@ export function GameOver({ game }: { game: GameState }) {
   }))
 
   return (
-    <div className="app">
+    <main className="app">
       <div className="start gameover">
         <h1>{playerWon ? '🏆 You made it!' : '🎩 Riley got there first.'}</h1>
         <p className="tagline">
@@ -111,6 +111,6 @@ export function GameOver({ game }: { game: GameState }) {
           </button>
         </div>
       </div>
-    </div>
+    </main>
   )
 }
