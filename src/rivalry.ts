@@ -93,7 +93,7 @@ const STREAK_LINES: Record<'player' | 'riley', string[]> = {
   ],
   riley: [
     'Riley tips their hat: "Same time next week?"',
-    'Riley\'s feeling good about today.',
+    "Riley's feeling good about today.",
     'Riley: "You\'re not catching up like this."',
   ],
 }
