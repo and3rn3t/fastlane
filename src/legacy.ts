@@ -23,20 +23,20 @@ export const LEGACY_PERKS: LegacyPerk[] = [
   {
     id: 'head-start',
     name: 'Head Start',
-    description: `Start every game with $${HEAD_START_BONUS} extra cash.`,
+    description: `Start every standard (non-Daily-Challenge) game with $${HEAD_START_BONUS} extra cash.`,
     isUnlocked: (stats) => stats.gamesPlayed >= 3,
   },
   {
     id: 'new-look',
     name: 'New Look',
-    description: 'Unlocks an alternate pawn on the board.',
+    description: 'Unlocks an alternate pawn on the board in standard (non-Daily-Challenge) games.',
     isUnlocked: (stats) => stats.gamesWon >= 1,
   },
 ]
 
-/** Sum of every unlocked perk's cash effect — currently just Head Start, but
- * summed rather than a single lookup so a future cash-bonus perk stacks for
- * free. Passed as NewGameOptions.playerCashBonus (engine/engine.ts). */
+/** Head Start's cash effect if unlocked, else 0. Passed as
+ * NewGameOptions.playerCashBonus (engine/engine.ts). A second cash-bonus
+ * perk would need its own lookup added here — nothing generic stacks yet. */
 export function legacyCashBonus(stats: LifetimeStats): number {
   const headStart = LEGACY_PERKS.find((p) => p.id === 'head-start')!
   return headStart.isUnlocked(stats) ? HEAD_START_BONUS : 0

@@ -255,7 +255,14 @@ export function GameScreen({ game }: { game: GameState }) {
     <main className="app">
       <TopBar game={game} onHelp={() => setHelpOpen(true)} />
       <div className="game-layout">
-        <Board game={game} rileyLocation={replay.location} playerPawn={legacyPawnGlyph(stats)} />
+        <Board
+          game={game}
+          rileyLocation={replay.location}
+          // Daily Challenge stays identical for every player — same rule
+          // already applied to the cash bonus and rivalry momentum, extended
+          // here to the cosmetic pawn too, so no perk touches that mode.
+          playerPawn={game.isDailyChallenge ? undefined : legacyPawnGlyph(stats)}
+        />
         <div className="side">
           <LocationSheet game={game} />
           <EventLog game={game} />
