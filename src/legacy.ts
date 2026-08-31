@@ -23,13 +23,13 @@ export const LEGACY_PERKS: LegacyPerk[] = [
   {
     id: 'head-start',
     name: 'Head Start',
-    description: `Start every game with $${HEAD_START_BONUS} extra cash.`,
+    description: `Start every standard (non-Daily-Challenge) game with $${HEAD_START_BONUS} extra cash.`,
     isUnlocked: (stats) => stats.gamesPlayed >= 3,
   },
   {
     id: 'new-look',
     name: 'New Look',
-    description: 'Unlocks an alternate pawn on the board.',
+    description: 'Unlocks an alternate pawn on the board in standard (non-Daily-Challenge) games.',
     isUnlocked: (stats) => stats.gamesWon >= 1,
   },
 ]

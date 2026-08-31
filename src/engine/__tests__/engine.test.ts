@@ -729,6 +729,27 @@ describe('AI personalities', () => {
   })
 })
 
+describe('newGame playerCashBonus', () => {
+  it('adds bonus only to the player, not Riley', () => {
+    const bonus = 50
+    const s = newGame({ playerName: 'Tester', goals: easyGoals, playerCashBonus: bonus })
+    expect(s.player.cash).toBe(RULE_PRESETS.classic.startingCash + bonus)
+    expect(s.riley.cash).toBe(RULE_PRESETS.classic.startingCash)
+  })
+
+  it('uses plain starting cash when playerCashBonus is omitted', () => {
+    const s = newGame({ playerName: 'Tester', goals: easyGoals })
+    expect(s.player.cash).toBe(RULE_PRESETS.classic.startingCash)
+    expect(s.riley.cash).toBe(RULE_PRESETS.classic.startingCash)
+  })
+
+  it('treats playerCashBonus of 0 the same as omitting it', () => {
+    const s = newGame({ playerName: 'Tester', goals: easyGoals, playerCashBonus: 0 })
+    expect(s.player.cash).toBe(RULE_PRESETS.classic.startingCash)
+    expect(s.riley.cash).toBe(RULE_PRESETS.classic.startingCash)
+  })
+})
+
 describe('rule presets', () => {
   it('defaults a new game to Classic rules', () => {
     const s = newGame({ playerName: 'Tester', goals: easyGoals })
