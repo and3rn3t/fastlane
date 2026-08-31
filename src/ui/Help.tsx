@@ -21,7 +21,13 @@ export function Help({ onClose }: { onClose: () => void }) {
 
   return (
     <div className="modal-backdrop" role="presentation" onClick={handleBackdropClick}>
-      <div className="modal" role="dialog" aria-modal="true" aria-label="How to play Fast Lane" ref={dialogRef}>
+      <div
+        className="modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="How to play Fast Lane"
+        ref={dialogRef}
+      >
         <h2>❓ How to play</h2>
         <div className="help-sections">
           <section>
