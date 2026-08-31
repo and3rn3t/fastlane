@@ -51,6 +51,7 @@ import type {
   LocationId,
   PlayerKey,
   RileyDifficulty,
+  RileyMomentum,
   SkillId,
 } from './types'
 
@@ -137,6 +138,26 @@ export const DIFFICULTY_SKILL: Record<RileyDifficulty, number> = {
 
 function get(state: GameState, key: PlayerKey) {
   return state[key]
+}
+
+// A losing streak against the player nudges Riley to play a bit more
+// urgently — bounded and small (15%) so it's a catch-up assist, not a
+// scripted difficulty spike. Chosen to sit well inside the gap between
+// adjacent goalWeights magnitudes (e.g. Hustler's 1.6 vs 0.8) rather than
+// swap the ranking outright.
+const MOMENTUM_BIAS = 1.15
+
+/** Applies rivalry momentum (src/rivalry.ts) on top of a resolved AiProfile.
+ * Only 'cold' (a real player streak) does anything — 'hot'/'even' return the
+ * profile unchanged, since winning against Riley should never be punished.
+ * Scales goalWeights and gambleFactor uniformly rather than favoring one
+ * goal, so it doesn't change *what* Riley prioritizes, just how eagerly. */
+export function applyMomentum(profile: AiProfile, momentum: RileyMomentum): AiProfile {
+  if (momentum !== 'cold') return profile
+  const goalWeights = Object.fromEntries(
+    Object.entries(profile.goalWeights).map(([goal, weight]) => [goal, weight * MOMENTUM_BIAS])
+  ) as Record<keyof Goals, number>
+  return { ...profile, goalWeights, gambleFactor: profile.gambleFactor * MOMENTUM_BIAS }
 }
 
 /** Cash the AI tries to keep on hand for rent and food before splurging. */

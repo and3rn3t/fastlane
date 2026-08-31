@@ -12,6 +12,8 @@ import {
 } from '@/engine'
 import { useGame } from '@/state/GameContext'
 import { dailyChallengeNumber, dailyChallengeOptions } from '@/daily'
+import { LEGACY_PERKS, legacyCashBonus } from '@/legacy'
+import { loadRivalry, rivalryLine, rivalryMomentum } from '@/rivalry'
 import { ACHIEVEMENTS, loadStats, type IncidentKind } from '@/stats'
 import {
   BoltIcon,
@@ -140,6 +142,8 @@ const PRESETS: Record<string, Record<keyof Goals, number>> = {
 export function StartScreen() {
   const { startGame, importSave } = useGame()
   const [stats] = useState(loadStats)
+  const [rivalry] = useState(loadRivalry)
+  const cashBonus = legacyCashBonus(stats)
   const [name, setName] = useState('')
   const [levels, setLevels] = useState<Record<keyof Goals, number>>(PRESETS.Standard)
   const [rileyProfile, setRileyProfile] = useState<AiProfileName>('balanced')
@@ -174,6 +178,7 @@ export function StartScreen() {
           Sixty hours a week. Rent is due, the fridge is empty, and Riley is already at work. Hit
           all four life goals before they do.
         </p>
+        {rivalryLine(rivalry) && <p className="rivalry-line">{rivalryLine(rivalry)}</p>}
       </div>
 
       <div className="daily-challenge">
@@ -203,7 +208,9 @@ export function StartScreen() {
               goals,
               rileyProfile,
               rileyDifficulty,
+              rileyMomentum: rivalryMomentum(rivalry),
               rules: RULE_PRESETS[rulePreset],
+              playerCashBonus: cashBonus,
             })
           }
         >
@@ -368,6 +375,28 @@ export function StartScreen() {
           </div>
         </div>
       )}
+
+      <div>
+        <span>🎖️ Legacy Perks</span>
+        <p className="stats-summary">Play more games to earn permanent bonuses.</p>
+        <div className="achievements">
+          {LEGACY_PERKS.map((perk) => {
+            const unlocked = perk.isUnlocked(stats)
+            return (
+              <div
+                key={perk.id}
+                className={`achievement-badge${unlocked ? ' unlocked' : ''}`}
+                title={perk.description}
+              >
+                <span className="name">
+                  {unlocked ? '🎖️' : <LockIcon size={12} />} {perk.name}
+                </span>
+                <span className="desc">{perk.description}</span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </main>
   )
 }

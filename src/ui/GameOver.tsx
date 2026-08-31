@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { GameState } from '@/engine'
 import { useGame } from '@/state/GameContext'
 import { shareableResult } from '@/daily'
+import { recordRivalryResult, rivalryLine } from '@/rivalry'
 import { recordGameResult, type Achievement } from '@/stats'
 import { CopyIcon } from './Icon'
 import { RecapChart } from './RecapChart'
@@ -11,6 +12,7 @@ export function GameOver({ game }: { game: GameState }) {
   const { quitToMenu } = useGame()
   const playerWon = game.winner === 'player'
   const [newlyUnlocked, setNewlyUnlocked] = useState<Achievement[]>([])
+  const [rivalryText, setRivalryText] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
   // Guards against StrictMode's dev-only double effect invocation: without
   // it, the second call correctly dedupes on rngSeed and returns an empty
@@ -22,6 +24,11 @@ export function GameOver({ game }: { game: GameState }) {
     if (!recordedRef.current) {
       recordedRef.current = true
       setNewlyUnlocked(recordGameResult(game).newlyUnlocked)
+      // Skip the Daily Challenge — it's meant to stay identical for every
+      // player, so it shouldn't feed a personal rivalry streak either.
+      if (!game.isDailyChallenge) {
+        setRivalryText(rivalryLine(recordRivalryResult(game).memory))
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -46,6 +53,7 @@ export function GameOver({ game }: { game: GameState }) {
             ? `All four goals reached in ${game.week - 1} weeks. The fast lane is yours, ${game.player.name}.`
             : `Riley hit all four goals in ${game.week - 1} weeks while you were... doing whatever that was.`}
         </p>
+        {rivalryText && <p className="rivalry-line">{rivalryText}</p>}
         {newlyUnlocked.length > 0 && (
           <div className="achievement-unlocked">
             {newlyUnlocked.map((a) => (

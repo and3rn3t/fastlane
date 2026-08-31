@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { jobById, netWorth, type GameState, type LocationId, type LogEntry } from '@/engine'
+import { legacyPawnGlyph } from '@/legacy'
 import { useGame } from '@/state/GameContext'
+import { loadStats } from '@/stats'
 import { Board, DeltaBadge, useDeltaFlash } from './Board'
 import { Help } from './Help'
 import {
@@ -247,12 +249,20 @@ function EventLog({ game }: { game: GameState }) {
 export function GameScreen({ game }: { game: GameState }) {
   const replay = useTurnReplay(game)
   const [helpOpen, setHelpOpen] = useAutoHelp()
+  const [stats] = useState(loadStats)
   useDisasterSound(game)
   return (
     <main className="app">
       <TopBar game={game} onHelp={() => setHelpOpen(true)} />
       <div className="game-layout">
-        <Board game={game} rileyLocation={replay.location} />
+        <Board
+          game={game}
+          rileyLocation={replay.location}
+          // Daily Challenge stays identical for every player — same rule
+          // already applied to the cash bonus and rivalry momentum, extended
+          // here to the cosmetic pawn too, so no perk touches that mode.
+          playerPawn={game.isDailyChallenge ? undefined : legacyPawnGlyph(stats)}
+        />
         <div className="side">
           <LocationSheet game={game} />
           <EventLog game={game} />

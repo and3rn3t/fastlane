@@ -133,7 +133,7 @@ describe('save migration', () => {
     expect(screen.getAllByText('$777').length).toBeGreaterThan(0)
 
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(9)
+    expect(upgraded.version).toBe(10)
     expect(upgraded.history).toEqual([])
     // 0 → 1 → 2 → 3 → 4 ran in sequence — every field along the way backfilled.
     expect(upgraded.player.health).toBe(100)
@@ -170,7 +170,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 3/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(9)
+    expect(upgraded.version).toBe(10)
     expect(upgraded.player.health).toBe(100)
     expect(upgraded.riley.health).toBe(100)
     expect(upgraded.player.hoursWorkedThisWeek).toBe(0)
@@ -200,7 +200,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 4/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(9)
+    expect(upgraded.version).toBe(10)
     expect(upgraded.player.health).toBe(88) // untouched by this migration
     expect(upgraded.player.jobTenureWeeks).toBe(0)
     expect(upgraded.player.promotionLevel).toBe(0)
@@ -242,7 +242,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 6/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(9)
+    expect(upgraded.version).toBe(10)
     expect(upgraded.player.promotionLevel).toBe(1) // untouched by this migration
     expect(upgraded.player.loanBalance).toBe(0)
     expect(upgraded.player.loanWeeksBehind).toBe(0)
@@ -287,7 +287,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 7/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(9)
+    expect(upgraded.version).toBe(10)
     expect(upgraded.player.loanBalance).toBe(500) // untouched by this migration
     expect(upgraded.rileyProfile).toBe('balanced')
     expect(upgraded.rules).toEqual({ eventFrequency: 1, economyVolatility: 1, startingCash: 200 })
@@ -316,7 +316,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 8/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(9)
+    expect(upgraded.version).toBe(10)
     expect(upgraded.rileyProfile).toBe('hustler') // untouched by this migration
     expect(upgraded.rules).toEqual({ eventFrequency: 1, economyVolatility: 1, startingCash: 200 })
     expect(upgraded.isDailyChallenge).toBe(false)
@@ -346,7 +346,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 9/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(9)
+    expect(upgraded.version).toBe(10)
     expect(upgraded.rules.startingCash).toBe(100) // untouched by this migration
     expect(upgraded.isDailyChallenge).toBe(false)
   })
@@ -376,7 +376,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 10/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(9)
+    expect(upgraded.version).toBe(10)
     expect(upgraded.rileyProfile).toBe('scholar') // untouched by this migration
     expect(upgraded.rileyDifficulty).toBe('normal')
   })
@@ -418,12 +418,49 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 11/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(9)
+    expect(upgraded.version).toBe(10)
     expect(upgraded.rileyDifficulty).toBe('easy') // untouched by this migration
     expect(upgraded.economy.marketIndex).toBe(1)
     expect(upgraded.player.skills).toEqual({ sales: 0, trades: 100, tech: 0 })
     expect(upgraded.player.investments).toBe(0)
     expect(upgraded.player.activeEvents).toEqual([])
+  })
+
+  it('upgrades a v9 (pre-rivalry-momentum) save, defaulting rileyMomentum to even', () => {
+    const v9 = {
+      version: 9,
+      week: 12,
+      rngSeed: 1,
+      phase: 'playing',
+      winner: null,
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      economy: {
+        priceIndex: 1,
+        wageIndex: 1,
+        interestRate: 0.005,
+        lotteryJackpot: 500,
+        marketIndex: 1,
+      },
+      player: legacyPlayer('V9Player', 99),
+      riley: legacyPlayer('Riley', 300),
+      rileyProfile: 'gambler',
+      rileyDifficulty: 'hard',
+      rules: { eventFrequency: 1, economyVolatility: 1, startingCash: 200 },
+      isDailyChallenge: false,
+      headline: 'A new life in the fast lane begins.',
+      log: [],
+      lastReport: null,
+      history: [],
+    }
+    localStorage.setItem('fastlane-save-v1', JSON.stringify(v9))
+
+    renderApp()
+
+    expect(screen.getByText(/Week 12/)).toBeTruthy()
+    const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
+    expect(upgraded.version).toBe(10)
+    expect(upgraded.rileyProfile).toBe('gambler') // untouched by this migration
+    expect(upgraded.rileyMomentum).toBe('even')
   })
 
   it('falls back to a fresh game and surfaces an error toast on corrupted JSON', () => {
@@ -454,5 +491,23 @@ describe('save migration', () => {
     renderApp()
     expect(screen.getByText(/Start new game/)).toBeTruthy()
     expect(screen.getByRole('alert')).toBeTruthy()
+  })
+
+  it('keeps the default pawn on the Daily Challenge even with the New Look perk unlocked', () => {
+    localStorage.setItem(
+      'fastlane-stats-v1',
+      JSON.stringify({
+        gamesPlayed: 1,
+        gamesWon: 1,
+        gamesLost: 0,
+        fastestWinWeeks: 10,
+        unlockedAchievements: [],
+        lastRecordedSeed: null,
+        incidents: { layoffs: 0, thefts: 0, evictions: 0, robberies: 0, garnishments: 0 },
+      })
+    )
+    renderApp()
+    fireEvent.click(screen.getByText(/Play today's challenge/))
+    expect(screen.getByLabelText('You is here').textContent).toBe('🙂')
   })
 })
