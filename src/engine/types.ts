@@ -214,7 +214,15 @@ export interface WeekSnapshot {
 /** Bump on any GameState/PlayerState shape change and add a migration step in
  * state/GameContext.tsx's MIGRATIONS map — see that file for the full scheme.
  * The engine owns this number since it owns what the shape actually is. */
-export const SAVE_VERSION = 9
+export const SAVE_VERSION = 10
+
+/** Riley's catch-up signal for the *current* game, derived once at game
+ * start from the player's rivalry history (src/rivalry.ts) and stored on
+ * GameState so it stays available to every week's 'endWeek' action, not just
+ * the UI layer that computed it. 'cold' nudges Riley's decision weighting
+ * (see ai.ts's applyMomentum); 'hot'/'even' apply no bias — winning against
+ * Riley is never punished, only a real losing streak gets a bounded assist. */
+export type RileyMomentum = 'hot' | 'cold' | 'even'
 
 /** Named weight presets for Riley's AI policy (ai.ts's AI_PROFILES) — a
  * game-level setting, not per-player state, since it configures how Riley's
@@ -252,6 +260,7 @@ export interface GameState {
   riley: PlayerState
   rileyProfile: AiProfileName
   rileyDifficulty: RileyDifficulty
+  rileyMomentum: RileyMomentum
   rules: RulesConfig
   /** True for a game started from the Daily Challenge button — a fixed,
    * date-derived seed/goals/rules/profile so every player's run that day is
