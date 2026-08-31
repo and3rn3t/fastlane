@@ -205,11 +205,15 @@ function useTokenPositions(
 export function Board({
   game,
   rileyLocation,
+  playerPawn = '🙂',
 }: {
   game: GameState
   /** Overrides where Riley's pawn renders — used during turn-playback replay
    * to walk the token through the week instead of jumping to the final spot. */
   rileyLocation?: LocationId
+  /** The player's board glyph — defaults to the original marker; a legacy
+   * perk (src/legacy.ts) can unlock an alternate one. Purely cosmetic. */
+  playerPawn?: string
 }) {
   const { dispatchGame } = useGame()
   const p = game.player
@@ -266,7 +270,7 @@ export function Board({
             title={`${p.name} is here`}
             aria-label={`${p.name} is here`}
           >
-            🙂
+            {playerPawn}
           </span>
         </span>
       )}

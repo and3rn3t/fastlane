@@ -115,6 +115,11 @@ function isPlausibleSave(data: unknown): data is Record<string, unknown> {
  * had no event chain in progress — `{}`-per-skill 0, `0`, and `[]` are real
  * facts, not guesses. `marketIndex` defaults to `1`, the same neutral
  * starting point `priceIndex`/`wageIndex` use.
+ *
+ * 9 → 10: Riley rivalry memory added `GameState.rileyMomentum`. A save from
+ * before that existed was necessarily started before any momentum bias could
+ * be computed, so it defaults to 'even' — no catch-up bias, identical to how
+ * every game before this feature already played.
  */
 function upgradePlayerToV2(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
@@ -216,6 +221,10 @@ const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<strin
     player: upgradePlayerToV9(save.player),
     riley: upgradePlayerToV9(save.riley),
     economy: upgradeEconomyToV9(save.economy),
+  }),
+  9: (save) => ({
+    ...save,
+    rileyMomentum: typeof save.rileyMomentum === 'string' ? save.rileyMomentum : 'even',
   }),
 }
 

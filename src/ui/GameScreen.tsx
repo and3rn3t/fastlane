@@ -1,6 +1,8 @@
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { jobById, netWorth, type GameState, type LocationId, type LogEntry } from '@/engine'
+import { legacyPawnGlyph } from '@/legacy'
 import { useGame } from '@/state/GameContext'
+import { loadStats } from '@/stats'
 import { Board, DeltaBadge, useDeltaFlash } from './Board'
 import { Help } from './Help'
 import {
@@ -247,12 +249,13 @@ function EventLog({ game }: { game: GameState }) {
 export function GameScreen({ game }: { game: GameState }) {
   const replay = useTurnReplay(game)
   const [helpOpen, setHelpOpen] = useAutoHelp()
+  const [stats] = useState(loadStats)
   useDisasterSound(game)
   return (
     <main className="app">
       <TopBar game={game} onHelp={() => setHelpOpen(true)} />
       <div className="game-layout">
-        <Board game={game} rileyLocation={replay.location} />
+        <Board game={game} rileyLocation={replay.location} playerPawn={legacyPawnGlyph(stats)} />
         <div className="side">
           <LocationSheet game={game} />
           <EventLog game={game} />

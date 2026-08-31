@@ -1,7 +1,7 @@
 // Reducer entry point: creates games and applies actions immutably.
 
 import * as act from './actions'
-import { AI_PROFILES, DIFFICULTY_SKILL, runAIWeek } from './ai'
+import { AI_PROFILES, applyMomentum, DIFFICULTY_SKILL, runAIWeek } from './ai'
 import { CREDIT_SCORE_START, HEALTH_START, RULE_PRESETS, WEEK_TIME } from './data'
 import { endWeek } from './week'
 import {
@@ -12,6 +12,7 @@ import {
   type Goals,
   type PlayerState,
   type RileyDifficulty,
+  type RileyMomentum,
   type RulesConfig,
 } from './types'
 
@@ -57,8 +58,16 @@ export interface NewGameOptions {
   seed?: number
   rileyProfile?: AiProfileName
   rileyDifficulty?: RileyDifficulty
+  /** Riley's catch-up signal for this game — see types.ts's RileyMomentum.
+   * Omit (defaults to 'even') for anything that must stay identical for
+   * every player, e.g. the Daily Challenge. */
+  rileyMomentum?: RileyMomentum
   rules?: RulesConfig
   isDailyChallenge?: boolean
+  /** Legacy-perk cash bonus (src/legacy.ts), added on top of the rules
+   * preset's startingCash for the player only — Riley always starts at the
+   * plain preset value, so this never changes Riley's own difficulty. */
+  playerCashBonus?: number
 }
 
 export function newGame(opts: NewGameOptions): GameState {
@@ -77,10 +86,15 @@ export function newGame(opts: NewGameOptions): GameState {
       lotteryJackpot: 500,
       marketIndex: 1,
     },
-    player: newPlayer(opts.playerName || 'You', false, rules.startingCash),
+    player: newPlayer(
+      opts.playerName || 'You',
+      false,
+      rules.startingCash + (opts.playerCashBonus ?? 0)
+    ),
     riley: newPlayer('Riley', true, rules.startingCash),
     rileyProfile: opts.rileyProfile ?? 'balanced',
     rileyDifficulty: opts.rileyDifficulty ?? 'normal',
+    rileyMomentum: opts.rileyMomentum ?? 'even',
     rules,
     isDailyChallenge: opts.isDailyChallenge ?? false,
     headline: 'A new life in the fast lane begins.',
@@ -192,10 +206,13 @@ export function applyAction(state: GameState, action: GameAction): GameState {
       // used to compute this internally, after runAIWeek had already logged
       // Riley's whole week, so lastReport.entries never actually contained it.
       const logStart = draft.log.length
-      const profile = {
-        ...AI_PROFILES[draft.rileyProfile],
-        skillLevel: DIFFICULTY_SKILL[draft.rileyDifficulty],
-      }
+      const profile = applyMomentum(
+        {
+          ...AI_PROFILES[draft.rileyProfile],
+          skillLevel: DIFFICULTY_SKILL[draft.rileyDifficulty],
+        },
+        draft.rileyMomentum
+      )
       runAIWeek(draft, 'riley', profile)
       endWeek(draft, logStart)
       break
