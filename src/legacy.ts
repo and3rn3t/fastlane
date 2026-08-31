@@ -34,9 +34,9 @@ export const LEGACY_PERKS: LegacyPerk[] = [
   },
 ]
 
-/** Sum of every unlocked perk's cash effect — currently just Head Start, but
- * summed rather than a single lookup so a future cash-bonus perk stacks for
- * free. Passed as NewGameOptions.playerCashBonus (engine/engine.ts). */
+/** Head Start's cash effect if unlocked, else 0. Passed as
+ * NewGameOptions.playerCashBonus (engine/engine.ts). A second cash-bonus
+ * perk would need its own lookup added here — nothing generic stacks yet. */
 export function legacyCashBonus(stats: LifetimeStats): number {
   const headStart = LEGACY_PERKS.find((p) => p.id === 'head-start')!
   return headStart.isUnlocked(stats) ? HEAD_START_BONUS : 0

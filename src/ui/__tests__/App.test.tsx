@@ -492,4 +492,22 @@ describe('save migration', () => {
     expect(screen.getByText(/Start new game/)).toBeTruthy()
     expect(screen.getByRole('alert')).toBeTruthy()
   })
+
+  it('keeps the default pawn on the Daily Challenge even with the New Look perk unlocked', () => {
+    localStorage.setItem(
+      'fastlane-stats-v1',
+      JSON.stringify({
+        gamesPlayed: 1,
+        gamesWon: 1,
+        gamesLost: 0,
+        fastestWinWeeks: 10,
+        unlockedAchievements: [],
+        lastRecordedSeed: null,
+        incidents: { layoffs: 0, thefts: 0, evictions: 0, robberies: 0, garnishments: 0 },
+      })
+    )
+    renderApp()
+    fireEvent.click(screen.getByText(/Play today's challenge/))
+    expect(screen.getByLabelText('You is here').textContent).toBe('🙂')
+  })
 })
