@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { jobById, LOCATIONS, type GameState, type LocationId } from '@/engine'
+import { useGame } from '@/state/GameContext'
 import { ChevronDownIcon } from './Icon'
 import { LOCATION_ICONS } from './icons'
 import {
@@ -39,6 +40,7 @@ const PEEK_ACTIONS: Partial<
  * static card, always expanded — a graceful degradation, not a separate
  * design target. */
 export function LocationSheet({ game }: { game: GameState }) {
+  const { dispatchGame } = useGame()
   const [sheetState, setSheetState] = useState<SheetState>(() =>
     isMobileViewport() ? 'peek' : 'expanded'
   )
@@ -50,7 +52,6 @@ export function LocationSheet({ game }: { game: GameState }) {
   // blocked-controls bug the backdrop below exists to fix.
   const [isMobileWidth, setIsMobileWidth] = useState(isMobileViewport)
   const prevLocationRef = useRef(game.player.location)
-  const prevLogLengthRef = useRef(game.log.length)
 
   useEffect(() => {
     const onResize = () => setIsMobileWidth(isMobileViewport())
@@ -58,20 +59,21 @@ export function LocationSheet({ game }: { game: GameState }) {
     return () => window.removeEventListener('resize', onResize)
   }, [])
 
+  // Arriving somewhere new opens the sheet so the player sees what's here.
+  // Taking an action at the *same* location deliberately does NOT collapse
+  // it back anymore (an earlier version did) — that auto-collapse fought
+  // anyone doing several actions in a row at one location (buying groceries
+  // repeatedly at MegaMart, working multiple shifts), and some locations had
+  // no peek action at all, so it collapsed into a dead, un-actionable state
+  // requiring a manual re-expand every time. The persistent End Week button
+  // below replaces auto-collapse as the way back to the board, so the sheet
+  // no longer needs to manage that on its own.
   useEffect(() => {
-    const locationChanged = prevLocationRef.current !== game.player.location
-    if (locationChanged) {
+    if (prevLocationRef.current !== game.player.location) {
       setSheetState('expanded')
-    } else if (game.log.length !== prevLogLengthRef.current) {
-      // An action was taken at the same location — collapse back to peek on
-      // mobile only; on desktop the panel stays expanded.
-      if (isMobileWidth) {
-        setSheetState((s) => (s === 'expanded' ? 'peek' : s))
-      }
     }
     prevLocationRef.current = game.player.location
-    prevLogLengthRef.current = game.log.length
-  }, [game.player.location, game.log.length, isMobileWidth])
+  }, [game.player.location])
 
   const loc = LOCATIONS[game.player.location]
   const p = game.player
@@ -113,6 +115,15 @@ export function LocationSheet({ game }: { game: GameState }) {
           </span>
           <ChevronDownIcon size={14} className="disclosure-chevron" />
         </button>
+        {isMobileWidth && (
+          <button
+            type="button"
+            className="location-sheet-end-week"
+            onClick={() => dispatchGame({ type: 'endWeek' })}
+          >
+            End week {p.timeLeft > 0 ? `(${p.timeLeft}h unused)` : ''}
+          </button>
+        )}
         {!expanded && PeekAction && (
           <div className="location-sheet-peek-action">
             <PeekAction game={game} />

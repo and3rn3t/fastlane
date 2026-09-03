@@ -1136,6 +1136,16 @@ details.action-group[open] .disclosure-chevron {
   flex-shrink: 0;
 }
 
+/* Persistent regardless of peek/expanded — replaces the old auto-collapse
+ * mechanic as the guaranteed way back to the board on mobile, where the
+ * board's own End Week button (`.end-week` below) can sit underneath this
+ * sheet's fixed overlay. Deliberately not `.primary`: it's a persistent
+ * utility control, not the current location's own action. */
+.location-sheet-end-week {
+  width: 100%;
+  margin-top: 0.6rem;
+}
+
 .location-sheet.expanded .disclosure-chevron {
   transform: rotate(180deg);
 }
@@ -1158,6 +1168,14 @@ details.action-group[open] .disclosure-chevron {
 @media (max-width: 899.98px) {
   .side {
     padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+  }
+
+  /* Superseded by `.location-sheet-end-week` here: this one can end up
+   * underneath the sheet's fixed overlay below, so it's no longer a
+   * reliable way to end the week at this width — the sheet's persistent
+   * copy, rendered at the same breakpoint, is. */
+  .end-week {
+    display: none;
   }
 
   .location-sheet {
