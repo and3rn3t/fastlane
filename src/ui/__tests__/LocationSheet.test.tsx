@@ -86,3 +86,65 @@ describe('LocationSheet backdrop (mobile bottom-sheet mode)', () => {
     expect(document.querySelector('.location-sheet-backdrop')).toBeTruthy()
   })
 })
+
+describe('LocationSheet persistent End Week control', () => {
+  const originalWidth = window.innerWidth
+
+  afterEach(() => {
+    cleanup()
+    setViewportWidth(originalWidth)
+  })
+
+  it('is available on mobile whether the sheet is peeked or expanded, and never on desktop', () => {
+    setViewportWidth(375)
+    render(
+      <GameProvider>
+        <LocationSheet game={freshGame()} />
+      </GameProvider>
+    )
+    expect(screen.getByRole('button', { name: /^End week/i })).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /Home/i }))
+    expect(screen.getByRole('button', { name: /^End week/i })).toBeTruthy()
+    cleanup()
+
+    setViewportWidth(1280)
+    render(
+      <GameProvider>
+        <LocationSheet game={freshGame()} />
+      </GameProvider>
+    )
+    expect(screen.queryByRole('button', { name: /^End week/i })).toBeNull()
+  })
+
+  it('does not collapse the expanded sheet back to peek after taking an action at the same location', () => {
+    // Regression test: an earlier version force-collapsed the sheet to peek
+    // whenever the game log grew at the same location, which fought anyone
+    // taking several actions in a row (e.g. buying groceries repeatedly at
+    // MegaMart, where there was no peek action at all, so it collapsed into
+    // a dead un-actionable state). Simulates that same-location log growth
+    // via a rerender and asserts the sheet is left exactly as the player set
+    // it, per the redesign.
+    setViewportWidth(375)
+    const game = freshGame()
+    const { rerender } = render(
+      <GameProvider>
+        <LocationSheet game={game} />
+      </GameProvider>
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Home/i }))
+    expect(screen.getByRole('button', { name: /Home/i }).getAttribute('aria-expanded')).toBe('true')
+
+    const gameAfterAction: GameState = {
+      ...game,
+      log: [...game.log, { week: game.week, actor: 'player', text: 'Relaxed 4h.' }],
+    }
+    rerender(
+      <GameProvider>
+        <LocationSheet game={gameAfterAction} />
+      </GameProvider>
+    )
+
+    expect(screen.getByRole('button', { name: /Home/i }).getAttribute('aria-expanded')).toBe('true')
+  })
+})
