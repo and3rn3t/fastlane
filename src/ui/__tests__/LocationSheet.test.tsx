@@ -1,12 +1,28 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { newGame, type GameState } from '@/engine'
-import { GameProvider } from '@/state/GameContext'
+import { GameProvider, SAVE_KEY, useGame } from '@/state/GameContext'
 import { LocationSheet } from '@/ui/LocationSheet'
 
 function freshGame(): GameState {
   const goals = { wealth: 4000, happiness: 70, education: 12, career: 30 }
   return newGame({ playerName: 'Tester', goals, seed: 1 })
+}
+
+/** Renders LocationSheet against GameProvider's own live game state (seeded
+ * via localStorage before mount, the same path a real save load takes)
+ * instead of a static prop, and surfaces the current phase — so a test can
+ * click the button and observe a real dispatch actually landing, rather than
+ * only checking the button exists. */
+function LiveGameHarness() {
+  const { game } = useGame()
+  if (!game) return null
+  return (
+    <>
+      <span data-testid="phase">{game.phase}</span>
+      <LocationSheet game={game} />
+    </>
+  )
 }
 
 function setViewportWidth(width: number) {
@@ -93,6 +109,7 @@ describe('LocationSheet persistent End Week control', () => {
   afterEach(() => {
     cleanup()
     setViewportWidth(originalWidth)
+    localStorage.removeItem(SAVE_KEY)
   })
 
   it('is available on mobile whether the sheet is peeked or expanded, and never on desktop', () => {
@@ -115,6 +132,21 @@ describe('LocationSheet persistent End Week control', () => {
       </GameProvider>
     )
     expect(screen.queryByRole('button', { name: /^End week/i })).toBeNull()
+  })
+
+  it('actually dispatches endWeek when clicked, advancing the game past a broken/removed handler', () => {
+    setViewportWidth(375)
+    localStorage.setItem(SAVE_KEY, JSON.stringify(freshGame()))
+    render(
+      <GameProvider>
+        <LiveGameHarness />
+      </GameProvider>
+    )
+    expect(screen.getByTestId('phase').textContent).toBe('playing')
+
+    fireEvent.click(screen.getByRole('button', { name: /^End week/i }))
+
+    expect(screen.getByTestId('phase').textContent).toBe('weekReport')
   })
 
   it('does not collapse the expanded sheet back to peek after taking an action at the same location', () => {
