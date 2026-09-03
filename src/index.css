@@ -1080,6 +1080,14 @@ details.action-group[open] .disclosure-chevron {
 
 /* ---------- location sheet ---------- */
 
+/* Hidden by default (desktop): the location panel there is a permanent
+ * static card, not a temporary sheet — see `.location-sheet.expanded`'s
+ * comment below and the media query for why the dimming/dismiss backdrop
+ * only makes sense once the sheet is actually a bottom sheet. */
+.location-sheet-backdrop {
+  display: none;
+}
+
 .location-sheet-handle {
   display: flex;
   align-items: center;
@@ -1128,6 +1136,16 @@ details.action-group[open] .disclosure-chevron {
   flex-shrink: 0;
 }
 
+/* Persistent regardless of peek/expanded — replaces the old auto-collapse
+ * mechanic as the guaranteed way back to the board on mobile, where the
+ * board's own End Week button (`.end-week` below) can sit underneath this
+ * sheet's fixed overlay. Deliberately not `.primary`: it's a persistent
+ * utility control, not the current location's own action. */
+.location-sheet-end-week {
+  width: 100%;
+  margin-top: 0.6rem;
+}
+
 .location-sheet.expanded .disclosure-chevron {
   transform: rotate(180deg);
 }
@@ -1150,6 +1168,14 @@ details.action-group[open] .disclosure-chevron {
 @media (max-width: 899.98px) {
   .side {
     padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+  }
+
+  /* Superseded by `.location-sheet-end-week` here: this one can end up
+   * underneath the sheet's fixed overlay below, so it's no longer a
+   * reliable way to end the week at this width — the sheet's persistent
+   * copy, rendered at the same breakpoint, is. */
+  .end-week {
+    display: none;
   }
 
   .location-sheet {
@@ -1177,6 +1203,33 @@ details.action-group[open] .disclosure-chevron {
     top: 0.5rem;
     left: 50%;
     transform: translateX(-50%);
+  }
+
+  /* Real bug this fixes, reported directly: the sheet's own content height
+   * (not even the 88vh cap below — Home's blurb is ~200px, well under it)
+   * can outgrow the gap between it and whatever sits above on a short
+   * viewport (confirmed on a 667px-tall screen: the expanded sheet's top
+   * edge lands *above* the board's End Week button, covering it with no
+   * way back — elementFromPoint at the button's coordinates resolved to
+   * the sheet's own text, not the button). Shrinking max-height further
+   * wouldn't have helped here since content never hit the old cap; the
+   * actual fix is giving the sheet a real dismiss path once it's covering
+   * the screen, the same way `.modal-backdrop` already does for Help/the
+   * week report — tap anywhere outside to collapse back to peek. */
+  .location-sheet-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgb(10 14 22 / 0.35);
+    /* Below .location-sheet (6), above everything else including .topbar
+     * (5) — same full-coverage precedent .modal-backdrop already sets for
+     * an explicitly-opened sheet/modal outranking the rest of the page.
+     * Reaches the same effective z-order as pawn-marker-wrap/.topbar (also
+     * 5) by coming later in source order, not by a higher number — both
+     * are ordinary sibling stacking contexts, so equal z-index resolves by
+     * DOM order here. */
+    z-index: 5;
+    animation: scrim-fade 0.2s ease-out both;
   }
 
   .location-sheet.expanded {
@@ -1371,6 +1424,32 @@ details.action-group[open] .disclosure-chevron {
   background: rgb(255 255 255 / 15%);
 }
 
+/* Neutral variant — an update-available notice isn't an error, so it
+ * shouldn't wear .toast's red. Same shape/positioning, --accent instead
+ * of --bad, plus a real action button ahead of the dismiss circle. */
+.toast-info {
+  background: var(--accent);
+}
+
+.toast-action {
+  flex-shrink: 0;
+  background: white;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Not a lighter/darker background: white-on-accent is already right at the
+ * 4.5:1 floor (verified: 4.58:1), so the global button:hover's
+ * filter: brightness(1.05) would push it below AA — confirmed by
+ * computing the actual composited contrast, not guessed (4.24:1, fails).
+ * A ring keeps the text/background pair untouched while still giving a
+ * real hover affordance. */
+.toast-action:hover:not(:disabled) {
+  filter: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
 .gameover {
   text-align: center;
   padding: 3rem 1rem;
@@ -1392,6 +1471,43 @@ details.action-group[open] .disclosure-chevron {
 .achievement-unlocked p {
   margin: 0.2rem 0;
   font-size: 0.9rem;
+}
+
+/* ---------- hint bar ---------- */
+
+.hint-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: color-mix(in srgb, var(--accent) 6%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  border-radius: var(--radius);
+  padding: 0.5rem 0.5rem 0.5rem 0.85rem;
+}
+
+.hint-bar .icon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.hint-bar .text {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.hint-dismiss {
+  flex-shrink: 0;
+  width: 44px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  border-radius: 50%;
+}
+
+.hint-dismiss:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
 }
 
 /* ---------- daily challenge ---------- */
@@ -1522,6 +1638,12 @@ details.action-group[open] .disclosure-chevron {
   border: none;
   color: inherit;
   font-size: 1rem;
+}
+
+.install-prompt .install-cta {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* ---------- turn playback ---------- */
