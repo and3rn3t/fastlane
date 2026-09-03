@@ -65,4 +65,24 @@ describe('LocationSheet backdrop (mobile bottom-sheet mode)', () => {
     expect(screen.getByRole('button', { name: /Home/i }).getAttribute('aria-expanded')).toBe('true')
     expect(document.querySelector('.location-sheet-backdrop')).toBeNull()
   })
+
+  it('picks up a backdrop after resizing from desktop into mobile width while expanded', () => {
+    // Regression test for a real gap: a tablet rotating from desktop-width
+    // landscape into mobile-width portrait while the sheet is expanded must
+    // not silently reintroduce the blocked-controls bug just because no
+    // other prop/state change happened to trigger a re-render.
+    setViewportWidth(1280)
+    render(
+      <GameProvider>
+        <LocationSheet game={freshGame()} />
+      </GameProvider>
+    )
+    expect(document.querySelector('.location-sheet-backdrop')).toBeNull()
+
+    setViewportWidth(375)
+    fireEvent(window, new Event('resize'))
+
+    expect(screen.getByRole('button', { name: /Home/i }).getAttribute('aria-expanded')).toBe('true')
+    expect(document.querySelector('.location-sheet-backdrop')).toBeTruthy()
+  })
 })

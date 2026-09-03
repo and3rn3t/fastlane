@@ -17,6 +17,10 @@ type SheetState = 'peek' | 'expanded'
 
 const DESKTOP_BREAKPOINT_PX = 900
 
+function isMobileViewport(): boolean {
+  return typeof window !== 'undefined' && window.innerWidth < DESKTOP_BREAKPOINT_PX
+}
+
 const PEEK_ACTIONS: Partial<
   Record<LocationId, (p: { game: GameState }) => React.JSX.Element | null>
 > = {
@@ -36,12 +40,23 @@ const PEEK_ACTIONS: Partial<
  * design target. */
 export function LocationSheet({ game }: { game: GameState }) {
   const [sheetState, setSheetState] = useState<SheetState>(() =>
-    typeof window !== 'undefined' && window.innerWidth >= DESKTOP_BREAKPOINT_PX
-      ? 'expanded'
-      : 'peek'
+    isMobileViewport() ? 'peek' : 'expanded'
   )
+  // Tracked in state (not just read inline on render) and kept live via a
+  // resize listener below — otherwise a width change that crosses the
+  // breakpoint without some unrelated re-render (e.g. a tablet rotating from
+  // desktop-width landscape into mobile-width portrait while the sheet is
+  // expanded) would leave this stale, silently reintroducing the
+  // blocked-controls bug the backdrop below exists to fix.
+  const [isMobileWidth, setIsMobileWidth] = useState(isMobileViewport)
   const prevLocationRef = useRef(game.player.location)
   const prevLogLengthRef = useRef(game.log.length)
+
+  useEffect(() => {
+    const onResize = () => setIsMobileWidth(isMobileViewport())
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
 
   useEffect(() => {
     const locationChanged = prevLocationRef.current !== game.player.location
@@ -50,13 +65,13 @@ export function LocationSheet({ game }: { game: GameState }) {
     } else if (game.log.length !== prevLogLengthRef.current) {
       // An action was taken at the same location — collapse back to peek on
       // mobile only; on desktop the panel stays expanded.
-      if (window.innerWidth < DESKTOP_BREAKPOINT_PX) {
+      if (isMobileWidth) {
         setSheetState((s) => (s === 'expanded' ? 'peek' : s))
       }
     }
     prevLocationRef.current = game.player.location
     prevLogLengthRef.current = game.log.length
-  }, [game.player.location, game.log.length])
+  }, [game.player.location, game.log.length, isMobileWidth])
 
   const loc = LOCATIONS[game.player.location]
   const p = game.player
@@ -64,14 +79,6 @@ export function LocationSheet({ game }: { game: GameState }) {
   const PeekAction = atWork ? WorkAction : PEEK_ACTIONS[loc.id]
   const LocIcon = LOCATION_ICONS[loc.id]
   const expanded = sheetState === 'expanded'
-
-  // Explicit width check, not just CSS's desktop-hides-it rule below — the
-  // desktop panel is a permanent static card, not a temporary sheet, so it
-  // should never even mount a click-blocking overlay, and this makes that
-  // guarantee visible/testable in JS rather than relying on the stylesheet
-  // alone. Matches the same ad-hoc `window.innerWidth` check the effect
-  // above already uses for other mobile-only sheet behavior.
-  const isMobileWidth = typeof window !== 'undefined' && window.innerWidth < DESKTOP_BREAKPOINT_PX
 
   return (
     <>
