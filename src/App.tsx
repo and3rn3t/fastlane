@@ -1,9 +1,10 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
+import { dailyChallengeOptions, dailyChallengeSeed } from '@/daily'
 import { useGame } from '@/state/GameContext'
 import { reportError } from '@/telemetry'
 import { GameScreen } from '@/ui/GameScreen'
-import { InstallPrompt } from '@/ui/InstallPrompt'
+import { InstallPrompt, useInstallPromptEvent } from '@/ui/InstallPrompt'
 import { StartScreen } from '@/ui/StartScreen'
 
 // Lazy: pulls in RecapChart's charting code, which no player needs until a
@@ -60,13 +61,43 @@ function UpdateToast() {
   )
 }
 
+/** Backs the manifest's "Daily Challenge" PWA shortcut (long-press the home
+ * screen icon → jump straight in). Lives at the App root, not inside
+ * StartScreen — StartScreen only mounts when there's no save in progress, so
+ * a returning player with an active game would never see the shortcut fire
+ * at all (real bug, caught by a Copilot review: `App` never renders
+ * StartScreen once `loadSave()` finds a game). If a save already exists,
+ * confirm before discarding it — the same `window.confirm()` pattern
+ * `GameScreen`'s own "quit to menu" already uses — and skip the prompt
+ * entirely if that save is already today's Daily Challenge. */
+function useDailyChallengeDeepLink() {
+  const { game, startGame } = useGame()
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('daily') !== '1') return
+    window.history.replaceState(null, '', window.location.pathname)
+    if (game?.isDailyChallenge && game.rngSeed === dailyChallengeSeed()) return
+    if (
+      game &&
+      !window.confirm("Start today's Daily Challenge? This will abandon your current game.")
+    ) {
+      return
+    }
+    startGame(dailyChallengeOptions('You'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+}
+
 export default function App() {
   const { game } = useGame()
+  const [installEvent, setInstallEvent] = useInstallPromptEvent()
+  useDailyChallengeDeepLink()
 
-  // ErrorToast/UpdateToast render in every branch: a failed-load message
-  // (see GameContext.tsx's loadSave) fires exactly when game is null, so it
-  // must be reachable from the StartScreen branch too, not just in-game —
-  // and a service worker update can become ready regardless of game state.
+  // UpdateToast renders in every branch: a service worker update can become
+  // ready regardless of game state. ErrorToast renders everywhere except
+  // game-over: a failed-load message (see GameContext.tsx's loadSave) fires
+  // exactly when game is null, so it must reach the StartScreen branch too —
+  // but GameOver never touches error/clearError, so there's nothing for it
+  // to show there.
   if (!game) {
     return (
       <>
@@ -92,7 +123,11 @@ export default function App() {
       <GameScreen game={game} />
       <ErrorToast />
       <UpdateToast />
-      <InstallPrompt game={game} />
+      <InstallPrompt
+        game={game}
+        installEvent={installEvent}
+        onInstallEventConsumed={() => setInstallEvent(null)}
+      />
     </>
   )
 }

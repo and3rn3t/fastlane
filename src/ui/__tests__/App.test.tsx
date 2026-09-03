@@ -1,7 +1,25 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { useState } from 'react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { useRegisterSW } from 'virtual:pwa-register/react'
 import App from '@/App'
 import { GameProvider } from '@/state/GameContext'
+import { reportError } from '@/telemetry'
+
+// virtual:pwa-register/react does real navigator.serviceWorker/workbox-window
+// work that isn't meaningful in jsdom — mocked so UpdateToast's own behavior
+// (needRefresh, reload, dismiss, registration-error reporting) can be
+// exercised directly instead of depending on whatever a real registration
+// attempt happens to no-op into. A per-test mockImplementation below can
+// still back it with real React state where a test needs re-renders.
+vi.mock('virtual:pwa-register/react', () => ({
+  useRegisterSW: vi.fn().mockReturnValue({
+    needRefresh: [false, vi.fn()],
+    offlineReady: [false, vi.fn()],
+    updateServiceWorker: vi.fn(),
+  }),
+}))
+vi.mock('@/telemetry', () => ({ reportError: vi.fn() }))
 
 function renderApp() {
   return render(
@@ -552,5 +570,133 @@ describe('save migration', () => {
     renderApp()
     fireEvent.click(screen.getByText(/Play today's challenge/))
     expect(screen.getByLabelText('You is here').textContent).toBe('🙂')
+  })
+})
+
+describe('UpdateToast', () => {
+  beforeEach(() => localStorage.clear())
+  afterEach(() => {
+    cleanup()
+    vi.mocked(useRegisterSW).mockReturnValue({
+      needRefresh: [false, vi.fn()],
+      offlineReady: [false, vi.fn()],
+      updateServiceWorker: vi.fn(),
+    })
+  })
+
+  it('shows nothing when no update is available (the default)', () => {
+    renderApp()
+    expect(screen.queryByText(/new version/i)).toBeNull()
+  })
+
+  it('shows the toast and calls updateServiceWorker(true) when Reload is clicked', () => {
+    const updateServiceWorker = vi.fn()
+    vi.mocked(useRegisterSW).mockReturnValue({
+      needRefresh: [true, vi.fn()],
+      offlineReady: [false, vi.fn()],
+      updateServiceWorker,
+    })
+    renderApp()
+
+    expect(screen.getByText(/new version/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /reload/i }))
+    expect(updateServiceWorker).toHaveBeenCalledWith(true)
+  })
+
+  it('dismissing hides the toast without reloading', () => {
+    // Backed by real React state (not a static mock return) so clicking
+    // dismiss's setNeedRefresh(false) actually re-renders — verifies the
+    // toast reacts to its own setter, not just that the setter was called.
+    vi.mocked(useRegisterSW).mockImplementation(() => {
+      const [needRefresh, setNeedRefresh] = useState(true)
+      return {
+        needRefresh: [needRefresh, setNeedRefresh],
+        offlineReady: [false, vi.fn()],
+        updateServiceWorker: vi.fn(),
+      }
+    })
+    renderApp()
+
+    expect(screen.getByText(/new version/i)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /^dismiss$/i }))
+    expect(screen.queryByText(/new version/i)).toBeNull()
+  })
+
+  it('reports a registration error via telemetry instead of failing silently', () => {
+    vi.mocked(useRegisterSW).mockImplementation((options) => {
+      options?.onRegisterError?.(new Error('registration failed'))
+      return {
+        needRefresh: [false, vi.fn()],
+        offlineReady: [false, vi.fn()],
+        updateServiceWorker: vi.fn(),
+      }
+    })
+    renderApp()
+    expect(reportError).toHaveBeenCalledWith(expect.any(Error), 'service-worker-registration')
+  })
+})
+
+describe('Daily Challenge deep link (?daily=1)', () => {
+  beforeEach(() => {
+    localStorage.clear()
+    window.history.replaceState(null, '', '/?daily=1')
+  })
+  afterEach(() => {
+    cleanup()
+    window.history.replaceState(null, '', '/')
+  })
+
+  it('auto-starts the Daily Challenge from a fresh visit and cleans the URL', () => {
+    renderApp()
+    expect(screen.getByText(/Week 1/)).toBeTruthy()
+    expect(window.location.search).toBe('')
+  })
+
+  it('does not re-trigger on a later render once the URL is already clean', () => {
+    // The effect only ever looks at the URL on mount — verifies that
+    // finishing the auto-start also actually removed ?daily=1, so a
+    // same-session re-render (e.g. dispatching another action) can't
+    // accidentally re-read a stale query string and restart the game.
+    renderApp()
+    expect(screen.getByText(/Week 1/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /Job Center/ }))
+    expect(screen.getByText(/Week 1/)).toBeTruthy()
+  })
+
+  it('confirms before abandoning an existing, different save', () => {
+    // Arrange with a clean URL — the shared beforeEach's ?daily=1 would
+    // otherwise auto-start a save before "Start new game" is even clickable.
+    window.history.replaceState(null, '', '/')
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderApp()
+    fireEvent.click(screen.getByText(/Start new game/))
+    expect(screen.getByText(/Week 1/)).toBeTruthy()
+
+    window.history.replaceState(null, '', '/?daily=1')
+    render(
+      <GameProvider>
+        <App />
+      </GameProvider>
+    )
+
+    expect(confirmSpy).toHaveBeenCalled()
+    // Declined — the original (non-daily) save is untouched.
+    expect(screen.queryAllByText(/Daily Challenge #/)).toHaveLength(0)
+    confirmSpy.mockRestore()
+  })
+
+  it("skips the confirm entirely when the existing save is already today's Daily Challenge", () => {
+    const confirmSpy = vi.spyOn(window, 'confirm')
+    renderApp() // auto-starts today's challenge via the ?daily=1 in beforeEach
+
+    window.history.replaceState(null, '', '/?daily=1')
+    render(
+      <GameProvider>
+        <App />
+      </GameProvider>
+    )
+
+    expect(confirmSpy).not.toHaveBeenCalled()
+    confirmSpy.mockRestore()
   })
 })

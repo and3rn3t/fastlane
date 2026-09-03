@@ -20,7 +20,7 @@ function isStandalone(): boolean {
 }
 
 /** Not in lib.dom.d.ts yet — Chromium-only, no official TS lib entry. */
-interface BeforeInstallPromptEvent extends Event {
+export interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
 }
@@ -29,8 +29,20 @@ interface BeforeInstallPromptEvent extends Event {
  * generic mini-infobar — but only once `preventDefault()` is called on it,
  * and only if it's ever going to fire at all (iOS Safari and browsers with
  * no installability signal never do). Captured here so the branded button
- * below can trigger the native prompt later, on the player's own timing. */
-function useInstallPromptEvent(): BeforeInstallPromptEvent | null {
+ * can trigger the native prompt later, on the player's own timing.
+ *
+ * Exported and called from `App.tsx`, not from inside `InstallPrompt` itself
+ * — `InstallPrompt` only mounts once a game exists, but the one-shot event
+ * can fire earlier, while a first-time visitor is still on `StartScreen`.
+ * A listener that isn't registered yet when the event fires loses it for
+ * good (real bug, caught by a Copilot review — verified against `App.tsx`'s
+ * actual render branches). Living at the App root, alongside
+ * `ErrorToast`/`UpdateToast`, keeps it listening regardless of which branch
+ * is showing. */
+export function useInstallPromptEvent(): [
+  BeforeInstallPromptEvent | null,
+  (event: BeforeInstallPromptEvent | null) => void,
+] {
   const [event, setEvent] = useState<BeforeInstallPromptEvent | null>(null)
   useEffect(() => {
     function onBeforeInstallPrompt(e: Event) {
@@ -40,7 +52,7 @@ function useInstallPromptEvent(): BeforeInstallPromptEvent | null {
     window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt)
     return () => window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt)
   }, [])
-  return event
+  return [event, setEvent]
 }
 
 /**
@@ -49,12 +61,20 @@ function useInstallPromptEvent(): BeforeInstallPromptEvent | null {
  * ~7-day localStorage eviction, but worth doing everywhere a save exists.
  * Two real install paths, mutually exclusive per platform: Android/desktop
  * Chrome gets a branded button wired to the captured `beforeinstallprompt`
- * event; iOS Safari has no such event (Add to Home Screen is a manual
- * Share-sheet action a page can't trigger), so it gets instructions instead.
+ * event (passed in from `App.tsx`, see `useInstallPromptEvent`'s comment);
+ * iOS Safari has no such event (Add to Home Screen is a manual Share-sheet
+ * action a page can't trigger), so it gets instructions instead.
  */
-export function InstallPrompt({ game }: { game: GameState }) {
+export function InstallPrompt({
+  game,
+  installEvent,
+  onInstallEventConsumed,
+}: {
+  game: GameState
+  installEvent: BeforeInstallPromptEvent | null
+  onInstallEventConsumed: () => void
+}) {
   const [dismissed, setDismissed] = useState(() => localStorage.getItem(DISMISS_KEY) === '1')
-  const installEvent = useInstallPromptEvent()
 
   const playedAWeek = game.week > 1
   const eligible = playedAWeek && !dismissed && !isStandalone()
@@ -74,9 +94,17 @@ export function InstallPrompt({ game }: { game: GameState }) {
           onClick={async () => {
             await installEvent.prompt()
             const { outcome } = await installEvent.userChoice
-            // Only the browser's own dialog can answer this — 'dismissed'
-            // just means "not now," not "never ask again," so only an
-            // actual accept should suppress the nudge for good.
+            // A beforeinstallprompt event can only be prompted once — clear
+            // it regardless of outcome, or a second click would reuse a
+            // consumed event (real bug, caught by a Copilot review: without
+            // this, the button stayed visible and did nothing on a second
+            // click). 'dismissed' just means "not now," not "never ask
+            // again," so only an actual accept also suppresses the nudge
+            // for good — a mere "not now" can still show the iOS-style
+            // fallback... except there is none for this platform, so the
+            // banner simply won't reappear until the next real event fires
+            // (e.g. a future page load), same as the browser's own infobar.
+            onInstallEventConsumed()
             if (outcome === 'accepted') dismiss()
           }}
         >
