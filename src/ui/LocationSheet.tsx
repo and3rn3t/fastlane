@@ -80,7 +80,15 @@ export function LocationSheet({ game }: { game: GameState }) {
   const atWork = p.jobId != null && jobById(p.jobId).workplace === p.location
   const PeekAction = atWork ? WorkAction : PEEK_ACTIONS[loc.id]
   const LocIcon = LOCATION_ICONS[loc.id]
-  const expanded = sheetState === 'expanded'
+  // Peek only makes sense where there's something to peek at. Several
+  // locations (First Bank, Gadget City, the Rent Office, ...) have no single
+  // "most relevant" action to show compactly — collapsing there used to
+  // leave a dead peek state with nothing but the handle and End Week, which
+  // read as broken (confirmed live: 142px tall vs. 587px expanded, no
+  // controls at all). Forcing expanded here means the handle's collapse
+  // toggle is a no-op at these locations, same as the persistent End Week
+  // button already is everywhere.
+  const expanded = sheetState === 'expanded' || !PeekAction
 
   return (
     <>
