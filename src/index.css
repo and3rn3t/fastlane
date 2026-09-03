@@ -1371,6 +1371,32 @@ details.action-group[open] .disclosure-chevron {
   background: rgb(255 255 255 / 15%);
 }
 
+/* Neutral variant — an update-available notice isn't an error, so it
+ * shouldn't wear .toast's red. Same shape/positioning, --accent instead
+ * of --bad, plus a real action button ahead of the dismiss circle. */
+.toast-info {
+  background: var(--accent);
+}
+
+.toast-action {
+  flex-shrink: 0;
+  background: white;
+  border: none;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Not a lighter/darker background: white-on-accent is already right at the
+ * 4.5:1 floor (verified: 4.58:1), so the global button:hover's
+ * filter: brightness(1.05) would push it below AA — confirmed by
+ * computing the actual composited contrast, not guessed (4.24:1, fails).
+ * A ring keeps the text/background pair untouched while still giving a
+ * real hover affordance. */
+.toast-action:hover:not(:disabled) {
+  filter: none;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
 .gameover {
   text-align: center;
   padding: 3rem 1rem;
@@ -1559,6 +1585,12 @@ details.action-group[open] .disclosure-chevron {
   border: none;
   color: inherit;
   font-size: 1rem;
+}
+
+.install-prompt .install-cta {
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 
 /* ---------- turn playback ---------- */
