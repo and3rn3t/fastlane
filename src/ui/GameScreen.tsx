@@ -133,11 +133,17 @@ function useTurnReplay(game: GameState) {
 // Priority order for RECENT_FAILURE_COPY below — eviction costs a place to
 // live, robbery costs cash/valuables, hunger only costs happiness, so a
 // week that somehow logs more than one gets the most consequential one.
-const RECENT_FAILURE_PRIORITY = ['evicted', 'robbed', 'went hungry'] as const satisfies readonly (typeof DISASTER_KEYWORDS)[number][]
+const RECENT_FAILURE_PRIORITY = [
+  'evicted',
+  'robbed',
+  'went hungry',
+] as const satisfies readonly (typeof DISASTER_KEYWORDS)[number][]
 
 const RECENT_FAILURE_COPY: Record<(typeof DISASTER_KEYWORDS)[number], string> = {
-  evicted: 'You were evicted last week — keep rent current at the Rent Office so it doesn’t happen again.',
-  robbed: 'You were robbed last week — Home Insurance at First Bank covers your valuables against it.',
+  evicted:
+    'You were evicted last week — keep rent current at the Rent Office so it doesn’t happen again.',
+  robbed:
+    'You were robbed last week — Home Insurance at First Bank covers your valuables against it.',
   'went hungry': 'You went hungry last week — keep food stocked at MegaMart or Burger Barn.',
 }
 
@@ -209,7 +215,8 @@ function HintBar({ game }: { game: GameState }) {
   const recentFailure = useMemo(() => recentFailureHint(game), [game])
   const tag = useMemo(() => previewNextAction(game, 'player'), [game])
 
-  const hint = recentFailure ?? (tag ? { key: `next:${tag}`, text: hintCopy(tag, game.player) } : null)
+  const hint =
+    recentFailure ?? (tag ? { key: `next:${tag}`, text: hintCopy(tag, game.player) } : null)
   if (game.phase !== 'playing' || !hint || hint.key === dismissedKey) return null
   return (
     <div className="hint-bar">
