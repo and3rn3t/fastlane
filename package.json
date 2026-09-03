@@ -17,6 +17,7 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "sim": "tsx scripts/sim.ts",
+    "sim:report": "tsx scripts/sim-report.ts",
     "lint": "eslint .",
     "type-check": "tsc --noEmit && tsc --noEmit -p functions/tsconfig.json",
     "format": "prettier --write .",
