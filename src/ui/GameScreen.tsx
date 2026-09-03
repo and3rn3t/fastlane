@@ -130,6 +130,49 @@ function useTurnReplay(game: GameState) {
  * UI layer, since it's presentation text, not a game rule. `housing` is the
  * one tag with two real situations behind it (no apartment vs. rent due), so
  * it's the only case that reads `p` for specifics. */
+// Priority order for RECENT_FAILURE_COPY below — eviction costs a place to
+// live, robbery costs cash/valuables, hunger only costs happiness, so a
+// week that somehow logs more than one gets the most consequential one.
+const RECENT_FAILURE_PRIORITY = [
+  'evicted',
+  'robbed',
+  'went hungry',
+] as const satisfies readonly (typeof DISASTER_KEYWORDS)[number][]
+
+const RECENT_FAILURE_COPY: Record<(typeof DISASTER_KEYWORDS)[number], string> = {
+  evicted:
+    'You were evicted last week — keep rent current at the Rent Office so it doesn’t happen again.',
+  // Street robbery triggers on cash carried, not on owned items — Home
+  // Insurance (which only covers durable-goods burglary, a separate roll)
+  // doesn't prevent this at all. Bank the surplus or get a secure apartment,
+  // the two things week.ts's actual robbery condition checks. Caught in PR
+  // review: an earlier draft pointed here to insurance, which wouldn't have
+  // helped.
+  robbed:
+    "You were robbed of cash last week — First Bank can hold what you don't carry, and a secure apartment stops it happening again.",
+  'went hungry': 'You went hungry last week — keep food stocked at MegaMart or Burger Barn.',
+}
+
+/** Reactive counterpart to `hintCopy`'s forward-looking suggestion: surfaces
+ * *recent* trouble instead of a current-turn precondition check, the same
+ * text-matching pattern `useDisasterSound` already uses against `lastReport`
+ * (itself set once per week and left in place through `dismissReport`, so it
+ * naturally reads as "last week" for the whole following week, then clears
+ * itself the moment a new week's report replaces it — no separate expiry
+ * logic needed). Keyed with the report's week number so a recurring failure
+ * in a *later* week isn't shadowed by an earlier dismissal of the same tag. */
+function recentFailureHint(game: GameState): { key: string; text: string } | null {
+  const report = game.lastReport
+  if (!report) return null
+  const playerTexts = report.entries.filter((e) => e.actor === 'player').map((e) => e.text)
+  for (const keyword of RECENT_FAILURE_PRIORITY) {
+    if (playerTexts.some((t) => t.includes(keyword))) {
+      return { key: `recent:${report.week}:${keyword}`, text: RECENT_FAILURE_COPY[keyword] }
+    }
+  }
+  return null
+}
+
 function hintCopy(tag: CandidateTag, p: PlayerState): string {
   switch (tag) {
     case 'food':
@@ -161,24 +204,33 @@ function hintCopy(tag: CandidateTag, p: PlayerState): string {
   }
 }
 
-/** A subtle, dismissible one-line suggestion for what to do next — reuses
- * Riley's own utility-scored decision logic (`previewNextAction`) rather
+/** A subtle, dismissible one-line suggestion for what to do next. Two
+ * sources, in priority order: recent trouble (`recentFailureHint`, reactive —
+ * "this already went wrong") beats the forward-looking suggestion (reuses
+ * Riley's own utility-scored decision logic via `previewNextAction` rather
  * than a second heuristic, so it can never disagree with what the AI itself
- * would consider best. Recomputed via `useMemo` keyed on `game` so it only
- * re-runs when the actual game state changes, not on unrelated re-renders
- * (muting sound, opening Help). Dismissing hides the *current* suggestion
- * only — once the player acts and the tag changes, a new hint can appear. */
+ * would consider best) — a player who was just evicted needs that surfaced
+ * over a generic "next best move," not alongside it as a second bar. Both are
+ * recomputed via `useMemo` keyed on `game` so they only re-run when the
+ * actual game state changes, not on unrelated re-renders (muting sound,
+ * opening Help). Dismissing hides the *current* suggestion only — once it
+ * changes (the player acts, or a new week's report lands), a new hint can
+ * appear. */
 function HintBar({ game }: { game: GameState }) {
-  const [dismissedTag, setDismissedTag] = useState<CandidateTag | null>(null)
+  const [dismissedKey, setDismissedKey] = useState<string | null>(null)
+  const recentFailure = useMemo(() => recentFailureHint(game), [game])
   const tag = useMemo(() => previewNextAction(game, 'player'), [game])
-  if (game.phase !== 'playing' || !tag || tag === dismissedTag) return null
+
+  const hint =
+    recentFailure ?? (tag ? { key: `next:${tag}`, text: hintCopy(tag, game.player) } : null)
+  if (game.phase !== 'playing' || !hint || hint.key === dismissedKey) return null
   return (
     <div className="hint-bar">
       <BoltIcon size={15} className="icon" />
-      <span className="text">{hintCopy(tag, game.player)}</span>
+      <span className="text">{hint.text}</span>
       <button
         className="hint-dismiss"
-        onClick={() => setDismissedTag(tag)}
+        onClick={() => setDismissedKey(hint.key)}
         aria-label="Dismiss suggestion"
       >
         <CloseIcon size={13} />

@@ -113,6 +113,38 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Buy \d+/ }))
     expect(screen.queryByText(/Running low on food/)).toBeNull()
   })
+
+  it('shows a recent-failure hint after a bad week, taking priority over the forward-looking hint', async () => {
+    renderApp()
+    fireEvent.click(screen.getByText(/Start new game/))
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+
+    // A fresh player never eats, so week 1's upkeep logs "went hungry" —
+    // same setup the forward-looking hint test above starts from.
+    fireEvent.click(screen.getByRole('button', { name: /End week/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Skip/ }))
+    await screen.findByRole('dialog', { name: /Week 1 report/i })
+    fireEvent.click(screen.getByRole('button', { name: /Start week 2/ }))
+
+    // The reactive "you went hungry last week" hint wins over the generic
+    // forward-looking "Running low on food" one — both would otherwise apply.
+    expect(screen.getByText(/You went hungry last week/)).toBeTruthy()
+    expect(screen.queryByText(/Running low on food/)).toBeNull()
+
+    // Dismisses the same way the forward-looking hint does.
+    fireEvent.click(screen.getByRole('button', { name: /Dismiss suggestion/i }))
+    expect(screen.queryByText(/You went hungry last week/)).toBeNull()
+
+    // The player still hasn't eaten, so week 2 logs the same "went hungry"
+    // keyword again. The hint's dismiss key includes the report's week
+    // number specifically so this recurrence isn't shadowed by the week 1
+    // dismissal above — without that, this would incorrectly stay hidden.
+    fireEvent.click(screen.getByRole('button', { name: /End week/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Skip/ }))
+    await screen.findByRole('dialog', { name: /Week 2 report/i })
+    fireEvent.click(screen.getByRole('button', { name: /Start week 3/ }))
+    expect(screen.getByText(/You went hungry last week/)).toBeTruthy()
+  })
 })
 
 describe('save migration', () => {
