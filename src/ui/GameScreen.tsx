@@ -133,7 +133,7 @@ function useTurnReplay(game: GameState) {
 function hintCopy(tag: CandidateTag, p: PlayerState): string {
   switch (tag) {
     case 'food':
-      return 'Running low on food — Megamart has groceries, or grab a hot meal at Burger Barn.'
+      return 'Running low on food — MegaMart has groceries, or grab a hot meal at Burger Barn.'
     case 'housing':
       return p.apartment === 'none'
         ? "You don't have a place to live yet — the Rent Office can set you up."
@@ -143,7 +143,9 @@ function hintCopy(tag: CandidateTag, p: PlayerState): string {
     case 'education':
       return 'A class at City University would move your Education goal forward.'
     case 'career':
-      return 'Worth checking the Job Board — you may be able to move up.'
+      return "You're qualified for a better job — worth checking the Job Board."
+    case 'career-prep':
+      return "Building toward your next job — a better outfit, a computer, or a class could clear what's blocking it."
     case 'happiness':
       return 'Your happiness could use some attention — relax at home or treat yourself at Gadget City.'
     case 'wealth':

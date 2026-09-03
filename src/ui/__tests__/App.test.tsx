@@ -75,6 +75,26 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Help$/i }))
     expect(screen.getByRole('dialog', { name: /How to play/i })).toBeTruthy()
   })
+
+  it('shows a next-step hint, dismisses it, and updates it once the suggested action is taken', () => {
+    renderApp()
+    fireEvent.click(screen.getByText(/Start new game/))
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+
+    // A fresh player is hungry (0 fed, 0 groceries) — the hint should say so.
+    expect(screen.getByText(/Running low on food/)).toBeTruthy()
+
+    // Dismissing hides this specific suggestion.
+    fireEvent.click(screen.getByRole('button', { name: /Dismiss suggestion/i }))
+    expect(screen.queryByText(/Running low on food/)).toBeNull()
+
+    // Resolving the actual shortfall (buy enough groceries at MegaMart)
+    // recomputes the hint — it's no longer the food suggestion, proving the
+    // hint tracks live state rather than being dismissed-forever or static.
+    fireEvent.click(screen.getByRole('button', { name: /MegaMart/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Buy \d+/ }))
+    expect(screen.queryByText(/Running low on food/)).toBeNull()
+  })
 })
 
 describe('save migration', () => {
@@ -432,8 +452,10 @@ describe('save migration', () => {
     // the fixture needs to actually be v9-shaped (bare legacyPlayer() is v0-
     // shaped) rather than relying on a migration this save claims is already
     // done. Real-world relevance: GameScreen's Next-step hint bar now clones
-    // both players on every render (previewNextAction), so a save missing
-    // these fields crashes immediately instead of limping along undetected.
+    // the active player on every render (previewNextAction), so a save
+    // missing these fields crashes immediately instead of limping along
+    // undetected — and both player and riley need to be v9-shaped here since
+    // this fixture is reused as both.
     const v9Fields = {
       health: 100,
       hoursWorkedThisWeek: 0,

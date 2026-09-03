@@ -250,14 +250,26 @@ function nextTargetJob(state: GameState, key: PlayerKey): JobDef | null {
   return candidates[0] ?? null
 }
 
-function pursueCareer(state: GameState, key: PlayerKey, profile: AiProfile): boolean {
+/** Returns `false` on no-op, `true`/a more specific `CandidateTag` on
+ * success. Five different real actions can fire here (apply for a job, buy
+ * an outfit, buy a computer, take a class, train a skill) — reporting only
+ * the generic `'career'` tag for all of them would tell a hint-bar viewer to
+ * "check the Job Board" even when the actual move was buying a computer at
+ * Gadget City, so every branch below reports which one actually happened.
+ * `runAIWeek`'s own `if (candidate.attempt())` check is unaffected: both
+ * `true` and any non-empty tag string are truthy. */
+function pursueCareer(
+  state: GameState,
+  key: PlayerKey,
+  profile: AiProfile
+): boolean | CandidateTag {
   const p = get(state, key)
   const better = bestQualifiedJob(state, key)
   if (better) {
     // Already qualified — free to take (a couple hours, no cash), so grab
     // it regardless of whether the career goal is already met.
     if (!act.hasItem(p, 'phone') && !goTo(state, key, 'employment')) return false
-    return attempt(() => act.applyJob(state, key, better.id))
+    return attempt(() => act.applyJob(state, key, better.id)) && 'career'
   }
   // Past this point, climbing further means *spending* cash/time (an
   // outfit, a computer, tuition) to chase a job Riley doesn't yet qualify
@@ -272,29 +284,33 @@ function pursueCareer(state: GameState, key: PlayerKey, profile: AiProfile): boo
   const target = nextTargetJob(state, key)
   if (!target) return false
   // Clear the cheapest blocker: dress first (one purchase), then education.
+  // Each still reports 'career-prep', not the specific location tag its
+  // underlying action would normally get standalone (e.g. 'education') —
+  // this is a career-motivated purchase/class, not the player pursuing that
+  // goal for its own sake, and the hint copy for 'career-prep' says so.
   if (p.dress < target.minDress) {
     const outfit = ITEMS.filter((i) => (i.dress ?? 0) >= target.minDress).sort(
       (a, b) => a.price - b.price
     )[0]
     if (outfit && p.cash >= act.price(state, outfit.price) + reserve(state, profile)) {
       if (!goTo(state, key, 'clothing')) return false
-      return attempt(() => act.buyItem(state, key, outfit.id))
+      return attempt(() => act.buyItem(state, key, outfit.id)) && 'career-prep'
     }
   }
   if (target.requiresComputer && !act.hasItem(p, 'computer')) {
     const computer = itemById('computer')
     if (p.cash >= act.price(state, computer.price) + reserve(state, profile)) {
       if (!goTo(state, key, 'gadgets')) return false
-      return attempt(() => act.buyItem(state, key, 'computer'))
+      return attempt(() => act.buyItem(state, key, 'computer')) && 'career-prep'
     }
   }
   if (p.education < target.minEducation) {
-    return studyOnce(state, key, profile)
+    return studyOnce(state, key, profile) && 'career-prep'
   }
   if (target.minSkills) {
     for (const [skillId, needed] of Object.entries(target.minSkills) as Array<[SkillId, number]>) {
       if (p.skills[skillId] < needed) {
-        return trainSkillOnce(state, key, profile, skillId)
+        return trainSkillOnce(state, key, profile, skillId) && 'career-prep'
       }
     }
   }
@@ -405,6 +421,7 @@ export type CandidateTag =
   | 'health'
   | 'education'
   | 'career'
+  | 'career-prep'
   | 'happiness'
   | 'wealth'
   | 'valuables'
@@ -415,7 +432,13 @@ export type CandidateTag =
 interface Candidate {
   utility: number
   tag: CandidateTag
-  attempt: () => boolean
+  /** Usually a plain success/failure boolean. `pursueCareer`'s candidate can
+   * instead return a more specific `CandidateTag` on success — see its own
+   * comment — since which of its several real actions fired matters more
+   * than this candidate's own generic `tag`. Any truthy value (`true` or a
+   * non-empty tag string) means success; `runAIWeek`'s `if (attempt())`
+   * check is unaffected either way. */
+  attempt: () => boolean | CandidateTag
 }
 
 // Fixed-tier utilities, well above anything goal-urgency scoring can
@@ -639,7 +662,8 @@ export function previewNextAction(state: GameState, key: PlayerKey): CandidateTa
     (a, b) => b.utility - a.utility
   )
   for (const candidate of ranked) {
-    if (candidate.attempt()) return candidate.tag
+    const result = candidate.attempt()
+    if (result) return typeof result === 'string' ? result : candidate.tag
   }
   return null
 }
