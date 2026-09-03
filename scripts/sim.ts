@@ -105,13 +105,22 @@ function average(nums: number[]): number {
   return nums.length === 0 ? 0 : nums.reduce((a, b) => a + b, 0) / nums.length
 }
 
+// `null` specifically means "no game in this batch was decided" (every one
+// hit the week cap) — average([]) silently returning 0 would otherwise print
+// as "0.0 weeks to win," reading as instant games rather than the opposite
+// (every game ran the full 60 weeks undecided). fmtWeeks() below is the one
+// place that formats this for display.
+function fmtWeeks(weeks: number | null): string {
+  return weeks === null ? 'n/a' : weeks.toFixed(1)
+}
+
 interface BatchSummary {
   gameCount: number
   results: SimResult[]
   playerWinPct: number
   rileyWinPct: number
   noWinnerPct: number
-  avgWeeksOverall: number
+  avgWeeksOverall: number | null
 }
 
 function runBatch(
@@ -126,13 +135,14 @@ function runBatch(
   const playerWins = results.filter((r) => r.winner === 'player').length
   const rileyWins = results.filter((r) => r.winner === 'riley').length
   const noWinner = results.filter((r) => r.winner === 'none').length
+  const decidedWeeks = results.filter((r) => r.winner !== 'none').map((r) => r.weeks)
   return {
     gameCount,
     results,
     playerWinPct: (playerWins / gameCount) * 100,
     rileyWinPct: (rileyWins / gameCount) * 100,
     noWinnerPct: (noWinner / gameCount) * 100,
-    avgWeeksOverall: average(results.filter((r) => r.winner !== 'none').map((r) => r.weeks)),
+    avgWeeksOverall: decidedWeeks.length === 0 ? null : average(decidedWeeks),
   }
 }
 
@@ -158,7 +168,7 @@ function reportSingleCell(
   )
   console.log(`\nAvg weeks to win — player: ${average(playerWins.map((r) => r.weeks)).toFixed(1)}`)
   console.log(`Avg weeks to win — riley:  ${average(rileyWins.map((r) => r.weeks)).toFixed(1)}`)
-  console.log(`Avg weeks to win — overall: ${batch.avgWeeksOverall.toFixed(1)}\n`)
+  console.log(`Avg weeks to win — overall: ${fmtWeeks(batch.avgWeeksOverall)}\n`)
 
   if (noWinner.length / gameCount > 0.1) {
     console.warn(
@@ -230,7 +240,7 @@ function reportMatrix(gameCount: number) {
           ? baseline
           : runBatch(gameCount, rileyProfile, rulesPreset)
       console.log(
-        `${rileyProfile.padEnd(11)} ${rulesPreset.padEnd(9)} ${batch.playerWinPct.toFixed(1).padStart(6)}%   ${batch.rileyWinPct.toFixed(1).padStart(5)}%   ${batch.noWinnerPct.toFixed(1).padStart(9)}%   ${batch.avgWeeksOverall.toFixed(1).padStart(6)}`
+        `${rileyProfile.padEnd(11)} ${rulesPreset.padEnd(9)} ${batch.playerWinPct.toFixed(1).padStart(6)}%   ${batch.rileyWinPct.toFixed(1).padStart(5)}%   ${batch.noWinnerPct.toFixed(1).padStart(9)}%   ${fmtWeeks(batch.avgWeeksOverall).padStart(6)}`
       )
       flags.push(...flagOutlier(batch, baseline, rileyProfile, rulesPreset))
     }
@@ -244,8 +254,22 @@ function reportMatrix(gameCount: number) {
   }
 }
 
+// Positive-integer only: a fractional gameCount (e.g. "1.5") still runs
+// ceil(gameCount) games via the seed loop's `<` condition, but every
+// percentage in the report divides by the fractional value instead — one
+// player win out of "1.5" games prints as 66.7%, two as 133.3%. Negative or
+// zero input runs no games at all and divides by a non-positive number,
+// producing NaN/negative percentages just as silently.
+function parseGameCount(arg: string | undefined): number {
+  if (arg === undefined) return 200
+  const n = Number(arg)
+  if (Number.isInteger(n) && n > 0) return n
+  console.warn(`⚠ Invalid game count "${arg}" — must be a positive integer. Falling back to 200.`)
+  return 200
+}
+
 function main() {
-  const gameCount = Number(process.argv[2]) || 200
+  const gameCount = parseGameCount(process.argv[2])
   const profileArg = process.argv[3]
 
   if (profileArg === 'matrix') {
@@ -253,9 +277,16 @@ function main() {
     return
   }
 
+  // Object.hasOwn, not `in`: AI_PROFILES is a plain object, so `in` also
+  // matches inherited Object.prototype keys like 'toString'/'constructor' —
+  // `pnpm sim 50 toString` would otherwise pass this check, get cast to
+  // AiProfileName, and crash deep in ai.ts when the "profile" turns out to
+  // be a function, not an AiProfile.
   const rileyProfile: AiProfileName =
-    profileArg && profileArg in AI_PROFILES ? (profileArg as AiProfileName) : 'balanced'
-  if (profileArg && !(profileArg in AI_PROFILES)) {
+    profileArg && Object.hasOwn(AI_PROFILES, profileArg)
+      ? (profileArg as AiProfileName)
+      : 'balanced'
+  if (profileArg && !Object.hasOwn(AI_PROFILES, profileArg)) {
     console.warn(`⚠ Unknown profile "${profileArg}" — falling back to balanced.`)
   }
 
