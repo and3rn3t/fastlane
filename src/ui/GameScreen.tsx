@@ -142,8 +142,14 @@ const RECENT_FAILURE_PRIORITY = [
 const RECENT_FAILURE_COPY: Record<(typeof DISASTER_KEYWORDS)[number], string> = {
   evicted:
     'You were evicted last week — keep rent current at the Rent Office so it doesn’t happen again.',
+  // Street robbery triggers on cash carried, not on owned items — Home
+  // Insurance (which only covers durable-goods burglary, a separate roll)
+  // doesn't prevent this at all. Bank the surplus or get a secure apartment,
+  // the two things week.ts's actual robbery condition checks. Caught in PR
+  // review: an earlier draft pointed here to insurance, which wouldn't have
+  // helped.
   robbed:
-    'You were robbed last week — Home Insurance at First Bank covers your valuables against it.',
+    "You were robbed of cash last week — First Bank can hold what you don't carry, and a secure apartment stops it happening again.",
   'went hungry': 'You went hungry last week — keep food stocked at MegaMart or Burger Barn.',
 }
 

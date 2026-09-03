@@ -43,11 +43,13 @@ const PROFILE_NAMES: AiProfileName[] = ['balanced', 'hustler', 'scholar', 'gambl
 interface SimResult {
   winner: 'player' | 'riley' | 'none'
   weeks: number
-  // The goal that was still short of its threshold the week *before* the
-  // winner cleared every goal at once (meetsGoals requires all four
-  // simultaneously) — i.e. whichever goal had the least progress banked
-  // going into the winning week, the real bottleneck rather than just
-  // "who won." null for a game with no winner.
+  // Of the goals that were still short of threshold entering the winning
+  // week and crossed it *during* that week (meetsGoals requires all four
+  // simultaneously, so every such goal necessarily crossed this exact week
+  // — a goal already >=1 last week can't be "completed" again), the one
+  // that had the least progress banked beforehand — the real bottleneck
+  // rather than just "who won." null for a game with no winner, or in the
+  // (should-be-impossible) case nothing actually crossed this week.
   winningGoal: GoalKey | null
   // Phase 2 system usage, read off Riley's final state — a stable win rate
   // with these all at zero would mean the AI integration silently failed
@@ -59,14 +61,20 @@ interface SimResult {
   rileyInheritances: number
 }
 
-// The goal with the lowest progress is the one that was gating the win —
-// the other three could have crossed their threshold weeks earlier and it
-// wouldn't have mattered until this one caught up.
-function bottleneckGoal(progress: Record<GoalKey, number>): GoalKey {
-  return GOAL_KEYS.reduce(
-    (worst, key) => (progress[key] < progress[worst] ? key : worst),
-    GOAL_KEYS[0]
-  )
+// Only a goal that was actually below threshold going into the winning week
+// AND cleared it by the end of that same week counts as "completed this
+// week" — picking the global lowest-progress goal instead (an earlier draft
+// of this function did) can misidentify a goal that was merely lagging but
+// had already crossed in some prior week, or that never needed to move this
+// week at all. Among genuine crossers, the one with the least progress
+// banked beforehand is the one that had the most catching up to do.
+function crossedGoal(
+  prior: Record<GoalKey, number>,
+  post: Record<GoalKey, number>
+): GoalKey | null {
+  const crossers = GOAL_KEYS.filter((key) => prior[key] < 1 && post[key] >= 1)
+  if (crossers.length === 0) return null
+  return crossers.reduce((worst, key) => (prior[key] < prior[worst] ? key : worst), crossers[0])
 }
 
 function runOneGame(
@@ -102,7 +110,13 @@ function runOneGame(
     state = applyAction(state, { type: 'endWeek' })
     if (state.phase === 'over') {
       const winner = state.winner ?? 'none'
-      const winningGoal = winner === 'none' ? null : bottleneckGoal(priorProgress[winner])
+      const winningGoal =
+        winner === 'none'
+          ? null
+          : crossedGoal(
+              priorProgress[winner],
+              goalProgress(state[winner], state.goals, state.economy.marketIndex)
+            )
       return { winner, weeks: state.week - 1, winningGoal, ...rileySystemUsage(state) }
     }
     state = applyAction(state, { type: 'dismissReport' })
@@ -141,7 +155,11 @@ function average(nums: number[]): number {
 function percentile(nums: number[], p: number): number | null {
   if (nums.length === 0) return null
   const sorted = [...nums].sort((a, b) => a - b)
-  const rank = Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length))
+  // Standard nearest-rank: rank = ceil(p/100 * N), 1-indexed, clamped into
+  // bounds. `Math.floor` here previously shifted every percentile up by one
+  // slot at exact boundaries (e.g. p10 of 10 values picked the 2nd-smallest
+  // instead of the smallest) — caught in PR review, not by a test.
+  const rank = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1))
   return sorted[rank]
 }
 
