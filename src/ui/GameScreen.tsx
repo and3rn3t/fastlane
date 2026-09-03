@@ -1,5 +1,14 @@
-import { lazy, Suspense, useEffect, useState } from 'react'
-import { jobById, netWorth, type GameState, type LocationId, type LogEntry } from '@/engine'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import {
+  jobById,
+  netWorth,
+  previewNextAction,
+  type CandidateTag,
+  type GameState,
+  type LocationId,
+  type LogEntry,
+  type PlayerState,
+} from '@/engine'
 import { legacyPawnGlyph } from '@/legacy'
 import { useGame } from '@/state/GameContext'
 import { loadStats } from '@/stats'
@@ -7,7 +16,9 @@ import { Board, DeltaBadge, useDeltaFlash } from './Board'
 import { Help } from './Help'
 import {
   BackIcon,
+  BoltIcon,
   ChevronDownIcon,
+  CloseIcon,
   ExportIcon,
   HelpIcon,
   SpeakerIcon,
@@ -112,6 +123,66 @@ function useTurnReplay(game: GameState) {
     done,
     skip: () => setProgress((s) => ({ ...s, skipped: true })),
   }
+}
+
+/** Copy for the hint bar's one-line suggestion. `previewNextAction()` only
+ * reports a category (`CandidateTag`) — the exact wording lives here, in the
+ * UI layer, since it's presentation text, not a game rule. `housing` is the
+ * one tag with two real situations behind it (no apartment vs. rent due), so
+ * it's the only case that reads `p` for specifics. */
+function hintCopy(tag: CandidateTag, p: PlayerState): string {
+  switch (tag) {
+    case 'food':
+      return 'Running low on food — Megamart has groceries, or grab a hot meal at Burger Barn.'
+    case 'housing':
+      return p.apartment === 'none'
+        ? "You don't have a place to live yet — the Rent Office can set you up."
+        : "Rent's due — settle up at the Rent Office before it piles up."
+    case 'health':
+      return 'Feeling run down — the Clinic can get you back on your feet.'
+    case 'education':
+      return 'A class at City University would move your Education goal forward.'
+    case 'career':
+      return 'Worth checking the Job Board — you may be able to move up.'
+    case 'happiness':
+      return 'Your happiness could use some attention — relax at home or treat yourself at Gadget City.'
+    case 'wealth':
+      return 'Put in a work shift to build toward your Wealth goal.'
+    case 'valuables':
+      return "You've got stuff worth protecting — Home Insurance at First Bank covers it."
+    case 'invest':
+      return "You've got surplus cash — First Bank can put it to work investing."
+    case 'bank':
+      return "You've got surplus cash sitting idle — bank it at First Bank."
+    case 'gamble':
+      return 'Feeling lucky? The Casino is open.'
+  }
+}
+
+/** A subtle, dismissible one-line suggestion for what to do next — reuses
+ * Riley's own utility-scored decision logic (`previewNextAction`) rather
+ * than a second heuristic, so it can never disagree with what the AI itself
+ * would consider best. Recomputed via `useMemo` keyed on `game` so it only
+ * re-runs when the actual game state changes, not on unrelated re-renders
+ * (muting sound, opening Help). Dismissing hides the *current* suggestion
+ * only — once the player acts and the tag changes, a new hint can appear. */
+function HintBar({ game }: { game: GameState }) {
+  const [dismissedTag, setDismissedTag] = useState<CandidateTag | null>(null)
+  const tag = useMemo(() => previewNextAction(game, 'player'), [game])
+  if (game.phase !== 'playing' || !tag || tag === dismissedTag) return null
+  return (
+    <div className="hint-bar">
+      <BoltIcon size={15} className="icon" />
+      <span className="text">{hintCopy(tag, game.player)}</span>
+      <button
+        className="hint-dismiss"
+        onClick={() => setDismissedTag(tag)}
+        aria-label="Dismiss suggestion"
+      >
+        <CloseIcon size={13} />
+      </button>
+    </div>
+  )
 }
 
 function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
@@ -254,6 +325,7 @@ export function GameScreen({ game }: { game: GameState }) {
   return (
     <main className="app">
       <TopBar game={game} onHelp={() => setHelpOpen(true)} />
+      <HintBar game={game} />
       <div className="game-layout">
         <Board
           game={game}

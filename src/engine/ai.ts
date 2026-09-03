@@ -396,8 +396,25 @@ function gambleAtCasino(state: GameState, key: PlayerKey, profile: AiProfile): b
   return attempt(() => act.playCasino(state, key, bet))
 }
 
+/** What each candidate is "about," independent of utility scoring — lets
+ * `previewNextAction` report a human-readable category for the UI's hint bar
+ * without duplicating any of the urgency/precondition logic above. */
+export type CandidateTag =
+  | 'food'
+  | 'housing'
+  | 'health'
+  | 'education'
+  | 'career'
+  | 'happiness'
+  | 'wealth'
+  | 'valuables'
+  | 'invest'
+  | 'bank'
+  | 'gamble'
+
 interface Candidate {
   utility: number
+  tag: CandidateTag
   attempt: () => boolean
 }
 
@@ -454,24 +471,43 @@ function buildCandidates(state: GameState, key: PlayerKey, profile: AiProfile): 
   const urgency = (goal: keyof Goals) => Math.max(0, 1 - progress[goal]) * profile.goalWeights[goal]
 
   const candidates: Candidate[] = [
-    { utility: SURVIVAL_UTILITY, attempt: () => ensureFood(state, key) },
-    { utility: SURVIVAL_UTILITY, attempt: () => ensureHousing(state, key) },
-    { utility: SURVIVAL_UTILITY, attempt: () => ensureHealth(state, key, profile) },
-    { utility: urgency('education'), attempt: () => studyOnce(state, key, profile) },
+    { utility: SURVIVAL_UTILITY, tag: 'food', attempt: () => ensureFood(state, key) },
+    { utility: SURVIVAL_UTILITY, tag: 'housing', attempt: () => ensureHousing(state, key) },
+    {
+      utility: SURVIVAL_UTILITY,
+      tag: 'health',
+      attempt: () => ensureHealth(state, key, profile),
+    },
+    {
+      utility: urgency('education'),
+      tag: 'education',
+      attempt: () => studyOnce(state, key, profile),
+    },
     {
       utility: urgency('career') + CAREER_LEVERAGE_BONUS,
+      tag: 'career',
       attempt: () => pursueCareer(state, key, profile),
     },
-    { utility: urgency('happiness'), attempt: () => pursueHappiness(state, key, profile) },
+    {
+      utility: urgency('happiness'),
+      tag: 'happiness',
+      attempt: () => pursueHappiness(state, key, profile),
+    },
     {
       utility: urgency('wealth'),
+      tag: 'wealth',
       attempt: () => workShift(state, key, 25 + profile.extraWorkHours),
     },
-    { utility: PROTECT_VALUABLES_UTILITY, attempt: () => protectValuables(state, key, profile) },
-    { utility: INVEST_UTILITY, attempt: () => investSurplus(state, key, profile) },
-    { utility: BANK_SURPLUS_UTILITY, attempt: () => bankSurplus(state, key, profile) },
+    {
+      utility: PROTECT_VALUABLES_UTILITY,
+      tag: 'valuables',
+      attempt: () => protectValuables(state, key, profile),
+    },
+    { utility: INVEST_UTILITY, tag: 'invest', attempt: () => investSurplus(state, key, profile) },
+    { utility: BANK_SURPLUS_UTILITY, tag: 'bank', attempt: () => bankSurplus(state, key, profile) },
     {
       utility: LAST_RESORT_WORK_UTILITY,
+      tag: 'wealth',
       attempt: () => workShift(state, key, p.timeLeft),
     },
   ]
@@ -479,6 +515,7 @@ function buildCandidates(state: GameState, key: PlayerKey, profile: AiProfile): 
   if (p.cash < reserve(state, profile)) {
     candidates.push({
       utility: RESERVE_WORK_UTILITY,
+      tag: 'wealth',
       attempt: () => workShift(state, key, 20 + profile.extraWorkHours),
     })
   }
@@ -492,7 +529,11 @@ function buildCandidates(state: GameState, key: PlayerKey, profile: AiProfile): 
   // its wealth-push-work check came first and stayed true almost the whole
   // game, so eager study rarely got a turn before wealth was already done.
   if (profile.studyEagerly && progress.wealth >= 1) {
-    candidates.push({ utility: EAGER_STUDY_UTILITY, attempt: () => studyOnce(state, key, profile) })
+    candidates.push({
+      utility: EAGER_STUDY_UTILITY,
+      tag: 'education',
+      attempt: () => studyOnce(state, key, profile),
+    })
   }
   // Gated on the wealth goal being fully met (progress === 1, i.e.
   // netWorth >= goals.wealth) rather than merely "high" — a fixed utility
@@ -509,6 +550,7 @@ function buildCandidates(state: GameState, key: PlayerKey, profile: AiProfile): 
   if (profile.gambles && progress.wealth >= 1) {
     candidates.push({
       utility: GAMBLE_UTILITY * profile.gambleFactor,
+      tag: 'gamble',
       attempt: () => gambleAtCasino(state, key, profile),
     })
   }
@@ -564,4 +606,40 @@ export function runAIWeek(
     }
     if (!advanced) break
   }
+}
+
+/** Read-only preview of what the Balanced policy would do next for this
+ * player right now — powers the UI's "what should I do next" hint bar.
+ * Reuses Riley's own scored-candidate logic instead of a second heuristic,
+ * so the hint can never drift from what the AI itself considers best. Runs
+ * against a throwaway shallow clone (the same technique `engine.ts`'s
+ * `applyAction` uses for its own per-action clone), so `.attempt()` calls
+ * mutate only the clone — the real state passed in is never touched, even
+ * though this consumes RNG rolls and pushes log entries on that clone.
+ * Always previews with Balanced's neutral goal weights, regardless of
+ * `key` or any actual profile in play, since this is advice for a human,
+ * not Riley's real policy.
+ *
+ * Only clones `state[key]` — every candidate's `attempt()` only ever reads/
+ * mutates `get(state, key)`, never the other player, same as `applyAction`'s
+ * own "only clone what's actually mutated" rule for its non-`endWeek` cases. */
+export function previewNextAction(state: GameState, key: PlayerKey): CandidateTag | null {
+  const clone: GameState = {
+    ...state,
+    goals: { ...state.goals },
+    economy: { ...state.economy },
+    rules: { ...state.rules },
+    player: key === 'player' ? act.clonePlayer(state.player) : state.player,
+    riley: key === 'riley' ? act.clonePlayer(state.riley) : state.riley,
+    log: state.log.slice(),
+    history: state.history.slice(),
+  }
+  if (get(clone, key).timeLeft <= 0) return null
+  const ranked = [...buildCandidates(clone, key, AI_PROFILES.balanced)].sort(
+    (a, b) => b.utility - a.utility
+  )
+  for (const candidate of ranked) {
+    if (candidate.attempt()) return candidate.tag
+  }
+  return null
 }
