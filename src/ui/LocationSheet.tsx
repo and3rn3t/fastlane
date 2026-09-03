@@ -65,35 +65,58 @@ export function LocationSheet({ game }: { game: GameState }) {
   const LocIcon = LOCATION_ICONS[loc.id]
   const expanded = sheetState === 'expanded'
 
+  // Explicit width check, not just CSS's desktop-hides-it rule below — the
+  // desktop panel is a permanent static card, not a temporary sheet, so it
+  // should never even mount a click-blocking overlay, and this makes that
+  // guarantee visible/testable in JS rather than relying on the stylesheet
+  // alone. Matches the same ad-hoc `window.innerWidth` check the effect
+  // above already uses for other mobile-only sheet behavior.
+  const isMobileWidth = typeof window !== 'undefined' && window.innerWidth < DESKTOP_BREAKPOINT_PX
+
   return (
-    <div className={`location-sheet panel${expanded ? ' expanded' : ''}`}>
-      <button
-        type="button"
-        className="location-sheet-handle"
-        aria-expanded={expanded}
-        aria-controls="location-sheet-body"
-        onClick={() => setSheetState((s) => (s === 'peek' ? 'expanded' : 'peek'))}
-      >
-        <span className="drag-pill" aria-hidden />
-        <span className="icon-chip" aria-hidden>
-          <LocIcon size={18} />
-        </span>
-        <span className="location-sheet-heading">
-          <strong>{loc.name}</strong>
-          <span className="desc">{loc.blurb}</span>
-        </span>
-        <ChevronDownIcon size={14} className="disclosure-chevron" />
-      </button>
-      {!expanded && PeekAction && (
-        <div className="location-sheet-peek-action">
-          <PeekAction game={game} />
-        </div>
+    <>
+      {expanded && isMobileWidth && (
+        <div
+          className="location-sheet-backdrop"
+          // Tap anywhere outside the sheet to collapse it — the same
+          // dismiss path `.modal-backdrop` already gives Help/the week
+          // report. Real bug this fixes: on a short viewport, the sheet's
+          // own content (not even the max-height cap) can cover controls
+          // behind it (e.g. Home's blurb over the board's End Week button)
+          // with previously no way back except finding the small handle.
+          onClick={() => setSheetState('peek')}
+          aria-hidden
+        />
       )}
-      {expanded && (
-        <div className="location-sheet-body" id="location-sheet-body">
-          <LocationPanelBody game={game} />
-        </div>
-      )}
-    </div>
+      <div className={`location-sheet panel${expanded ? ' expanded' : ''}`}>
+        <button
+          type="button"
+          className="location-sheet-handle"
+          aria-expanded={expanded}
+          aria-controls="location-sheet-body"
+          onClick={() => setSheetState((s) => (s === 'peek' ? 'expanded' : 'peek'))}
+        >
+          <span className="drag-pill" aria-hidden />
+          <span className="icon-chip" aria-hidden>
+            <LocIcon size={18} />
+          </span>
+          <span className="location-sheet-heading">
+            <strong>{loc.name}</strong>
+            <span className="desc">{loc.blurb}</span>
+          </span>
+          <ChevronDownIcon size={14} className="disclosure-chevron" />
+        </button>
+        {!expanded && PeekAction && (
+          <div className="location-sheet-peek-action">
+            <PeekAction game={game} />
+          </div>
+        )}
+        {expanded && (
+          <div className="location-sheet-body" id="location-sheet-body">
+            <LocationPanelBody game={game} />
+          </div>
+        )}
+      </div>
+    </>
   )
 }

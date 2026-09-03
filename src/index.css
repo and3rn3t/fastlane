@@ -1080,6 +1080,14 @@ details.action-group[open] .disclosure-chevron {
 
 /* ---------- location sheet ---------- */
 
+/* Hidden by default (desktop): the location panel there is a permanent
+ * static card, not a temporary sheet — see `.location-sheet.expanded`'s
+ * comment below and the media query for why the dimming/dismiss backdrop
+ * only makes sense once the sheet is actually a bottom sheet. */
+.location-sheet-backdrop {
+  display: none;
+}
+
 .location-sheet-handle {
   display: flex;
   align-items: center;
@@ -1177,6 +1185,33 @@ details.action-group[open] .disclosure-chevron {
     top: 0.5rem;
     left: 50%;
     transform: translateX(-50%);
+  }
+
+  /* Real bug this fixes, reported directly: the sheet's own content height
+   * (not even the 88vh cap below — Home's blurb is ~200px, well under it)
+   * can outgrow the gap between it and whatever sits above on a short
+   * viewport (confirmed on a 667px-tall screen: the expanded sheet's top
+   * edge lands *above* the board's End Week button, covering it with no
+   * way back — elementFromPoint at the button's coordinates resolved to
+   * the sheet's own text, not the button). Shrinking max-height further
+   * wouldn't have helped here since content never hit the old cap; the
+   * actual fix is giving the sheet a real dismiss path once it's covering
+   * the screen, the same way `.modal-backdrop` already does for Help/the
+   * week report — tap anywhere outside to collapse back to peek. */
+  .location-sheet-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgb(10 14 22 / 0.35);
+    /* Below .location-sheet (6), above everything else including .topbar
+     * (5) — same full-coverage precedent .modal-backdrop already sets for
+     * an explicitly-opened sheet/modal outranking the rest of the page.
+     * Reaches the same effective z-order as pawn-marker-wrap/.topbar (also
+     * 5) by coming later in source order, not by a higher number — both
+     * are ordinary sibling stacking contexts, so equal z-index resolves by
+     * DOM order here. */
+    z-index: 5;
+    animation: scrim-fade 0.2s ease-out both;
   }
 
   .location-sheet.expanded {
