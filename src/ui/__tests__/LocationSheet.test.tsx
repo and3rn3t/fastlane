@@ -180,13 +180,19 @@ describe('LocationSheet persistent End Week control', () => {
     expect(screen.getByRole('button', { name: /Home/i }).getAttribute('aria-expanded')).toBe('true')
   })
 
-  it('never collapses into an empty dead peek at a location with no peek action', () => {
-    // Regression test for a real reported bug: several locations (First
-    // Bank, Gadget City, the Rent Office, ...) have no single "most
-    // relevant" action to show compactly, so tapping the handle to collapse
+  it('shows a hint instead of an empty peek at a location with no peek action, and stays genuinely collapsible', () => {
+    // Regression test for two real reported bugs in sequence. First: several
+    // locations (First Bank, Gadget City, the Rent Office, ...) have no
+    // single "most relevant" action to show compactly, so collapsing there
     // used to leave a peek state with nothing in it but the handle and End
     // Week — no way to deposit, withdraw, invest, etc. without re-expanding,
-    // and it read as broken (confirmed live: 142px tall vs. 587px expanded).
+    // and it read as broken. Second, a first attempt at fixing that forced
+    // the sheet permanently expanded wherever there was no peek action —
+    // which, on a short viewport, could cover board tiles with a fixed
+    // overlay the player could no longer dismiss (the backdrop and handle
+    // both set state to 'peek', but expanded no longer answered to it),
+    // trapping them behind it with no way to travel elsewhere except ending
+    // the week. Peek must stay non-empty *and* genuinely collapsible.
     setViewportWidth(375)
     const game = freshGame()
     const gameAtBank: GameState = { ...game, player: { ...game.player, location: 'bank' } }
@@ -195,13 +201,28 @@ describe('LocationSheet persistent End Week control', () => {
         <LocationSheet game={gameAtBank} />
       </GameProvider>
     )
-    // Tapping the handle would normally toggle to peek — here it must have
-    // no effect, since First Bank has nothing to peek at.
+    // Starts peeked (mobile default) with a non-empty hint, not nothing.
+    expect(screen.getByRole('button', { name: /First Bank/i }).getAttribute('aria-expanded')).toBe(
+      'false'
+    )
+    expect(document.querySelector('.location-sheet-peek-action')?.textContent).toMatch(/tap/i)
+    expect(document.querySelector('.location-sheet-body')).toBeNull()
+    expect(document.querySelector('.location-sheet-backdrop')).toBeNull()
+
+    // Tapping the handle expands it, same as everywhere else.
     fireEvent.click(screen.getByRole('button', { name: /First Bank/i }))
     expect(screen.getByRole('button', { name: /First Bank/i }).getAttribute('aria-expanded')).toBe(
       'true'
     )
     expect(document.querySelector('.location-sheet-body')).toBeTruthy()
-    expect(document.querySelector('.location-sheet-peek-action')).toBeNull()
+
+    // And tapping it again must genuinely collapse back — not get stuck
+    // expanded, which is exactly what trapped the player behind the sheet.
+    fireEvent.click(screen.getByRole('button', { name: /First Bank/i }))
+    expect(screen.getByRole('button', { name: /First Bank/i }).getAttribute('aria-expanded')).toBe(
+      'false'
+    )
+    expect(document.querySelector('.location-sheet-body')).toBeNull()
+    expect(document.querySelector('.location-sheet-backdrop')).toBeNull()
   })
 })

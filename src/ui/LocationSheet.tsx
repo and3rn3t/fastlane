@@ -80,15 +80,7 @@ export function LocationSheet({ game }: { game: GameState }) {
   const atWork = p.jobId != null && jobById(p.jobId).workplace === p.location
   const PeekAction = atWork ? WorkAction : PEEK_ACTIONS[loc.id]
   const LocIcon = LOCATION_ICONS[loc.id]
-  // Peek only makes sense where there's something to peek at. Several
-  // locations (First Bank, Gadget City, the Rent Office, ...) have no single
-  // "most relevant" action to show compactly — collapsing there used to
-  // leave a dead peek state with nothing but the handle and End Week, which
-  // read as broken (confirmed live: 142px tall vs. 587px expanded, no
-  // controls at all). Forcing expanded here means the handle's collapse
-  // toggle is a no-op at these locations, same as the persistent End Week
-  // button already is everywhere.
-  const expanded = sheetState === 'expanded' || !PeekAction
+  const expanded = sheetState === 'expanded'
 
   return (
     <>
@@ -132,9 +124,22 @@ export function LocationSheet({ game }: { game: GameState }) {
             End week {p.timeLeft > 0 ? `(${p.timeLeft}h unused)` : ''}
           </button>
         )}
-        {!expanded && PeekAction && (
+        {!expanded && (
           <div className="location-sheet-peek-action">
-            <PeekAction game={game} />
+            {PeekAction ? (
+              <PeekAction game={game} />
+            ) : (
+              // A previous version forced this sheet permanently expanded
+              // wherever there was no peek action, to avoid a content-less
+              // peek row — but an always-expanded sheet is a fixed, tall
+              // overlay that can cover board tiles on short viewports, and
+              // since `expanded` no longer answered to the handle or the
+              // backdrop tap there, it trapped the player behind it with no
+              // way to travel elsewhere except ending the week. Peek must
+              // stay genuinely collapsible everywhere; this hint just makes
+              // the empty case read as "tap for more", not "broken".
+              <p className="blurb">Tap above to see what's here.</p>
+            )}
           </div>
         )}
         {expanded && (
