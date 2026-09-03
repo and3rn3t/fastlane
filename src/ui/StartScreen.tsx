@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import {
   CAREER_TARGETS,
   EDUCATION_TARGETS,
@@ -151,6 +151,19 @@ export function StartScreen() {
   const [rulePreset, setRulePreset] = useState<RulePresetName>('classic')
   const [importError, setImportError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Backs the manifest's "Daily Challenge" PWA shortcut (long-press the home
+  // screen icon → jump straight in) — only fires from a fresh StartScreen
+  // (no save in progress; App.tsx renders GameScreen instead once one
+  // exists), which is exactly when a deep-link shortcut is useful. Clears
+  // the query param via replaceState so a reload/back-navigation doesn't
+  // re-trigger it.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('daily') !== '1') return
+    window.history.replaceState(null, '', window.location.pathname)
+    startGame(dailyChallengeOptions('You'))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function handleFileChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
