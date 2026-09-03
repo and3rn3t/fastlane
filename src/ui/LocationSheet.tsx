@@ -124,9 +124,22 @@ export function LocationSheet({ game }: { game: GameState }) {
             End week {p.timeLeft > 0 ? `(${p.timeLeft}h unused)` : ''}
           </button>
         )}
-        {!expanded && PeekAction && (
+        {!expanded && (
           <div className="location-sheet-peek-action">
-            <PeekAction game={game} />
+            {PeekAction ? (
+              <PeekAction game={game} />
+            ) : (
+              // A previous version forced this sheet permanently expanded
+              // wherever there was no peek action, to avoid a content-less
+              // peek row — but an always-expanded sheet is a fixed, tall
+              // overlay that can cover board tiles on short viewports, and
+              // since `expanded` no longer answered to the handle or the
+              // backdrop tap there, it trapped the player behind it with no
+              // way to travel elsewhere except ending the week. Peek must
+              // stay genuinely collapsible everywhere; this hint just makes
+              // the empty case read as "tap for more", not "broken".
+              <p className="blurb">Tap above to see what's here.</p>
+            )}
           </div>
         )}
         {expanded && (
