@@ -75,6 +75,26 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Help$/i }))
     expect(screen.getByRole('dialog', { name: /How to play/i })).toBeTruthy()
   })
+
+  it('shows a next-step hint, dismisses it, and updates it once the suggested action is taken', () => {
+    renderApp()
+    fireEvent.click(screen.getByText(/Start new game/))
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+
+    // A fresh player is hungry (0 fed, 0 groceries) — the hint should say so.
+    expect(screen.getByText(/Running low on food/)).toBeTruthy()
+
+    // Dismissing hides this specific suggestion.
+    fireEvent.click(screen.getByRole('button', { name: /Dismiss suggestion/i }))
+    expect(screen.queryByText(/Running low on food/)).toBeNull()
+
+    // Resolving the actual shortfall (buy enough groceries at MegaMart)
+    // recomputes the hint — it's no longer the food suggestion, proving the
+    // hint tracks live state rather than being dismissed-forever or static.
+    fireEvent.click(screen.getByRole('button', { name: /MegaMart/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^Buy \d+/ }))
+    expect(screen.queryByText(/Running low on food/)).toBeNull()
+  })
 })
 
 describe('save migration', () => {
@@ -427,6 +447,29 @@ describe('save migration', () => {
   })
 
   it('upgrades a v9 (pre-rivalry-momentum) save, defaulting rileyMomentum to even', () => {
+    // A genuine v9 save already has every field migrations 1-9 add — unlike
+    // the v1-v8 tests above, this one isn't exercising those migrations, so
+    // the fixture needs to actually be v9-shaped (bare legacyPlayer() is v0-
+    // shaped) rather than relying on a migration this save claims is already
+    // done. Real-world relevance: GameScreen's Next-step hint bar now clones
+    // the active player on every render (previewNextAction), so a save
+    // missing these fields crashes immediately instead of limping along
+    // undetected — and both player and riley need to be v9-shaped here since
+    // this fixture is reused as both.
+    const v9Fields = {
+      health: 100,
+      hoursWorkedThisWeek: 0,
+      jobTenureWeeks: 0,
+      promotionLevel: 0,
+      loanBalance: 0,
+      loanWeeksBehind: 0,
+      creditScore: 50,
+      garnished: false,
+      loanPaidThisWeek: false,
+      skills: { sales: 0, trades: 0, tech: 0 },
+      investments: 0,
+      activeEvents: [],
+    }
     const v9 = {
       version: 9,
       week: 12,
@@ -441,8 +484,8 @@ describe('save migration', () => {
         lotteryJackpot: 500,
         marketIndex: 1,
       },
-      player: legacyPlayer('V9Player', 99),
-      riley: legacyPlayer('Riley', 300),
+      player: { ...legacyPlayer('V9Player', 99), ...v9Fields },
+      riley: { ...legacyPlayer('Riley', 300), ...v9Fields },
       rileyProfile: 'gambler',
       rileyDifficulty: 'hard',
       rules: { eventFrequency: 1, economyVolatility: 1, startingCash: 200 },

@@ -12,4 +12,4 @@ export {
   wagePerHour,
 } from './actions'
 export { careerScore, goalProgress, meetsGoals } from './week'
-export { AI_PROFILES, runAIWeek, type AiProfile } from './ai'
+export { AI_PROFILES, runAIWeek, previewNextAction, type AiProfile, type CandidateTag } from './ai'

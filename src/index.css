@@ -1394,6 +1394,43 @@ details.action-group[open] .disclosure-chevron {
   font-size: 0.9rem;
 }
 
+/* ---------- hint bar ---------- */
+
+.hint-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  background: color-mix(in srgb, var(--accent) 6%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
+  border-radius: var(--radius);
+  padding: 0.5rem 0.5rem 0.5rem 0.85rem;
+}
+
+.hint-bar .icon {
+  flex-shrink: 0;
+  color: var(--accent);
+}
+
+.hint-bar .text {
+  flex: 1;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.hint-dismiss {
+  flex-shrink: 0;
+  width: 44px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  border-radius: 50%;
+}
+
+.hint-dismiss:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+}
+
 /* ---------- daily challenge ---------- */
 
 .daily-challenge {
