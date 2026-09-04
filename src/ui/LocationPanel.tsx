@@ -166,9 +166,14 @@ function JobBoard({ game }: { game: GameState }) {
                   {reqs.map((r) => (
                     <span key={r.key} className={r.met ? 'req met' : 'req unmet'}>
                       {r.met ? <CheckIcon size={11} /> : <LockIcon size={11} />}{' '}
+                      {/* Both icons above already set aria-hidden internally (Icon.tsx),
+                          and the Computer row has no numeric progress at all, so
+                          without this a screen reader announces nothing but
+                          "Computer" — met/unmet would be conveyed by color alone. */}
+                      <span className="sr-only">{r.met ? 'Met: ' : 'Not met: '}</span>
                       {r.key === 'computer'
                         ? r.label
-                        : `${r.label} ${Math.round(r.current)}/${r.required}`}
+                        : `${r.label} ${Math.floor(r.current)}/${r.required}`}
                       {r.waived && ' (waived)'}
                     </span>
                   ))}
