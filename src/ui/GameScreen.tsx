@@ -1,8 +1,13 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import {
+  APPLY_JOB_TIME,
+  bestQualifiedJob,
+  hasItem,
   jobById,
+  LOCATIONS,
   netWorth,
   previewNextAction,
+  travelCost,
   type CandidateTag,
   type GameState,
   type LocationId,
@@ -17,6 +22,7 @@ import { Help } from './Help'
 import {
   BackIcon,
   BoltIcon,
+  BriefcaseIcon,
   ChevronDownIcon,
   CloseIcon,
   ExportIcon,
@@ -239,6 +245,74 @@ function HintBar({ game }: { game: GameState }) {
   )
 }
 
+/** A dedicated "you now qualify for a better job" banner — reuses Wave 11's
+ * hint-bar visual shell (`.hint-bar`/`.hint-dismiss`, plus the existing
+ * `button.primary` style for the CTA — a different data source, not a new
+ * visual pattern, per the roadmap). Reads `bestQualifiedJob()` from the new
+ * `career.ts`, the same pure query Riley's AI uses via `pursueCareer`, so
+ * this can never suggest a job the AI itself wouldn't consider a genuine
+ * upgrade. Skipped when `HintBar`'s own utility-scored suggestion already
+ * happens to be `'career'` this turn, so the two banners never say the same
+ * thing twice — `previewNextAction` only surfaces `'career'` when applying
+ * is the single highest-utility action available, which is exactly the
+ * scenario this banner would otherwise duplicate. Dismissed per-session
+ * (component state, like `HintBar`) rather than persisted, keyed by the
+ * job's id so a *different*, even-better job surfaces as a new suggestion
+ * rather than staying hidden behind an earlier dismissal. */
+function JobSwitchNudge({ game }: { game: GameState }) {
+  const { dispatchGame } = useGame()
+  // A Set, not a single id: dismissing job A must not un-hide job B later
+  // dismissed, and vice versa — each dismissal should stay effective for
+  // the rest of the session independently of whatever else gets dismissed.
+  const [dismissedJobIds, setDismissedJobIds] = useState<ReadonlySet<string>>(new Set())
+  const primaryTag = useMemo(() => previewNextAction(game, 'player'), [game])
+  const better = useMemo(() => bestQualifiedJob(game, 'player'), [game])
+
+  if (game.phase !== 'playing' || primaryTag === 'career') return null
+  if (!better || dismissedJobIds.has(better.id)) return null
+
+  const canApplyNow = game.player.location === 'employment' || hasItem(game.player, 'phone')
+  // Whichever action the button is actually about to take this click —
+  // applying outright, or the first step of traveling there — must fit in
+  // the time the player has left. Without this check, clicking with too
+  // little time left throws an uncaught "Not enough time left this week"
+  // (applyJob/travel both call the engine's spendTime, which asserts this).
+  const timeNeeded = canApplyNow
+    ? APPLY_JOB_TIME
+    : travelCost(game.player.location, 'employment', hasItem(game.player, 'bike'))
+  const canAffordSwitch = game.player.timeLeft >= timeNeeded
+
+  return (
+    <div className="hint-bar">
+      <BriefcaseIcon size={15} className="icon" />
+      <span className="text">
+        You now qualify for {better.title} at {LOCATIONS[better.workplace].name}
+        {game.player.jobId ? ' — a step up from your current job.' : '.'}
+      </span>
+      <button
+        className="primary"
+        disabled={!canAffordSwitch}
+        onClick={() =>
+          dispatchGame(
+            canApplyNow
+              ? { type: 'applyJob', jobId: better.id }
+              : { type: 'travel', to: 'employment' }
+          )
+        }
+      >
+        Switch now
+      </button>
+      <button
+        className="hint-dismiss"
+        onClick={() => setDismissedJobIds((prev) => new Set(prev).add(better.id))}
+        aria-label="Dismiss job suggestion"
+      >
+        <CloseIcon size={13} />
+      </button>
+    </div>
+  )
+}
+
 function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
   const { quitToMenu, exportSave } = useGame()
   const p = game.player
@@ -380,6 +454,7 @@ export function GameScreen({ game }: { game: GameState }) {
     <main className="app">
       <TopBar game={game} onHelp={() => setHelpOpen(true)} />
       <HintBar game={game} />
+      <JobSwitchNudge game={game} />
       <div className="game-layout">
         <Board
           game={game}

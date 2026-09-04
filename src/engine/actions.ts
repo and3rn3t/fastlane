@@ -3,6 +3,7 @@
 // these so human and rival play by identical rules.
 
 import {
+  APPLY_JOB_TIME,
   CASINO_MAX_BET,
   CASINO_MIN_BET,
   CASINO_PAYOUT_MULTIPLIER,
@@ -249,7 +250,7 @@ export function applyJob(state: GameState, key: PlayerKey, jobId: string) {
   const job = jobById(jobId)
   const qual = qualifiesFor(p, jobId)
   require_(qual.ok, `Not qualified: ${qual.reasons.join(', ')}`)
-  spendTime(p, 2)
+  spendTime(p, APPLY_JOB_TIME)
   p.jobId = job.id
   p.jobTenureWeeks = 0
   p.promotionLevel = 0
