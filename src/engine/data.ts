@@ -224,6 +224,19 @@ export const JOBS: JobDef[] = [
     trainsSkill: 'sales',
     minSkills: { sales: 40 },
   },
+  {
+    id: 'regional-manager',
+    title: 'Regional Manager',
+    workplace: 'burgers',
+    wage: 21,
+    prestige: 50,
+    minDress: 85,
+    minEducation: 18,
+    minExperience: 240,
+    requiresComputer: true,
+    trainsSkill: 'sales',
+    minSkills: { sales: 60 },
+  },
   // MegaMart
   {
     id: 'stocker',
@@ -258,6 +271,19 @@ export const JOBS: JobDef[] = [
     minExperience: 100,
     trainsSkill: 'sales',
     minSkills: { sales: 40 },
+  },
+  {
+    id: 'regional-director',
+    title: 'Regional Director',
+    workplace: 'megamart',
+    wage: 20,
+    prestige: 48,
+    minDress: 80,
+    minEducation: 18,
+    minExperience: 200,
+    requiresComputer: true,
+    trainsSkill: 'sales',
+    minSkills: { sales: 60 },
   },
   // Assembly Works
   {
@@ -342,6 +368,23 @@ export const JOBS: JobDef[] = [
     trainsSkill: 'tech',
     minSkills: { tech: 50 },
   },
+  {
+    // Deliberately kept below Professor's 88 (the game's highest-prestige
+    // job) — a banking role outranking the University's own terminal tier
+    // would read oddly, and nothing in the roadmap asked for a new overall
+    // ceiling, just a fourth rung matching Assembly Works' tier count.
+    id: 'regional-vp',
+    title: 'Regional VP',
+    workplace: 'bank',
+    wage: 36,
+    prestige: 82,
+    minDress: 90,
+    minEducation: 26,
+    minExperience: 360,
+    requiresComputer: true,
+    trainsSkill: 'tech',
+    minSkills: { tech: 65 },
+  },
   // City University
   {
     id: 'ta',
@@ -352,6 +395,23 @@ export const JOBS: JobDef[] = [
     minDress: 25,
     minEducation: 10,
     minExperience: 0,
+    trainsSkill: 'tech',
+  },
+  {
+    // Fills what was previously a stark 30->88 prestige gap with nothing in
+    // between — the shallowest, most lopsided ladder in the game before
+    // this. requiresComputer (not gated at 'ta') mirrors First Bank's own
+    // pattern of the office track needing one starting at the *second*
+    // tier, not just the terminal one.
+    id: 'lecturer',
+    title: 'Lecturer',
+    workplace: 'university',
+    wage: 20,
+    prestige: 55,
+    minDress: 40,
+    minEducation: 18,
+    minExperience: 80,
+    requiresComputer: true,
     trainsSkill: 'tech',
   },
   {
