@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { AI_PROFILES, DIFFICULTY_SKILL, runAIWeek } from '../ai'
-import { EngineError, netWorth, qualifiesFor, wagePerHour } from '../actions'
+import { EngineError, jobRequirements, netWorth, qualifiesFor, wagePerHour } from '../actions'
+import { bestQualifiedJob, nextTargetJob } from '../career'
 import {
   FOOD_NEEDED,
+  JOBS,
   MARKET_INDEX_MAX,
   MARKET_INDEX_MIN,
   RULE_PRESETS,
@@ -10,6 +12,7 @@ import {
   SKILL_TRAIN_GAIN,
   SKILL_TRAIN_PRICE,
   WEEK_TIME,
+  jobById,
   maxLoan,
   travelCost,
 } from '../data'
@@ -200,6 +203,196 @@ describe('skills', () => {
         'store-manager'
       ).ok
     ).toBe(true)
+  })
+})
+
+describe('jobRequirements', () => {
+  it('only emits rows for criteria the job actually gates on', () => {
+    // fry-cook: minDress 10, minEducation 0, minExperience 0, no computer/skills
+    // — only dress should appear, not the three zero/absent requirements.
+    const reqs = jobRequirements(game().player, 'fry-cook')
+    expect(reqs.map((r) => r.key)).toEqual(['dress'])
+  })
+
+  it('reports current/required/met per criterion, not just pass/fail', () => {
+    const p = { ...game().player, dress: 18, education: 5, experience: 30 }
+    const reqs = jobRequirements(p, 'cashier') // minDress 25, minEducation 2, minExperience 20
+    expect(reqs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'education', current: 5, required: 2, met: true }),
+        expect.objectContaining({ key: 'dress', current: 18, required: 25, met: false }),
+        expect.objectContaining({ key: 'experience', current: 30, required: 20, met: true }),
+      ])
+    )
+  })
+
+  it('marks a skill requirement with its display name and progress', () => {
+    const p = { ...game().player, dress: 100, education: 100, experience: 1000 }
+    const reqs = jobRequirements(p, 'store-manager')
+    const skillReq = reqs.find((r) => r.key === 'skill:sales')
+    expect(skillReq).toEqual(
+      expect.objectContaining({ label: 'Sales skill', current: 0, required: 40, met: false })
+    )
+  })
+
+  it('marks a computer requirement as a 0/1 boolean, not a raw count', () => {
+    const withoutComputer = jobRequirements(game().player, 'analyst').find(
+      (r) => r.key === 'computer'
+    )
+    expect(withoutComputer).toEqual(
+      expect.objectContaining({ current: 0, required: 1, met: false })
+    )
+  })
+
+  it('marks dress/experience as met-but-waived during a layoff, not silently met', () => {
+    const laidOff = {
+      ...game().player,
+      dress: 0,
+      experience: 0,
+      activeEvents: [{ chainId: 'layoff' as const, stage: 0, weeksInStage: 0 }],
+    }
+    const reqs = jobRequirements(laidOff, 'cashier')
+    const dressReq = reqs.find((r) => r.key === 'dress')
+    const expReq = reqs.find((r) => r.key === 'experience')
+    expect(dressReq).toEqual(
+      expect.objectContaining({ current: 0, required: 25, met: true, waived: true })
+    )
+    expect(expReq).toEqual(
+      expect.objectContaining({ current: 0, required: 20, met: true, waived: true })
+    )
+  })
+
+  it('qualifiesFor stays derived from jobRequirements, not a second source of truth', () => {
+    const p = { ...game().player, dress: 5 }
+    const reqs = jobRequirements(p, 'cashier')
+    const qual = qualifiesFor(p, 'cashier')
+    expect(qual.ok).toBe(reqs.every((r) => r.met))
+  })
+})
+
+describe('deepened career ladders (Wave 12)', () => {
+  it('gives Burger Barn, MegaMart, and First Bank a fourth tier, matching Assembly Works', () => {
+    const tiersByWorkplace = new Map<string, number>()
+    for (const job of JOBS) {
+      tiersByWorkplace.set(job.workplace, (tiersByWorkplace.get(job.workplace) ?? 0) + 1)
+    }
+    expect(tiersByWorkplace.get('burgers')).toBe(4)
+    // MegaMart has 5 entries, not 4 — Department Manager forks into two
+    // (Regional Buyer, Ops Director) rather than one linear 4th rung; see
+    // the "career fork" describe block below for that fork's own coverage.
+    expect(tiersByWorkplace.get('megamart')).toBe(5)
+    expect(tiersByWorkplace.get('factory')).toBe(4) // unchanged — already the deepest ladder
+    expect(tiersByWorkplace.get('bank')).toBe(4)
+    // University: still shallower by design — a third tier fills the old
+    // 30->88 gap, but a hard jump to 4 wasn't the ask (see roadmap note).
+    expect(tiersByWorkplace.get('university')).toBe(3)
+  })
+
+  it("keeps every new tier strictly above its ladder's previous ceiling", () => {
+    expect(jobById('regional-manager').prestige).toBeGreaterThan(jobById('store-manager').prestige)
+    expect(jobById('regional-director').prestige).toBeGreaterThan(jobById('dept-manager').prestige)
+    expect(jobById('ops-director').prestige).toBeGreaterThan(jobById('dept-manager').prestige)
+    expect(jobById('regional-vp').prestige).toBeGreaterThan(jobById('branch-manager').prestige)
+    expect(jobById('lecturer').prestige).toBeGreaterThan(jobById('ta').prestige)
+    expect(jobById('professor').prestige).toBeGreaterThan(jobById('lecturer').prestige)
+  })
+
+  it("keeps Regional VP below Professor — a banking role should not outrank the game's academic ceiling", () => {
+    expect(jobById('regional-vp').prestige).toBeLessThan(jobById('professor').prestige)
+  })
+
+  it('every new tier is actually reachable — a maxed-out player qualifies for all of them', () => {
+    const maxed = {
+      ...game().player,
+      dress: 100,
+      education: 100,
+      experience: 1000,
+      skills: { sales: 100, trades: 100, tech: 100 },
+      items: ['computer' as const],
+    }
+    for (const id of [
+      'regional-manager',
+      'regional-director',
+      'ops-director',
+      'regional-vp',
+      'lecturer',
+    ]) {
+      expect(qualifiesFor(maxed, id).ok).toBe(true)
+    }
+  })
+
+  it('gates each new tier on a higher skill bar than the tier below it, where the ladder already gated on skill', () => {
+    expect(jobById('regional-manager').minSkills?.sales).toBeGreaterThan(
+      jobById('store-manager').minSkills?.sales ?? 0
+    )
+    expect(jobById('regional-director').minSkills?.sales).toBeGreaterThan(
+      jobById('dept-manager').minSkills?.sales ?? 0
+    )
+    expect(jobById('regional-vp').minSkills?.tech).toBeGreaterThan(
+      jobById('branch-manager').minSkills?.tech ?? 0
+    )
+  })
+})
+
+describe('career fork: Department Manager -> Regional Buyer / Ops Director (Wave 12)', () => {
+  it('puts both branches at the same prestige — a genuine either/or, not a real tier plus a decoy', () => {
+    expect(jobById('regional-director').prestige).toBe(jobById('ops-director').prestige)
+  })
+
+  it('diverges the two branches on skill and computer requirements, not just a title swap', () => {
+    const buyer = jobById('regional-director')
+    const ops = jobById('ops-director')
+    expect(buyer.minSkills).toEqual({ sales: 60 })
+    expect(ops.minSkills).toEqual({ tech: 60 })
+    expect(buyer.requiresComputer).toBeFalsy()
+    expect(ops.requiresComputer).toBe(true)
+  })
+
+  it("nextTargetJob breaks the prestige tie toward whichever branch the player's skills already favor", () => {
+    const s = game()
+    // analyst: prestige 45. Everything above it that's *lower* than the
+    // fork's 48 (store-manager 30, technician 35, ta 30, etc.) is already
+    // below 45 too, so the fork genuinely is the tied-lowest candidate
+    // above this specific career score — unlike dept-manager's 28, where
+    // store-manager (30) would beat the fork to the punch and the tie-break
+    // would never even be reached.
+    const salesLeaning = {
+      ...s,
+      player: { ...s.player, jobId: 'analyst', skills: { sales: 30, trades: 0, tech: 0 } },
+    }
+    const techLeaning = {
+      ...s,
+      player: { ...s.player, jobId: 'analyst', skills: { sales: 0, trades: 0, tech: 30 } },
+    }
+    expect(nextTargetJob(salesLeaning, 'player')?.id).toBe('regional-director')
+    expect(nextTargetJob(techLeaning, 'player')?.id).toBe('ops-director')
+  })
+
+  it('falls back to the first-listed branch (Regional Buyer) when neither skill has any lead', () => {
+    const s = game()
+    const noLean = { ...s, player: { ...s.player, jobId: 'analyst' } }
+    expect(nextTargetJob(noLean, 'player')?.id).toBe('regional-director')
+  })
+
+  it('bestQualifiedJob returns the fork branch whose specific requirements are met, not the other one', () => {
+    const s = game()
+    const qualifiedForOps = {
+      ...s,
+      player: {
+        ...s.player,
+        jobId: 'dept-manager',
+        dress: 60,
+        education: 15,
+        experience: 150,
+        skills: { sales: 0, trades: 0, tech: 60 },
+        items: ['computer' as const],
+      },
+    }
+    // Meets ops-director's bars but not regional-buyer's (0 sales skill,
+    // dress/experience below its higher bars) or lecturer's (education 15
+    // < its 18) — isolates that bestQualifiedJob is reading each fork
+    // branch's own requirements, not just picking whichever comes first.
+    expect(bestQualifiedJob(qualifiedForOps, 'player')?.id).toBe('ops-director')
   })
 })
 

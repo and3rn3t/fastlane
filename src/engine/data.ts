@@ -6,6 +6,7 @@ export const MEAL_TIME = 2
 export const CLASS_TIME = 8
 export const RELAX_CAP = 10
 export const EVICTION_WEEKS = 3
+export const APPLY_JOB_TIME = 2
 
 export const MEAL_PRICE = 9
 export const GROCERY_PRICE_MEGAMART = 4
@@ -186,7 +187,11 @@ export const LOOP_SIZE = 14
 // its top rung additionally demands (JobDef.minSkills) — retail/food service
 // builds sales, the factory builds trades, bank/university build tech. This
 // is what makes the ladder branch by specialization: grinding at MegaMart
-// for a year doesn't help you clear Assembly Works' engineer role.
+// for a year doesn't help you clear Assembly Works' engineer role. The one
+// deliberate exception: MegaMart's Ops Director (Wave 12's Branching
+// specializations fork off Department Manager) trains tech, not sales —
+// the whole point of a fork is a real cross-skill choice, not two flavors
+// of the same path.
 export const JOBS: JobDef[] = [
   // Burger Barn
   {
@@ -223,6 +228,19 @@ export const JOBS: JobDef[] = [
     trainsSkill: 'sales',
     minSkills: { sales: 40 },
   },
+  {
+    id: 'regional-manager',
+    title: 'Regional Manager',
+    workplace: 'burgers',
+    wage: 21,
+    prestige: 50,
+    minDress: 85,
+    minEducation: 18,
+    minExperience: 240,
+    requiresComputer: true,
+    trainsSkill: 'sales',
+    minSkills: { sales: 60 },
+  },
   // MegaMart
   {
     id: 'stocker',
@@ -257,6 +275,48 @@ export const JOBS: JobDef[] = [
     minExperience: 100,
     trainsSkill: 'sales',
     minSkills: { sales: 40 },
+  },
+  {
+    // Department Manager forks here into two divergent next-tier roles
+    // (Wave 12's Branching specializations) instead of one linear rung —
+    // Regional Buyer stays on the sales track this ladder already trains;
+    // Ops Director pivots to tech, the one skill dimension MegaMart alone
+    // never otherwise touches. Same prestige on purpose: a genuine fork,
+    // not a "real" and a "consolation" tier — see career.ts's
+    // nextTargetJob() for how Riley picks between prestige-tied branches.
+    // `id` intentionally kept as 'regional-director' (the prior session's
+    // pre-fork name) even though the title changed — this job already
+    // shipped in production; renaming the id would 404 any live save where
+    // a player or Riley already holds it (jobById() throws on an unknown
+    // id, and current-version saves skip migration entirely). Caught in
+    // PR review, not before merge.
+    id: 'regional-director',
+    title: 'Regional Buyer',
+    workplace: 'megamart',
+    wage: 20,
+    prestige: 48,
+    minDress: 80,
+    minEducation: 18,
+    minExperience: 200,
+    trainsSkill: 'sales',
+    minSkills: { sales: 60 },
+  },
+  {
+    // minEducation deliberately below Lecturer's (18) — the real gate here
+    // is proven tech skill, not classroom hours, and an ops role earning
+    // its keep through hands-on systems work over formal study is the
+    // point of the branch, not an incidental data quirk.
+    id: 'ops-director',
+    title: 'Ops Director',
+    workplace: 'megamart',
+    wage: 20,
+    prestige: 48,
+    minDress: 60,
+    minEducation: 15,
+    minExperience: 150,
+    requiresComputer: true,
+    trainsSkill: 'tech',
+    minSkills: { tech: 60 },
   },
   // Assembly Works
   {
@@ -341,6 +401,23 @@ export const JOBS: JobDef[] = [
     trainsSkill: 'tech',
     minSkills: { tech: 50 },
   },
+  {
+    // Deliberately kept below Professor's 88 (the game's highest-prestige
+    // job) — a banking role outranking the University's own terminal tier
+    // would read oddly, and nothing in the roadmap asked for a new overall
+    // ceiling, just a fourth rung matching Assembly Works' tier count.
+    id: 'regional-vp',
+    title: 'Regional VP',
+    workplace: 'bank',
+    wage: 36,
+    prestige: 82,
+    minDress: 90,
+    minEducation: 26,
+    minExperience: 360,
+    requiresComputer: true,
+    trainsSkill: 'tech',
+    minSkills: { tech: 65 },
+  },
   // City University
   {
     id: 'ta',
@@ -351,6 +428,23 @@ export const JOBS: JobDef[] = [
     minDress: 25,
     minEducation: 10,
     minExperience: 0,
+    trainsSkill: 'tech',
+  },
+  {
+    // Fills what was previously a stark 30->88 prestige gap with nothing in
+    // between — the shallowest, most lopsided ladder in the game before
+    // this. requiresComputer (not gated at 'ta') mirrors First Bank's own
+    // pattern of the office track needing one starting at the *second*
+    // tier, not just the terminal one.
+    id: 'lecturer',
+    title: 'Lecturer',
+    workplace: 'university',
+    wage: 20,
+    prestige: 55,
+    minDress: 40,
+    minEducation: 18,
+    minExperience: 80,
+    requiresComputer: true,
     trainsSkill: 'tech',
   },
   {

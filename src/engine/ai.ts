@@ -26,13 +26,13 @@
 
 import * as act from './actions'
 import { EngineError } from './actions'
+import { bestQualifiedJob, nextTargetJob } from './career'
 import {
   CASINO_MAX_BET,
   CASINO_MIN_BET,
   DOCTOR_PRICE,
   HEALTH_SICK_THRESHOLD,
   ITEMS,
-  JOBS,
   RENT,
   SKILL_TRAIN_PRICE,
   TUITION,
@@ -47,7 +47,6 @@ import type {
   GameState,
   Goals,
   ItemId,
-  JobDef,
   LocationId,
   PlayerKey,
   RileyDifficulty,
@@ -229,25 +228,6 @@ function ensureHealth(state: GameState, key: PlayerKey, profile: AiProfile): boo
   if (p.cash < act.price(state, DOCTOR_PRICE) + reserve(state, profile)) return false
   if (!goTo(state, key, 'clinic')) return false
   return attempt(() => act.seeDoctor(state, key))
-}
-
-function bestQualifiedJob(state: GameState, key: PlayerKey): JobDef | null {
-  const p = get(state, key)
-  const current = careerScore(p)
-  const candidates = JOBS.filter((j) => j.prestige > current && act.qualifiesFor(p, j.id).ok).sort(
-    (a, b) => b.prestige - a.prestige
-  )
-  return candidates[0] ?? null
-}
-
-/** The job this AI is working toward: lowest-prestige job above their current one. */
-function nextTargetJob(state: GameState, key: PlayerKey): JobDef | null {
-  const p = get(state, key)
-  const current = careerScore(p)
-  const candidates = JOBS.filter((j) => j.prestige > current).sort(
-    (a, b) => a.prestige - b.prestige
-  )
-  return candidates[0] ?? null
 }
 
 /** Returns `false` on no-op, `true`/a more specific `CandidateTag` on

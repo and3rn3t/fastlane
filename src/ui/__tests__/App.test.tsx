@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import App from '@/App'
-import { GameProvider } from '@/state/GameContext'
+import { newGame } from '@/engine'
+import { GameProvider, SAVE_KEY } from '@/state/GameContext'
 import { reportError } from '@/telemetry'
 
 // virtual:pwa-register/react does real navigator.serviceWorker/workbox-window
@@ -112,6 +113,94 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /MegaMart/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Buy \d+/ }))
     expect(screen.queryByText(/Running low on food/)).toBeNull()
+  })
+
+  it('shows a recent-failure hint after a bad week, taking priority over the forward-looking hint', async () => {
+    renderApp()
+    fireEvent.click(screen.getByText(/Start new game/))
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+
+    // A fresh player never eats, so week 1's upkeep logs "went hungry" —
+    // same setup the forward-looking hint test above starts from.
+    fireEvent.click(screen.getByRole('button', { name: /End week/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Skip/ }))
+    await screen.findByRole('dialog', { name: /Week 1 report/i })
+    fireEvent.click(screen.getByRole('button', { name: /Start week 2/ }))
+
+    // The reactive "you went hungry last week" hint wins over the generic
+    // forward-looking "Running low on food" one — both would otherwise apply.
+    expect(screen.getByText(/You went hungry last week/)).toBeTruthy()
+    expect(screen.queryByText(/Running low on food/)).toBeNull()
+
+    // Dismisses the same way the forward-looking hint does.
+    fireEvent.click(screen.getByRole('button', { name: /Dismiss suggestion/i }))
+    expect(screen.queryByText(/You went hungry last week/)).toBeNull()
+
+    // The player still hasn't eaten, so week 2 logs the same "went hungry"
+    // keyword again. The hint's dismiss key includes the report's week
+    // number specifically so this recurrence isn't shadowed by the week 1
+    // dismissal above — without that, this would incorrectly stay hidden.
+    fireEvent.click(screen.getByRole('button', { name: /End week/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Skip/ }))
+    await screen.findByRole('dialog', { name: /Week 2 report/i })
+    fireEvent.click(screen.getByRole('button', { name: /Start week 3/ }))
+    expect(screen.getByText(/You went hungry last week/)).toBeTruthy()
+  })
+
+  it('shows a job-switch nudge for a free upgrade; "Switch now" travels, then applies', () => {
+    renderApp()
+    fireEvent.click(screen.getByText(/Start new game/))
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+
+    // A fresh, job-less player has a real requirement for Stocker (minDress
+    // 10) — they qualify only because starting Dress (20) already clears
+    // it, not because the job is requirement-free. The nudge should
+    // surface it alongside the unrelated food hint, not replace it.
+    expect(screen.getByText(/You now qualify for Stocker at MegaMart/)).toBeTruthy()
+    expect(screen.getByText(/Running low on food/)).toBeTruthy()
+
+    // "Switch now" can't apply immediately (not at Employment, no phone) —
+    // it travels there instead, same first-step logic the AI itself uses.
+    fireEvent.click(screen.getByRole('button', { name: /Switch now/ }))
+    expect(screen.getByText(/Browse openings across town and apply/)).toBeTruthy()
+
+    // Now that the player *is* at Employment, the same button's other
+    // branch applies — this is the feature's actual switching behavior, not
+    // just its travel-there fallback. TopBar's "Job" stat is the least
+    // ambiguous place to check this — "Stocker" alone also matches the
+    // (still-visible) Job Board listing title.
+    fireEvent.click(screen.getByRole('button', { name: /Switch now/ }))
+    const jobStat = screen.getByText('Job').closest('.stat')
+    expect(jobStat?.textContent).toContain('Stocker')
+  })
+
+  it('dismisses the job-switch nudge independently of the unrelated food hint', () => {
+    renderApp()
+    fireEvent.click(screen.getByText(/Start new game/))
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+
+    fireEvent.click(screen.getByRole('button', { name: /Dismiss job suggestion/i }))
+    expect(screen.queryByText(/You now qualify for Stocker at MegaMart/)).toBeNull()
+    expect(screen.getByText(/Running low on food/)).toBeTruthy()
+  })
+
+  it('disables "Switch now" once there is not enough time left to act on it', () => {
+    // At home with 0h left, the CTA's fallback (travel to Employment, 1h
+    // from home) doesn't fit — clicking it would otherwise throw the
+    // engine's own "Not enough time left this week" EngineError uncaught.
+    const state = newGame({
+      playerName: 'Tester',
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      seed: 1,
+    })
+    localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify({ ...state, player: { ...state.player, timeLeft: 0 } })
+    )
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+    const switchButton = screen.getByRole('button', { name: /Switch now/ }) as HTMLButtonElement
+    expect(switchButton.disabled).toBe(true)
   })
 })
 
@@ -570,6 +659,29 @@ describe('save migration', () => {
     renderApp()
     fireEvent.click(screen.getByText(/Play today's challenge/))
     expect(screen.getByLabelText('You is here').textContent).toBe('🙂')
+  })
+
+  it('resolves a live save holding the pre-fork job id under its new title, not a crash', () => {
+    // Wave 12's Branching specializations renamed this job's *title* to
+    // "Regional Buyer" but deliberately kept its id as 'regional-director'
+    // — a save already holding that id (from before the fork shipped)
+    // skips migration entirely once it's already at the current
+    // SAVE_VERSION (migrateSave() only runs migrations below that
+    // version), so jobById() must still resolve it or this throws instead
+    // of rendering. Caught in PR review, regression-tested here.
+    const state = newGame({
+      playerName: 'Tester',
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      seed: 1,
+    })
+    localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify({ ...state, player: { ...state.player, jobId: 'regional-director' } })
+    )
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+    const jobStat = screen.getByText('Job').closest('.stat')
+    expect(jobStat?.textContent).toContain('Regional Buyer')
   })
 })
 

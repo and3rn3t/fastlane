@@ -4,6 +4,7 @@ export * from './engine'
 export {
   EngineError,
   qualifiesFor,
+  jobRequirements,
   netWorth,
   foodShortfall,
   hasItem,
@@ -13,3 +14,4 @@ export {
 } from './actions'
 export { careerScore, goalProgress, meetsGoals } from './week'
 export { AI_PROFILES, runAIWeek, previewNextAction, type AiProfile, type CandidateTag } from './ai'
+export { bestQualifiedJob, nextTargetJob } from './career'

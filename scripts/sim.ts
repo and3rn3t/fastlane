@@ -20,6 +20,7 @@
 import {
   AI_PROFILES,
   applyAction,
+  goalProgress,
   newGame,
   runAIWeek,
   RULE_PRESETS,
@@ -29,16 +30,27 @@ import {
   type RulePresetName,
 } from '../src/engine/index.ts'
 
+export type GoalKey = keyof Goals
+export const GOAL_KEYS: GoalKey[] = ['wealth', 'happiness', 'education', 'career']
+
 // The StartScreen "Standard" preset (level 4 of 10) — the default a new
 // player would actually pick, so the baseline reflects real play.
 const STANDARD_GOALS: Goals = { wealth: 4000, happiness: 70, education: 12, career: 30 }
-const MAX_WEEKS = 60
-const RULE_PRESET_NAMES: RulePresetName[] = ['classic', 'brutal', 'zen']
-const PROFILE_NAMES: AiProfileName[] = ['balanced', 'hustler', 'scholar', 'gambler']
+export const MAX_WEEKS = 60
+export const RULE_PRESET_NAMES: RulePresetName[] = ['classic', 'brutal', 'zen']
+export const PROFILE_NAMES: AiProfileName[] = ['balanced', 'hustler', 'scholar', 'gambler']
 
-interface SimResult {
+export interface SimResult {
   winner: 'player' | 'riley' | 'none'
   weeks: number
+  // Of the goals that were still short of threshold entering the winning
+  // week and crossed it *during* that week (meetsGoals requires all four
+  // simultaneously, so every such goal necessarily crossed this exact week
+  // — a goal already >=1 last week can't be "completed" again), the one
+  // that had the least progress banked beforehand — the real bottleneck
+  // rather than just "who won." null for a game with no winner, or in the
+  // (should-be-impossible) case nothing actually crossed this week.
+  winningGoal: GoalKey | null
   // Phase 2 system usage, read off Riley's final state — a stable win rate
   // with these all at zero would mean the AI integration silently failed
   // even though the top-line numbers look fine. See reportSingleCell().
@@ -47,6 +59,22 @@ interface SimResult {
   rileyInvestmentValue: number
   rileyLayoffs: number
   rileyInheritances: number
+}
+
+// Only a goal that was actually below threshold going into the winning week
+// AND cleared it by the end of that same week counts as "completed this
+// week" — picking the global lowest-progress goal instead (an earlier draft
+// of this function did) can misidentify a goal that was merely lagging but
+// had already crossed in some prior week, or that never needed to move this
+// week at all. Among genuine crossers, the one with the least progress
+// banked beforehand is the one that had the most catching up to do.
+export function crossedGoal(
+  prior: Record<GoalKey, number>,
+  post: Record<GoalKey, number>
+): GoalKey | null {
+  const crossers = GOAL_KEYS.filter((key) => prior[key] < 1 && post[key] >= 1)
+  if (crossers.length === 0) return null
+  return crossers.reduce((worst, key) => (prior[key] < prior[worst] ? key : worst), crossers[0])
 }
 
 function runOneGame(
@@ -68,16 +96,32 @@ function runOneGame(
   })
 
   for (let i = 0; i < MAX_WEEKS; i++) {
+    // Snapshot each side's goal progress *before* this week resolves, so if
+    // this turns out to be the winning week we still have the "just before
+    // winning" picture — reading it off `state` after applyAction would only
+    // show the fully-met goals, hiding which one was still the laggard.
+    const priorProgress = {
+      player: goalProgress(state.player, state.goals, state.economy.marketIndex),
+      riley: goalProgress(state.riley, state.goals, state.economy.marketIndex),
+    }
     // Player side always runs Balanced — a fixed opponent is what makes the
     // win rate a meaningful signal for whatever Riley profile is under test.
     runAIWeek(state, 'player', AI_PROFILES.balanced)
     state = applyAction(state, { type: 'endWeek' })
     if (state.phase === 'over') {
-      return { winner: state.winner ?? 'none', weeks: state.week - 1, ...rileySystemUsage(state) }
+      const winner = state.winner ?? 'none'
+      const winningGoal =
+        winner === 'none'
+          ? null
+          : crossedGoal(
+              priorProgress[winner],
+              goalProgress(state[winner], state.goals, state.economy.marketIndex)
+            )
+      return { winner, weeks: state.week - 1, winningGoal, ...rileySystemUsage(state) }
     }
     state = applyAction(state, { type: 'dismissReport' })
   }
-  return { winner: 'none', weeks: MAX_WEEKS, ...rileySystemUsage(state) }
+  return { winner: 'none', weeks: MAX_WEEKS, winningGoal: null, ...rileySystemUsage(state) }
 }
 
 function rileySystemUsage(
@@ -105,25 +149,60 @@ function average(nums: number[]): number {
   return nums.length === 0 ? 0 : nums.reduce((a, b) => a + b, 0) / nums.length
 }
 
+// Nearest-rank percentile over a copy of `nums` (sorted ascending) — `null`
+// input/empty array means "no decided games," same convention as
+// avgWeeksOverall below, not a fabricated 0.
+function percentile(nums: number[], p: number): number | null {
+  if (nums.length === 0) return null
+  const sorted = [...nums].sort((a, b) => a - b)
+  // Standard nearest-rank: rank = ceil(p/100 * N), 1-indexed, clamped into
+  // bounds. `Math.floor` here previously shifted every percentile up by one
+  // slot at exact boundaries (e.g. p10 of 10 values picked the 2nd-smallest
+  // instead of the smallest) — caught in PR review, not by a test.
+  const rank = Math.min(sorted.length - 1, Math.max(0, Math.ceil((p / 100) * sorted.length) - 1))
+  return sorted[rank]
+}
+
 // `null` specifically means "no game in this batch was decided" (every one
 // hit the week cap) — average([]) silently returning 0 would otherwise print
 // as "0.0 weeks to win," reading as instant games rather than the opposite
 // (every game ran the full 60 weeks undecided). fmtWeeks() below is the one
 // place that formats this for display.
-function fmtWeeks(weeks: number | null): string {
+export function fmtWeeks(weeks: number | null): string {
   return weeks === null ? 'n/a' : weeks.toFixed(1)
 }
 
-interface BatchSummary {
+export type GoalTally = Record<GoalKey, number>
+
+function tallyGoals(results: SimResult[], winner: 'player' | 'riley'): GoalTally {
+  const tally: GoalTally = { wealth: 0, happiness: 0, education: 0, career: 0 }
+  for (const r of results) {
+    if (r.winner === winner && r.winningGoal) tally[r.winningGoal]++
+  }
+  return tally
+}
+
+export interface BatchSummary {
   gameCount: number
   results: SimResult[]
   playerWinPct: number
   rileyWinPct: number
   noWinnerPct: number
   avgWeeksOverall: number | null
+  // Weeks-to-win distribution across every decided game (player + Riley wins
+  // combined) — a flat average hides bimodal skew (e.g. one side habitually
+  // rushing wealth while the other grinds career), percentiles surface it.
+  weeksP10: number | null
+  weeksP50: number | null
+  weeksP90: number | null
+  // Which goal was still short a week before each side actually won — the
+  // real bottleneck, not just the win/loss tally. Counts, not percentages,
+  // so callers can divide by whichever denominator (gameCount vs. that
+  // side's own win count) makes sense for their report.
+  goalBreakdown: { player: GoalTally; riley: GoalTally }
 }
 
-function runBatch(
+export function runBatch(
   gameCount: number,
   rileyProfile: AiProfileName,
   rulesPreset: RulePresetName
@@ -143,6 +222,13 @@ function runBatch(
     rileyWinPct: (rileyWins / gameCount) * 100,
     noWinnerPct: (noWinner / gameCount) * 100,
     avgWeeksOverall: decidedWeeks.length === 0 ? null : average(decidedWeeks),
+    weeksP10: percentile(decidedWeeks, 10),
+    weeksP50: percentile(decidedWeeks, 50),
+    weeksP90: percentile(decidedWeeks, 90),
+    goalBreakdown: {
+      player: tallyGoals(results, 'player'),
+      riley: tallyGoals(results, 'riley'),
+    },
   }
 }
 
@@ -168,13 +254,35 @@ function reportSingleCell(
   )
   console.log(`\nAvg weeks to win — player: ${average(playerWins.map((r) => r.weeks)).toFixed(1)}`)
   console.log(`Avg weeks to win — riley:  ${average(rileyWins.map((r) => r.weeks)).toFixed(1)}`)
-  console.log(`Avg weeks to win — overall: ${fmtWeeks(batch.avgWeeksOverall)}\n`)
+  console.log(`Avg weeks to win — overall: ${fmtWeeks(batch.avgWeeksOverall)}`)
+  // Percentiles alongside the average above — a flat mean can't tell a
+  // consistent ~25-week game apart from a 50/50 mix of 10-week blowouts and
+  // 40-week grinds; p10/p50/p90 make that skew visible.
+  console.log(
+    `Weeks to win — p10: ${fmtWeeks(batch.weeksP10)}, p50: ${fmtWeeks(batch.weeksP50)}, p90: ${fmtWeeks(batch.weeksP90)}\n`
+  )
 
   if (noWinner.length / gameCount > 0.1) {
     console.warn(
       `⚠ More than 10% of games hit the ${MAX_WEEKS}-week cap with no winner — that's worth a look.`
     )
   }
+
+  // Which goal was the last one over the line for each side's wins — the
+  // actual bottleneck, not just who won. Denominator is that side's own win
+  // count (not gameCount) since the question is "of the games this side won,
+  // what decided it," not "of all games."
+  const goalPct = (tally: GoalTally, wins: number) => (n: number) =>
+    wins === 0 ? 'n/a' : `${((n / wins) * 100).toFixed(0)}%`
+  const playerGoalPct = goalPct(batch.goalBreakdown.player, playerWins.length)
+  const rileyGoalPct = goalPct(batch.goalBreakdown.riley, rileyWins.length)
+  console.log(`Winning goal breakdown (which goal was the bottleneck):`)
+  console.log(
+    `  Player wins — wealth: ${playerGoalPct(batch.goalBreakdown.player.wealth)}, happiness: ${playerGoalPct(batch.goalBreakdown.player.happiness)}, education: ${playerGoalPct(batch.goalBreakdown.player.education)}, career: ${playerGoalPct(batch.goalBreakdown.player.career)}`
+  )
+  console.log(
+    `  Riley wins  — wealth: ${rileyGoalPct(batch.goalBreakdown.riley.wealth)}, happiness: ${rileyGoalPct(batch.goalBreakdown.riley.happiness)}, education: ${rileyGoalPct(batch.goalBreakdown.riley.education)}, career: ${rileyGoalPct(batch.goalBreakdown.riley.career)}\n`
+  )
 
   // Usage, not outcome: a stable win rate above with zero skill/investment/
   // chain activity would mean the AI integration silently regressed even
@@ -196,11 +304,13 @@ function reportSingleCell(
 // Flags an outlier cell against the Balanced/Classic baseline the same way
 // Wave 9's balance note does for a new mechanic: >10 points of win-rate
 // drift, or a no-winner rate above 3%, is worth a second look rather than
-// silently passing.
-const DRIFT_THRESHOLD_POINTS = 10
-const NO_WINNER_GUARD_PCT = 3
+// silently passing. Exported so sim-report.ts's CI gate reuses these exact
+// numbers rather than redefining its own — one set of thresholds, not two
+// that can quietly drift apart.
+export const DRIFT_THRESHOLD_POINTS = 10
+export const NO_WINNER_GUARD_PCT = 3
 
-function flagOutlier(
+export function flagOutlier(
   batch: BatchSummary,
   baseline: BatchSummary,
   rileyProfile: AiProfileName,
@@ -226,7 +336,10 @@ function reportMatrix(gameCount: number) {
     `\nFast Lane balance matrix — ${gameCount} games/cell, Standard goals, AI vs AI, ` +
       `${PROFILE_NAMES.length}×${RULE_PRESET_NAMES.length} = ${PROFILE_NAMES.length * RULE_PRESET_NAMES.length} cells\n`
   )
-  const header = 'profile     rules     player%   riley%   no-winner%   avg wks'
+  // p50 sits alongside the mean rather than replacing it: a matrix cell
+  // where they diverge is itself a signal (skewed, not just noisy) that a
+  // reader would otherwise only find by re-running that one cell solo.
+  const header = 'profile     rules     player%   riley%   no-winner%   avg wks  p50 wks'
   console.log(header)
   console.log('-'.repeat(header.length))
 
@@ -240,7 +353,7 @@ function reportMatrix(gameCount: number) {
           ? baseline
           : runBatch(gameCount, rileyProfile, rulesPreset)
       console.log(
-        `${rileyProfile.padEnd(11)} ${rulesPreset.padEnd(9)} ${batch.playerWinPct.toFixed(1).padStart(6)}%   ${batch.rileyWinPct.toFixed(1).padStart(5)}%   ${batch.noWinnerPct.toFixed(1).padStart(9)}%   ${fmtWeeks(batch.avgWeeksOverall).padStart(6)}`
+        `${rileyProfile.padEnd(11)} ${rulesPreset.padEnd(9)} ${batch.playerWinPct.toFixed(1).padStart(6)}%   ${batch.rileyWinPct.toFixed(1).padStart(5)}%   ${batch.noWinnerPct.toFixed(1).padStart(9)}%   ${fmtWeeks(batch.avgWeeksOverall).padStart(6)}   ${fmtWeeks(batch.weeksP50).padStart(6)}`
       )
       flags.push(...flagOutlier(batch, baseline, rileyProfile, rulesPreset))
     }
@@ -260,12 +373,19 @@ function reportMatrix(gameCount: number) {
 // player win out of "1.5" games prints as 66.7%, two as 133.3%. Negative or
 // zero input runs no games at all and divides by a non-positive number,
 // producing NaN/negative percentages just as silently.
-function parseGameCount(arg: string | undefined): number {
-  if (arg === undefined) return 200
+// `fallback` is a parameter, not a hardcoded 200, so a caller with its own
+// default (sim-report.ts's 100/cell) falls back to *that* on invalid input
+// instead of silently reverting to sim.ts's own default — otherwise
+// `pnpm sim:report invalid` would run 200 games/cell (2,400 total) despite
+// the report documenting a 100-game default everywhere else.
+export function parseGameCount(arg: string | undefined, fallback = 200): number {
+  if (arg === undefined) return fallback
   const n = Number(arg)
   if (Number.isInteger(n) && n > 0) return n
-  console.warn(`⚠ Invalid game count "${arg}" — must be a positive integer. Falling back to 200.`)
-  return 200
+  console.warn(
+    `⚠ Invalid game count "${arg}" — must be a positive integer. Falling back to ${fallback}.`
+  )
+  return fallback
 }
 
 function main() {
@@ -303,4 +423,15 @@ function main() {
   reportSingleCell(batch, rileyProfile, rulesPreset)
 }
 
-main()
+// Only run the CLI when this file is executed directly (`pnpm sim`/`tsx
+// scripts/sim.ts`), not when sim-report.ts imports its exports — without
+// this guard, that import would also kick off a full default-args sim run
+// as an unwanted side effect, before sim-report.ts's own matrix even starts.
+// `import.meta.filename` (Node 24, per this repo's pinned engine) compares
+// directly against process.argv[1] as plain filesystem paths — the earlier
+// `file://${...}` string-building against `import.meta.url` broke on
+// Windows paths and on any path containing characters that get percent-
+// encoded in a file: URL (e.g. spaces), which would silently skip main().
+if (import.meta.filename === process.argv[1]) {
+  main()
+}
