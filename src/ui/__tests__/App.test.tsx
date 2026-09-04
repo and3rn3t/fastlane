@@ -660,6 +660,29 @@ describe('save migration', () => {
     fireEvent.click(screen.getByText(/Play today's challenge/))
     expect(screen.getByLabelText('You is here').textContent).toBe('🙂')
   })
+
+  it('resolves a live save holding the pre-fork job id under its new title, not a crash', () => {
+    // Wave 12's Branching specializations renamed this job's *title* to
+    // "Regional Buyer" but deliberately kept its id as 'regional-director'
+    // — a save already holding that id (from before the fork shipped)
+    // skips migration entirely once it's already at the current
+    // SAVE_VERSION (migrateSave() only runs migrations below that
+    // version), so jobById() must still resolve it or this throws instead
+    // of rendering. Caught in PR review, regression-tested here.
+    const state = newGame({
+      playerName: 'Tester',
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      seed: 1,
+    })
+    localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify({ ...state, player: { ...state.player, jobId: 'regional-director' } })
+    )
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+    const jobStat = screen.getByText('Job').closest('.stat')
+    expect(jobStat?.textContent).toContain('Regional Buyer')
+  })
 })
 
 describe('UpdateToast', () => {
