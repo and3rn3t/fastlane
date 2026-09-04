@@ -1,11 +1,13 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import {
+  APPLY_JOB_TIME,
   bestQualifiedJob,
   hasItem,
   jobById,
   LOCATIONS,
   netWorth,
   previewNextAction,
+  travelCost,
   type CandidateTag,
   type GameState,
   type LocationId,
@@ -259,24 +261,37 @@ function HintBar({ game }: { game: GameState }) {
  * rather than staying hidden behind an earlier dismissal. */
 function JobSwitchNudge({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
-  const [dismissedJobId, setDismissedJobId] = useState<string | null>(null)
+  // A Set, not a single id: dismissing job A must not un-hide job B later
+  // dismissed, and vice versa — each dismissal should stay effective for
+  // the rest of the session independently of whatever else gets dismissed.
+  const [dismissedJobIds, setDismissedJobIds] = useState<ReadonlySet<string>>(new Set())
   const primaryTag = useMemo(() => previewNextAction(game, 'player'), [game])
   const better = useMemo(() => bestQualifiedJob(game, 'player'), [game])
 
   if (game.phase !== 'playing' || primaryTag === 'career') return null
-  if (!better || better.id === dismissedJobId) return null
+  if (!better || dismissedJobIds.has(better.id)) return null
 
   const canApplyNow = game.player.location === 'employment' || hasItem(game.player, 'phone')
+  // Whichever action the button is actually about to take this click —
+  // applying outright, or the first step of traveling there — must fit in
+  // the time the player has left. Without this check, clicking with too
+  // little time left throws an uncaught "Not enough time left this week"
+  // (applyJob/travel both call the engine's spendTime, which asserts this).
+  const timeNeeded = canApplyNow
+    ? APPLY_JOB_TIME
+    : travelCost(game.player.location, 'employment', hasItem(game.player, 'bike'))
+  const canAffordSwitch = game.player.timeLeft >= timeNeeded
 
   return (
     <div className="hint-bar">
       <BriefcaseIcon size={15} className="icon" />
       <span className="text">
-        You now qualify for {better.title} at {LOCATIONS[better.workplace].name} — a step up from
-        your current job.
+        You now qualify for {better.title} at {LOCATIONS[better.workplace].name}
+        {game.player.jobId ? ' — a step up from your current job.' : '.'}
       </span>
       <button
         className="primary"
+        disabled={!canAffordSwitch}
         onClick={() =>
           dispatchGame(
             canApplyNow
@@ -289,7 +304,7 @@ function JobSwitchNudge({ game }: { game: GameState }) {
       </button>
       <button
         className="hint-dismiss"
-        onClick={() => setDismissedJobId(better.id)}
+        onClick={() => setDismissedJobIds((prev) => new Set(prev).add(better.id))}
         aria-label="Dismiss job suggestion"
       >
         <CloseIcon size={13} />
