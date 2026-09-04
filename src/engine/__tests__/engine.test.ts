@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { AI_PROFILES, DIFFICULTY_SKILL, runAIWeek } from '../ai'
 import { EngineError, jobRequirements, netWorth, qualifiesFor, wagePerHour } from '../actions'
+import { bestQualifiedJob, nextTargetJob } from '../career'
 import {
   FOOD_NEEDED,
   JOBS,
@@ -276,7 +277,10 @@ describe('deepened career ladders (Wave 12)', () => {
       tiersByWorkplace.set(job.workplace, (tiersByWorkplace.get(job.workplace) ?? 0) + 1)
     }
     expect(tiersByWorkplace.get('burgers')).toBe(4)
-    expect(tiersByWorkplace.get('megamart')).toBe(4)
+    // MegaMart has 5 entries, not 4 — Department Manager forks into two
+    // (Regional Buyer, Ops Director) rather than one linear 4th rung; see
+    // the "career fork" describe block below for that fork's own coverage.
+    expect(tiersByWorkplace.get('megamart')).toBe(5)
     expect(tiersByWorkplace.get('factory')).toBe(4) // unchanged — already the deepest ladder
     expect(tiersByWorkplace.get('bank')).toBe(4)
     // University: still shallower by design — a third tier fills the old
@@ -286,7 +290,8 @@ describe('deepened career ladders (Wave 12)', () => {
 
   it("keeps every new tier strictly above its ladder's previous ceiling", () => {
     expect(jobById('regional-manager').prestige).toBeGreaterThan(jobById('store-manager').prestige)
-    expect(jobById('regional-director').prestige).toBeGreaterThan(jobById('dept-manager').prestige)
+    expect(jobById('regional-buyer').prestige).toBeGreaterThan(jobById('dept-manager').prestige)
+    expect(jobById('ops-director').prestige).toBeGreaterThan(jobById('dept-manager').prestige)
     expect(jobById('regional-vp').prestige).toBeGreaterThan(jobById('branch-manager').prestige)
     expect(jobById('lecturer').prestige).toBeGreaterThan(jobById('ta').prestige)
     expect(jobById('professor').prestige).toBeGreaterThan(jobById('lecturer').prestige)
@@ -296,7 +301,7 @@ describe('deepened career ladders (Wave 12)', () => {
     expect(jobById('regional-vp').prestige).toBeLessThan(jobById('professor').prestige)
   })
 
-  it('every new tier is actually reachable — a maxed-out player qualifies for all four', () => {
+  it('every new tier is actually reachable — a maxed-out player qualifies for all of them', () => {
     const maxed = {
       ...game().player,
       dress: 100,
@@ -305,7 +310,13 @@ describe('deepened career ladders (Wave 12)', () => {
       skills: { sales: 100, trades: 100, tech: 100 },
       items: ['computer' as const],
     }
-    for (const id of ['regional-manager', 'regional-director', 'regional-vp', 'lecturer']) {
+    for (const id of [
+      'regional-manager',
+      'regional-buyer',
+      'ops-director',
+      'regional-vp',
+      'lecturer',
+    ]) {
       expect(qualifiesFor(maxed, id).ok).toBe(true)
     }
   })
@@ -314,12 +325,74 @@ describe('deepened career ladders (Wave 12)', () => {
     expect(jobById('regional-manager').minSkills?.sales).toBeGreaterThan(
       jobById('store-manager').minSkills?.sales ?? 0
     )
-    expect(jobById('regional-director').minSkills?.sales).toBeGreaterThan(
+    expect(jobById('regional-buyer').minSkills?.sales).toBeGreaterThan(
       jobById('dept-manager').minSkills?.sales ?? 0
     )
     expect(jobById('regional-vp').minSkills?.tech).toBeGreaterThan(
       jobById('branch-manager').minSkills?.tech ?? 0
     )
+  })
+})
+
+describe('career fork: Department Manager -> Regional Buyer / Ops Director (Wave 12)', () => {
+  it('puts both branches at the same prestige — a genuine either/or, not a real tier plus a decoy', () => {
+    expect(jobById('regional-buyer').prestige).toBe(jobById('ops-director').prestige)
+  })
+
+  it('diverges the two branches on skill and computer requirements, not just a title swap', () => {
+    const buyer = jobById('regional-buyer')
+    const ops = jobById('ops-director')
+    expect(buyer.minSkills).toEqual({ sales: 60 })
+    expect(ops.minSkills).toEqual({ tech: 60 })
+    expect(buyer.requiresComputer).toBeFalsy()
+    expect(ops.requiresComputer).toBe(true)
+  })
+
+  it("nextTargetJob breaks the prestige tie toward whichever branch the player's skills already favor", () => {
+    const s = game()
+    // analyst: prestige 45. Everything above it that's *lower* than the
+    // fork's 48 (store-manager 30, technician 35, ta 30, etc.) is already
+    // below 45 too, so the fork genuinely is the tied-lowest candidate
+    // above this specific career score — unlike dept-manager's 28, where
+    // store-manager (30) would beat the fork to the punch and the tie-break
+    // would never even be reached.
+    const salesLeaning = {
+      ...s,
+      player: { ...s.player, jobId: 'analyst', skills: { sales: 30, trades: 0, tech: 0 } },
+    }
+    const techLeaning = {
+      ...s,
+      player: { ...s.player, jobId: 'analyst', skills: { sales: 0, trades: 0, tech: 30 } },
+    }
+    expect(nextTargetJob(salesLeaning, 'player')?.id).toBe('regional-buyer')
+    expect(nextTargetJob(techLeaning, 'player')?.id).toBe('ops-director')
+  })
+
+  it('falls back to the first-listed branch (Regional Buyer) when neither skill has any lead', () => {
+    const s = game()
+    const noLean = { ...s, player: { ...s.player, jobId: 'analyst' } }
+    expect(nextTargetJob(noLean, 'player')?.id).toBe('regional-buyer')
+  })
+
+  it('bestQualifiedJob returns the fork branch whose specific requirements are met, not the other one', () => {
+    const s = game()
+    const qualifiedForOps = {
+      ...s,
+      player: {
+        ...s.player,
+        jobId: 'dept-manager',
+        dress: 60,
+        education: 15,
+        experience: 150,
+        skills: { sales: 0, trades: 0, tech: 60 },
+        items: ['computer' as const],
+      },
+    }
+    // Meets ops-director's bars but not regional-buyer's (0 sales skill,
+    // dress/experience below its higher bars) or lecturer's (education 15
+    // < its 18) — isolates that bestQualifiedJob is reading each fork
+    // branch's own requirements, not just picking whichever comes first.
+    expect(bestQualifiedJob(qualifiedForOps, 'player')?.id).toBe('ops-director')
   })
 })
 
