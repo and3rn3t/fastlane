@@ -7,10 +7,10 @@
 
 > Keep this block tiny: at most 1-2 items in progress, 1-2 up next.
 
-| Status     | Item                                      | Notes                                                                                                                                                                                                                                                               |
-| ---------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ⬜ up next | Shared `ActionRow` primitive (Wave 11, M) | Promoted after Hint bar: recent-failure awareness shipped 2026-09-03, closing out Wave 11's other queued item. This one has no dependency of its own and both Wave 8's and Wave 9's preambles are already blocked on it landing before their location-action items. |
-| ⬜ up next | Deepen existing ladders (Wave 12, M)      | Promoted after "You now qualify" job-switch nudge shipped 2026-09-04 — continuing the career-feature push; pure `data.ts` additions, no dependency of its own.                                                                                                      |
+| Status     | Item                                            | Notes                                                                                                                                                                                                                                                               |
+| ---------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ⬜ up next | Shared `ActionRow` primitive (Wave 11, M)       | Promoted after Hint bar: recent-failure awareness shipped 2026-09-03, closing out Wave 11's other queued item. This one has no dependency of its own and both Wave 8's and Wave 9's preambles are already blocked on it landing before their location-action items. |
+| ⬜ up next | "You now qualify" job-switch nudge (Wave 12, M) | Promoted after Job requirement checklist shipped 2026-09-04 — user asked to expand career features; this is the natural next Wave 12 item, and its dependency (Wave 11's hint bar) already shipped.                                                                 |
 
 ## Wave Sequence
 
