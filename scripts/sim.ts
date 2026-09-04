@@ -30,17 +30,17 @@ import {
   type RulePresetName,
 } from '../src/engine/index.ts'
 
-type GoalKey = keyof Goals
-const GOAL_KEYS: GoalKey[] = ['wealth', 'happiness', 'education', 'career']
+export type GoalKey = keyof Goals
+export const GOAL_KEYS: GoalKey[] = ['wealth', 'happiness', 'education', 'career']
 
 // The StartScreen "Standard" preset (level 4 of 10) — the default a new
 // player would actually pick, so the baseline reflects real play.
 const STANDARD_GOALS: Goals = { wealth: 4000, happiness: 70, education: 12, career: 30 }
-const MAX_WEEKS = 60
-const RULE_PRESET_NAMES: RulePresetName[] = ['classic', 'brutal', 'zen']
-const PROFILE_NAMES: AiProfileName[] = ['balanced', 'hustler', 'scholar', 'gambler']
+export const MAX_WEEKS = 60
+export const RULE_PRESET_NAMES: RulePresetName[] = ['classic', 'brutal', 'zen']
+export const PROFILE_NAMES: AiProfileName[] = ['balanced', 'hustler', 'scholar', 'gambler']
 
-interface SimResult {
+export interface SimResult {
   winner: 'player' | 'riley' | 'none'
   weeks: number
   // Of the goals that were still short of threshold entering the winning
@@ -68,7 +68,7 @@ interface SimResult {
 // had already crossed in some prior week, or that never needed to move this
 // week at all. Among genuine crossers, the one with the least progress
 // banked beforehand is the one that had the most catching up to do.
-function crossedGoal(
+export function crossedGoal(
   prior: Record<GoalKey, number>,
   post: Record<GoalKey, number>
 ): GoalKey | null {
@@ -168,11 +168,11 @@ function percentile(nums: number[], p: number): number | null {
 // as "0.0 weeks to win," reading as instant games rather than the opposite
 // (every game ran the full 60 weeks undecided). fmtWeeks() below is the one
 // place that formats this for display.
-function fmtWeeks(weeks: number | null): string {
+export function fmtWeeks(weeks: number | null): string {
   return weeks === null ? 'n/a' : weeks.toFixed(1)
 }
 
-type GoalTally = Record<GoalKey, number>
+export type GoalTally = Record<GoalKey, number>
 
 function tallyGoals(results: SimResult[], winner: 'player' | 'riley'): GoalTally {
   const tally: GoalTally = { wealth: 0, happiness: 0, education: 0, career: 0 }
@@ -182,7 +182,7 @@ function tallyGoals(results: SimResult[], winner: 'player' | 'riley'): GoalTally
   return tally
 }
 
-interface BatchSummary {
+export interface BatchSummary {
   gameCount: number
   results: SimResult[]
   playerWinPct: number
@@ -202,7 +202,7 @@ interface BatchSummary {
   goalBreakdown: { player: GoalTally; riley: GoalTally }
 }
 
-function runBatch(
+export function runBatch(
   gameCount: number,
   rileyProfile: AiProfileName,
   rulesPreset: RulePresetName
@@ -304,11 +304,13 @@ function reportSingleCell(
 // Flags an outlier cell against the Balanced/Classic baseline the same way
 // Wave 9's balance note does for a new mechanic: >10 points of win-rate
 // drift, or a no-winner rate above 3%, is worth a second look rather than
-// silently passing.
-const DRIFT_THRESHOLD_POINTS = 10
-const NO_WINNER_GUARD_PCT = 3
+// silently passing. Exported so sim-report.ts's CI gate reuses these exact
+// numbers rather than redefining its own — one set of thresholds, not two
+// that can quietly drift apart.
+export const DRIFT_THRESHOLD_POINTS = 10
+export const NO_WINNER_GUARD_PCT = 3
 
-function flagOutlier(
+export function flagOutlier(
   batch: BatchSummary,
   baseline: BatchSummary,
   rileyProfile: AiProfileName,
@@ -371,12 +373,19 @@ function reportMatrix(gameCount: number) {
 // player win out of "1.5" games prints as 66.7%, two as 133.3%. Negative or
 // zero input runs no games at all and divides by a non-positive number,
 // producing NaN/negative percentages just as silently.
-function parseGameCount(arg: string | undefined): number {
-  if (arg === undefined) return 200
+// `fallback` is a parameter, not a hardcoded 200, so a caller with its own
+// default (sim-report.ts's 100/cell) falls back to *that* on invalid input
+// instead of silently reverting to sim.ts's own default — otherwise
+// `pnpm sim:report invalid` would run 200 games/cell (2,400 total) despite
+// the report documenting a 100-game default everywhere else.
+export function parseGameCount(arg: string | undefined, fallback = 200): number {
+  if (arg === undefined) return fallback
   const n = Number(arg)
   if (Number.isInteger(n) && n > 0) return n
-  console.warn(`⚠ Invalid game count "${arg}" — must be a positive integer. Falling back to 200.`)
-  return 200
+  console.warn(
+    `⚠ Invalid game count "${arg}" — must be a positive integer. Falling back to ${fallback}.`
+  )
+  return fallback
 }
 
 function main() {
@@ -414,4 +423,15 @@ function main() {
   reportSingleCell(batch, rileyProfile, rulesPreset)
 }
 
-main()
+// Only run the CLI when this file is executed directly (`pnpm sim`/`tsx
+// scripts/sim.ts`), not when sim-report.ts imports its exports — without
+// this guard, that import would also kick off a full default-args sim run
+// as an unwanted side effect, before sim-report.ts's own matrix even starts.
+// `import.meta.filename` (Node 24, per this repo's pinned engine) compares
+// directly against process.argv[1] as plain filesystem paths — the earlier
+// `file://${...}` string-building against `import.meta.url` broke on
+// Windows paths and on any path containing characters that get percent-
+// encoded in a file: URL (e.g. spaces), which would silently skip main().
+if (import.meta.filename === process.argv[1]) {
+  main()
+}
