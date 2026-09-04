@@ -145,6 +145,28 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /Start week 3/ }))
     expect(screen.getByText(/You went hungry last week/)).toBeTruthy()
   })
+
+  it('shows a job-switch nudge for a free upgrade, and "Switch now" travels there', () => {
+    renderApp()
+    fireEvent.click(screen.getByText(/Start new game/))
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+
+    // A fresh, job-less player already qualifies for Stocker at MegaMart
+    // (no requirements) — the nudge should surface it alongside the
+    // unrelated food hint, not replace it.
+    expect(screen.getByText(/You now qualify for Stocker at MegaMart/)).toBeTruthy()
+    expect(screen.getByText(/Running low on food/)).toBeTruthy()
+
+    // "Switch now" can't apply immediately (not at Employment, no phone) —
+    // it travels there instead, same first-step logic the AI itself uses.
+    fireEvent.click(screen.getByRole('button', { name: /Switch now/ }))
+    expect(screen.getByText(/Browse openings across town and apply/)).toBeTruthy()
+
+    // Dismissing hides it independently of the food hint.
+    fireEvent.click(screen.getByRole('button', { name: /Dismiss job suggestion/i }))
+    expect(screen.queryByText(/You now qualify for Stocker at MegaMart/)).toBeNull()
+    expect(screen.getByText(/Running low on food/)).toBeTruthy()
+  })
 })
 
 describe('save migration', () => {

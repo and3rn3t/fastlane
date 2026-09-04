@@ -1,6 +1,9 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import {
+  bestQualifiedJob,
+  hasItem,
   jobById,
+  LOCATIONS,
   netWorth,
   previewNextAction,
   type CandidateTag,
@@ -17,6 +20,7 @@ import { Help } from './Help'
 import {
   BackIcon,
   BoltIcon,
+  BriefcaseIcon,
   ChevronDownIcon,
   CloseIcon,
   ExportIcon,
@@ -239,6 +243,61 @@ function HintBar({ game }: { game: GameState }) {
   )
 }
 
+/** A dedicated "you now qualify for a better job" banner — reuses Wave 11's
+ * hint-bar visual shell (`.hint-bar`/`.hint-dismiss`, plus the existing
+ * `button.primary` style for the CTA — a different data source, not a new
+ * visual pattern, per the roadmap). Reads `bestQualifiedJob()` from the new
+ * `career.ts`, the same pure query Riley's AI uses via `pursueCareer`, so
+ * this can never suggest a job the AI itself wouldn't consider a genuine
+ * upgrade. Skipped when `HintBar`'s own utility-scored suggestion already
+ * happens to be `'career'` this turn, so the two banners never say the same
+ * thing twice — `previewNextAction` only surfaces `'career'` when applying
+ * is the single highest-utility action available, which is exactly the
+ * scenario this banner would otherwise duplicate. Dismissed per-session
+ * (component state, like `HintBar`) rather than persisted, keyed by the
+ * job's id so a *different*, even-better job surfaces as a new suggestion
+ * rather than staying hidden behind an earlier dismissal. */
+function JobSwitchNudge({ game }: { game: GameState }) {
+  const { dispatchGame } = useGame()
+  const [dismissedJobId, setDismissedJobId] = useState<string | null>(null)
+  const primaryTag = useMemo(() => previewNextAction(game, 'player'), [game])
+  const better = useMemo(() => bestQualifiedJob(game, 'player'), [game])
+
+  if (game.phase !== 'playing' || primaryTag === 'career') return null
+  if (!better || better.id === dismissedJobId) return null
+
+  const canApplyNow = game.player.location === 'employment' || hasItem(game.player, 'phone')
+
+  return (
+    <div className="hint-bar">
+      <BriefcaseIcon size={15} className="icon" />
+      <span className="text">
+        You now qualify for {better.title} at {LOCATIONS[better.workplace].name} — a step up from
+        your current job.
+      </span>
+      <button
+        className="primary"
+        onClick={() =>
+          dispatchGame(
+            canApplyNow
+              ? { type: 'applyJob', jobId: better.id }
+              : { type: 'travel', to: 'employment' }
+          )
+        }
+      >
+        Switch now
+      </button>
+      <button
+        className="hint-dismiss"
+        onClick={() => setDismissedJobId(better.id)}
+        aria-label="Dismiss job suggestion"
+      >
+        <CloseIcon size={13} />
+      </button>
+    </div>
+  )
+}
+
 function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
   const { quitToMenu, exportSave } = useGame()
   const p = game.player
@@ -380,6 +439,7 @@ export function GameScreen({ game }: { game: GameState }) {
     <main className="app">
       <TopBar game={game} onHelp={() => setHelpOpen(true)} />
       <HintBar game={game} />
+      <JobSwitchNudge game={game} />
       <div className="game-layout">
         <Board
           game={game}
