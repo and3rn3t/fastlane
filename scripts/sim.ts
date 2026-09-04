@@ -68,7 +68,7 @@ export interface SimResult {
 // had already crossed in some prior week, or that never needed to move this
 // week at all. Among genuine crossers, the one with the least progress
 // banked beforehand is the one that had the most catching up to do.
-function crossedGoal(
+export function crossedGoal(
   prior: Record<GoalKey, number>,
   post: Record<GoalKey, number>
 ): GoalKey | null {
@@ -373,12 +373,19 @@ function reportMatrix(gameCount: number) {
 // player win out of "1.5" games prints as 66.7%, two as 133.3%. Negative or
 // zero input runs no games at all and divides by a non-positive number,
 // producing NaN/negative percentages just as silently.
-export function parseGameCount(arg: string | undefined): number {
-  if (arg === undefined) return 200
+// `fallback` is a parameter, not a hardcoded 200, so a caller with its own
+// default (sim-report.ts's 100/cell) falls back to *that* on invalid input
+// instead of silently reverting to sim.ts's own default — otherwise
+// `pnpm sim:report invalid` would run 200 games/cell (2,400 total) despite
+// the report documenting a 100-game default everywhere else.
+export function parseGameCount(arg: string | undefined, fallback = 200): number {
+  if (arg === undefined) return fallback
   const n = Number(arg)
   if (Number.isInteger(n) && n > 0) return n
-  console.warn(`⚠ Invalid game count "${arg}" — must be a positive integer. Falling back to 200.`)
-  return 200
+  console.warn(
+    `⚠ Invalid game count "${arg}" — must be a positive integer. Falling back to ${fallback}.`
+  )
+  return fallback
 }
 
 function main() {
@@ -420,6 +427,11 @@ function main() {
 // scripts/sim.ts`), not when sim-report.ts imports its exports — without
 // this guard, that import would also kick off a full default-args sim run
 // as an unwanted side effect, before sim-report.ts's own matrix even starts.
-if (import.meta.url === `file://${process.argv[1]}`) {
+// `import.meta.filename` (Node 24, per this repo's pinned engine) compares
+// directly against process.argv[1] as plain filesystem paths — the earlier
+// `file://${...}` string-building against `import.meta.url` broke on
+// Windows paths and on any path containing characters that get percent-
+// encoded in a file: URL (e.g. spaces), which would silently skip main().
+if (import.meta.filename === process.argv[1]) {
   main()
 }

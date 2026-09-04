@@ -58,7 +58,7 @@ function reportCell(
 }
 
 function main() {
-  const gameCount = parseGameCount(process.argv[2] ?? String(REPORT_DEFAULT_GAME_COUNT))
+  const gameCount = parseGameCount(process.argv[2], REPORT_DEFAULT_GAME_COUNT)
 
   console.log(
     `Fast Lane CI balance report — ${gameCount} games/cell, Standard goals, AI vs AI, ` +

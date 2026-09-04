@@ -39,4 +39,6 @@ jobs:
         env:
           HUSKY: 0
       - name: Run balance report
-        run: pnpm sim:report ${{ inputs.gameCount }}
+        env:
+          GAME_COUNT: ${{ inputs.gameCount }}
+        run: pnpm sim:report "$GAME_COUNT"
