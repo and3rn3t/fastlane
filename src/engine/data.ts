@@ -284,7 +284,13 @@ export const JOBS: JobDef[] = [
     // never otherwise touches. Same prestige on purpose: a genuine fork,
     // not a "real" and a "consolation" tier — see career.ts's
     // nextTargetJob() for how Riley picks between prestige-tied branches.
-    id: 'regional-buyer',
+    // `id` intentionally kept as 'regional-director' (the prior session's
+    // pre-fork name) even though the title changed — this job already
+    // shipped in production; renaming the id would 404 any live save where
+    // a player or Riley already holds it (jobById() throws on an unknown
+    // id, and current-version saves skip migration entirely). Caught in
+    // PR review, not before merge.
+    id: 'regional-director',
     title: 'Regional Buyer',
     workplace: 'megamart',
     wage: 20,

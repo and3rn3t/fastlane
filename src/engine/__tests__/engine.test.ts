@@ -290,7 +290,7 @@ describe('deepened career ladders (Wave 12)', () => {
 
   it("keeps every new tier strictly above its ladder's previous ceiling", () => {
     expect(jobById('regional-manager').prestige).toBeGreaterThan(jobById('store-manager').prestige)
-    expect(jobById('regional-buyer').prestige).toBeGreaterThan(jobById('dept-manager').prestige)
+    expect(jobById('regional-director').prestige).toBeGreaterThan(jobById('dept-manager').prestige)
     expect(jobById('ops-director').prestige).toBeGreaterThan(jobById('dept-manager').prestige)
     expect(jobById('regional-vp').prestige).toBeGreaterThan(jobById('branch-manager').prestige)
     expect(jobById('lecturer').prestige).toBeGreaterThan(jobById('ta').prestige)
@@ -312,7 +312,7 @@ describe('deepened career ladders (Wave 12)', () => {
     }
     for (const id of [
       'regional-manager',
-      'regional-buyer',
+      'regional-director',
       'ops-director',
       'regional-vp',
       'lecturer',
@@ -325,7 +325,7 @@ describe('deepened career ladders (Wave 12)', () => {
     expect(jobById('regional-manager').minSkills?.sales).toBeGreaterThan(
       jobById('store-manager').minSkills?.sales ?? 0
     )
-    expect(jobById('regional-buyer').minSkills?.sales).toBeGreaterThan(
+    expect(jobById('regional-director').minSkills?.sales).toBeGreaterThan(
       jobById('dept-manager').minSkills?.sales ?? 0
     )
     expect(jobById('regional-vp').minSkills?.tech).toBeGreaterThan(
@@ -336,11 +336,11 @@ describe('deepened career ladders (Wave 12)', () => {
 
 describe('career fork: Department Manager -> Regional Buyer / Ops Director (Wave 12)', () => {
   it('puts both branches at the same prestige — a genuine either/or, not a real tier plus a decoy', () => {
-    expect(jobById('regional-buyer').prestige).toBe(jobById('ops-director').prestige)
+    expect(jobById('regional-director').prestige).toBe(jobById('ops-director').prestige)
   })
 
   it('diverges the two branches on skill and computer requirements, not just a title swap', () => {
-    const buyer = jobById('regional-buyer')
+    const buyer = jobById('regional-director')
     const ops = jobById('ops-director')
     expect(buyer.minSkills).toEqual({ sales: 60 })
     expect(ops.minSkills).toEqual({ tech: 60 })
@@ -364,14 +364,14 @@ describe('career fork: Department Manager -> Regional Buyer / Ops Director (Wave
       ...s,
       player: { ...s.player, jobId: 'analyst', skills: { sales: 0, trades: 0, tech: 30 } },
     }
-    expect(nextTargetJob(salesLeaning, 'player')?.id).toBe('regional-buyer')
+    expect(nextTargetJob(salesLeaning, 'player')?.id).toBe('regional-director')
     expect(nextTargetJob(techLeaning, 'player')?.id).toBe('ops-director')
   })
 
   it('falls back to the first-listed branch (Regional Buyer) when neither skill has any lead', () => {
     const s = game()
     const noLean = { ...s, player: { ...s.player, jobId: 'analyst' } }
-    expect(nextTargetJob(noLean, 'player')?.id).toBe('regional-buyer')
+    expect(nextTargetJob(noLean, 'player')?.id).toBe('regional-director')
   })
 
   it('bestQualifiedJob returns the fork branch whose specific requirements are met, not the other one', () => {
