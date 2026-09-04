@@ -13,7 +13,7 @@ function freshGame(): GameState {
 afterEach(cleanup)
 
 describe('ActionRow', () => {
-  it('renders label content inside .grow and children after it, both inside .action-row', () => {
+  it('renders label content inside .grow, followed by children as direct siblings, inside .action-row', () => {
     render(
       <ActionRow label={<strong>Label text</strong>}>
         <button>Do it</button>
@@ -21,13 +21,27 @@ describe('ActionRow', () => {
     )
     const row = document.querySelector('.action-row')!
     expect(row).toBeTruthy()
-    expect(row.querySelector('.grow strong')?.textContent).toBe('Label text')
-    expect(screen.getByRole('button', { name: 'Do it' })).toBeTruthy()
+    // Direct-child order, not just presence anywhere in the document — a
+    // button that got hoisted out of .action-row, or reordered ahead of the
+    // label, should fail this the same way losing it entirely would.
+    expect(row.children).toHaveLength(2)
+    expect(row.children[0].className).toBe('grow')
+    expect(row.children[0].querySelector('strong')?.textContent).toBe('Label text')
+    expect(row.children[1].tagName).toBe('BUTTON')
+    expect(row.children[1].textContent).toBe('Do it')
+  })
+
+  it('renders just the label with no children, since a future row may have no trailing control', () => {
+    render(<ActionRow label="Just a label" />)
+    const row = document.querySelector('.action-row')!
+    expect(row.children).toHaveLength(1)
+    expect(row.children[0].className).toBe('grow')
+    expect(row.textContent).toBe('Just a label')
   })
 })
 
 describe('NumberField', () => {
-  it('clamps a cleared/invalid field to floor instead of going NaN', () => {
+  it('resets to floor on a cleared field', () => {
     let value = 5
     const { rerender } = render(
       <NumberField value={value} onChange={(n) => (value = n)} ariaLabel="Amount" floor={0} />
@@ -70,7 +84,7 @@ describe('NumberField', () => {
     expect(value).toBe(20)
   })
 
-  it('floors fractional/typo input the same way the original inline clamps did', () => {
+  it('floors fractional input the same way the original inline clamps did', () => {
     let value = 5
     render(<NumberField value={value} onChange={(n) => (value = n)} ariaLabel="Amount" floor={0} />)
     fireEvent.change(screen.getByLabelText('Amount'), { target: { value: '12.9' } })
@@ -84,13 +98,11 @@ describe('NumberField', () => {
     expect(value).toBe(0)
   })
 
-  it('regression: clearing the Casino bet field no longer leaves Spin enabled with a NaN bet', () => {
-    // Real bug this fixes: the original inline clamp (`Math.max(0,
-    // Math.floor(Number(e.target.value)))`) returns NaN, not 0, once the
-    // field is cleared — and CasinoAction's own downstream
-    // `Math.min(CASINO_MAX_BET, bet, p.cash)` propagates that NaN, so
-    // `disabled={clamped < CASINO_MIN_BET}` (NaN < x is always false) left
-    // the Spin button enabled while displaying "bet $NaN, win $NaN".
+  it('CasinoAction: clearing the bet field resets it to $0 and disables Spin', () => {
+    // Integration check that the shared field is wired up correctly in a
+    // real caller, not a regression test — CASINO_MIN_BET is > 0, so a
+    // cleared/zeroed bet has always correctly disabled Spin here, before
+    // and after this component moved onto NumberField.
     render(
       <GameProvider>
         <CasinoAction game={freshGame()} />

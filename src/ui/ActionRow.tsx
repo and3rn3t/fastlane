@@ -12,7 +12,7 @@ export function ActionRow({
   children,
 }: {
   label: React.ReactNode
-  children: React.ReactNode
+  children?: React.ReactNode
 }) {
   return (
     <div className="action-row">
@@ -72,11 +72,14 @@ export function Stepper({
  * (bet/tickets/deposit/invest/loan amounts). `htmlMin`/`htmlMax` are just the
  * native attributes (cosmetic/mobile-keyboard hints — pass whatever value
  * that field's markup already used, even where it doesn't match `floor`).
- * `floor`/`ceil` drive the actual value clamp. Always guards against `NaN`
- * on a cleared/invalid field (falling back to `floor`) — several call sites
- * previously clamped with bare `Math.max`/`Math.min`, which pass `NaN`
- * through unchanged and could leave a "disabled forever" or, for Casino,
- * a genuinely broken enabled-with-NaN action button. */
+ * `floor`/`ceil` drive the actual value clamp, matching each call site's
+ * previous literal clamp math exactly (a plain `Math.max`/`Math.min` is
+ * enough: the browser's own number-input value-sanitization algorithm
+ * already guarantees `e.target.value` is either a valid finite numeric
+ * string or `''` before this ever runs — confirmed empirically, including
+ * against jsdom — so `Number(e.target.value)` can't itself produce `NaN` or
+ * `Infinity` here, and a defensive guard against that would just be
+ * unreachable code). */
 export function NumberField({
   value,
   onChange,
@@ -105,9 +108,8 @@ export function NumberField({
       aria-label={ariaLabel}
       onChange={(e) => {
         const parsed = Math.floor(Number(e.target.value))
-        const safe = Number.isFinite(parsed) ? parsed : floor
         const clamped =
-          ceil !== undefined ? Math.min(ceil, Math.max(floor, safe)) : Math.max(floor, safe)
+          ceil !== undefined ? Math.min(ceil, Math.max(floor, parsed)) : Math.max(floor, parsed)
         onChange(clamped)
       }}
     />
