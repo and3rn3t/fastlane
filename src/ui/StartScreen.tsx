@@ -15,10 +15,10 @@ import { dailyChallengeNumber, dailyChallengeOptions } from '@/daily'
 import { LEGACY_PERKS, legacyCashBonus } from '@/legacy'
 import { loadRivalry, rivalryLine, rivalryMomentum } from '@/rivalry'
 import { ACHIEVEMENTS, loadStats, type IncidentKind } from '@/stats'
+import { CollapsibleActionGroup } from './ActionRow'
 import {
   BoltIcon,
   BriefcaseIcon,
-  ChevronDownIcon,
   DiceIcon,
   DollarIcon,
   GradCapIcon,
@@ -218,115 +218,107 @@ export function StartScreen() {
         </button>
       </div>
 
-      <details className="action-group">
-        <summary className="section-label">
-          Customize match
-          <ChevronDownIcon size={13} className="disclosure-chevron" />
-        </summary>
-        <div className="action-group-body">
-          <label>
-            Your name{' '}
-            <input
-              type="text"
-              value={name}
-              placeholder="You"
-              maxLength={16}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
+      <CollapsibleActionGroup label="Customize match">
+        <label>
+          Your name{' '}
+          <input
+            type="text"
+            value={name}
+            placeholder="You"
+            maxLength={16}
+            onChange={(e) => setName(e.target.value)}
+          />
+        </label>
 
-          <div>
-            <div className="presets">
-              {Object.entries(PRESETS).map(([label, preset]) => (
-                <button type="button" key={label} onClick={() => setLevels(preset)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {ROWS.map((row) => (
-            <div className="goal-row" key={row.key}>
-              <span className={`goal-row-label cat-${row.category}`}>
-                <row.Icon size={15} /> {row.label}
-              </span>
-              <input
-                type="range"
-                className={`cat-${row.category}`}
-                min={1}
-                max={10}
-                value={levels[row.key]}
-                aria-label={`${row.label} goal`}
-                style={
-                  {
-                    '--fill-pct': `${((levels[row.key] - 1) / 9) * 100}%`,
-                  } as React.CSSProperties
-                }
-                onChange={(e) => setLevels({ ...levels, [row.key]: Number(e.target.value) })}
-              />
-              <span className="target">{row.format(row.targets[levels[row.key] - 1])}</span>
-            </div>
-          ))}
-
-          <div>
-            <span>Rules</span>
-            <div className="presets">
-              {RULE_OPTIONS.map((rule) => (
-                <button
-                  type="button"
-                  key={rule.id}
-                  className={rulePreset === rule.id ? 'primary' : ''}
-                  aria-pressed={rulePreset === rule.id}
-                  onClick={() => setRulePreset(rule.id)}
-                >
-                  {rule.label}
-                </button>
-              ))}
-            </div>
-            <p className="blurb">{RULE_OPTIONS.find((rule) => rule.id === rulePreset)!.blurb}</p>
-          </div>
-
-          <div>
-            <span>Riley's playstyle</span>
-            <div className="presets">
-              {RILEY_PROFILES.map((prof) => (
-                <button
-                  type="button"
-                  key={prof.id}
-                  className={rileyProfile === prof.id ? 'primary' : ''}
-                  aria-pressed={rileyProfile === prof.id}
-                  onClick={() => setRileyProfile(prof.id)}
-                >
-                  <prof.Icon size={14} /> {prof.label}
-                </button>
-              ))}
-            </div>
-            <p className="blurb">
-              {RILEY_PROFILES.find((prof) => prof.id === rileyProfile)!.blurb}
-            </p>
-          </div>
-
-          <div>
-            <span>Riley's difficulty</span>
-            <div className="presets">
-              {DIFFICULTY_OPTIONS.map((diff) => (
-                <button
-                  type="button"
-                  key={diff.id}
-                  className={rileyDifficulty === diff.id ? 'primary' : ''}
-                  aria-pressed={rileyDifficulty === diff.id}
-                  onClick={() => setRileyDifficulty(diff.id)}
-                >
-                  {diff.label}
-                </button>
-              ))}
-            </div>
-            <p className="blurb">
-              {DIFFICULTY_OPTIONS.find((diff) => diff.id === rileyDifficulty)!.blurb}
-            </p>
+        <div>
+          <div className="presets">
+            {Object.entries(PRESETS).map(([label, preset]) => (
+              <button type="button" key={label} onClick={() => setLevels(preset)}>
+                {label}
+              </button>
+            ))}
           </div>
         </div>
-      </details>
+
+        {ROWS.map((row) => (
+          <div className="goal-row" key={row.key}>
+            <span className={`goal-row-label cat-${row.category}`}>
+              <row.Icon size={15} /> {row.label}
+            </span>
+            <input
+              type="range"
+              className={`cat-${row.category}`}
+              min={1}
+              max={10}
+              value={levels[row.key]}
+              aria-label={`${row.label} goal`}
+              style={
+                {
+                  '--fill-pct': `${((levels[row.key] - 1) / 9) * 100}%`,
+                } as React.CSSProperties
+              }
+              onChange={(e) => setLevels({ ...levels, [row.key]: Number(e.target.value) })}
+            />
+            <span className="target">{row.format(row.targets[levels[row.key] - 1])}</span>
+          </div>
+        ))}
+
+        <div>
+          <span>Rules</span>
+          <div className="presets">
+            {RULE_OPTIONS.map((rule) => (
+              <button
+                type="button"
+                key={rule.id}
+                className={rulePreset === rule.id ? 'primary' : ''}
+                aria-pressed={rulePreset === rule.id}
+                onClick={() => setRulePreset(rule.id)}
+              >
+                {rule.label}
+              </button>
+            ))}
+          </div>
+          <p className="blurb">{RULE_OPTIONS.find((rule) => rule.id === rulePreset)!.blurb}</p>
+        </div>
+
+        <div>
+          <span>Riley's playstyle</span>
+          <div className="presets">
+            {RILEY_PROFILES.map((prof) => (
+              <button
+                type="button"
+                key={prof.id}
+                className={rileyProfile === prof.id ? 'primary' : ''}
+                aria-pressed={rileyProfile === prof.id}
+                onClick={() => setRileyProfile(prof.id)}
+              >
+                <prof.Icon size={14} /> {prof.label}
+              </button>
+            ))}
+          </div>
+          <p className="blurb">{RILEY_PROFILES.find((prof) => prof.id === rileyProfile)!.blurb}</p>
+        </div>
+
+        <div>
+          <span>Riley's difficulty</span>
+          <div className="presets">
+            {DIFFICULTY_OPTIONS.map((diff) => (
+              <button
+                type="button"
+                key={diff.id}
+                className={rileyDifficulty === diff.id ? 'primary' : ''}
+                aria-pressed={rileyDifficulty === diff.id}
+                onClick={() => setRileyDifficulty(diff.id)}
+              >
+                {diff.label}
+              </button>
+            ))}
+          </div>
+          <p className="blurb">
+            {DIFFICULTY_OPTIONS.find((diff) => diff.id === rileyDifficulty)!.blurb}
+          </p>
+        </div>
+      </CollapsibleActionGroup>
 
       <div className="start-actions">
         <button type="button" className="text-action" onClick={() => fileInputRef.current?.click()}>
