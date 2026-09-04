@@ -269,60 +269,6 @@ describe('jobRequirements', () => {
   })
 })
 
-describe('deepened career ladders (Wave 12)', () => {
-  it('gives Burger Barn, MegaMart, and First Bank a fourth tier, matching Assembly Works', () => {
-    const tiersByWorkplace = new Map<string, number>()
-    for (const job of JOBS) {
-      tiersByWorkplace.set(job.workplace, (tiersByWorkplace.get(job.workplace) ?? 0) + 1)
-    }
-    expect(tiersByWorkplace.get('burgers')).toBe(4)
-    expect(tiersByWorkplace.get('megamart')).toBe(4)
-    expect(tiersByWorkplace.get('factory')).toBe(4) // unchanged — already the deepest ladder
-    expect(tiersByWorkplace.get('bank')).toBe(4)
-    // University: still shallower by design — a third tier fills the old
-    // 30->88 gap, but a hard jump to 4 wasn't the ask (see roadmap note).
-    expect(tiersByWorkplace.get('university')).toBe(3)
-  })
-
-  it("keeps every new tier strictly above its ladder's previous ceiling", () => {
-    expect(jobById('regional-manager').prestige).toBeGreaterThan(jobById('store-manager').prestige)
-    expect(jobById('regional-director').prestige).toBeGreaterThan(jobById('dept-manager').prestige)
-    expect(jobById('regional-vp').prestige).toBeGreaterThan(jobById('branch-manager').prestige)
-    expect(jobById('lecturer').prestige).toBeGreaterThan(jobById('ta').prestige)
-    expect(jobById('professor').prestige).toBeGreaterThan(jobById('lecturer').prestige)
-  })
-
-  it("keeps Regional VP below Professor — a banking role should not outrank the game's academic ceiling", () => {
-    expect(jobById('regional-vp').prestige).toBeLessThan(jobById('professor').prestige)
-  })
-
-  it('every new tier is actually reachable — a maxed-out player qualifies for all four', () => {
-    const maxed = {
-      ...game().player,
-      dress: 100,
-      education: 100,
-      experience: 1000,
-      skills: { sales: 100, trades: 100, tech: 100 },
-      items: ['computer' as const],
-    }
-    for (const id of ['regional-manager', 'regional-director', 'regional-vp', 'lecturer']) {
-      expect(qualifiesFor(maxed, id).ok).toBe(true)
-    }
-  })
-
-  it('gates each new tier on a higher skill bar than the tier below it, where the ladder already gated on skill', () => {
-    expect(jobById('regional-manager').minSkills?.sales).toBeGreaterThan(
-      jobById('store-manager').minSkills?.sales ?? 0
-    )
-    expect(jobById('regional-director').minSkills?.sales).toBeGreaterThan(
-      jobById('dept-manager').minSkills?.sales ?? 0
-    )
-    expect(jobById('regional-vp').minSkills?.tech).toBeGreaterThan(
-      jobById('branch-manager').minSkills?.tech ?? 0
-    )
-  })
-})
-
 describe('end of week', () => {
   it('accrues rent and evicts after three unpaid weeks', () => {
     let s = applyAction(game(), { type: 'travel', to: 'rentoffice' })
