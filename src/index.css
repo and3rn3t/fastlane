@@ -1213,8 +1213,39 @@ details.action-group[open] .disclosure-chevron {
   }
 
   .location-modal .location-modal-header {
+    justify-content: space-between;
     padding-bottom: 0.7rem;
     border-bottom: 1px solid var(--line);
+  }
+
+  /* Always enabled, regardless of what LocationPanelBody renders below (a
+   * location with everything already owned has zero enabled action buttons
+   * — without this, useModalDialog finds nothing to focus or trap Tab
+   * around, leaving keyboard/AT users with no way to dismiss the dialog). */
+  .location-modal-close {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  /* Sticks to the bottom of the modal's own scroll area (nearest scrolling
+   * ancestor for `position: sticky`, since `.modal` itself scrolls) so End
+   * Week stays reachable without scrolling — necessary because arriving
+   * somewhere new auto-opens this sheet, which would otherwise cover the
+   * dock's copy at the exact moment a player might want to skip the
+   * location and just end the week. */
+  .location-modal-footer {
+    position: sticky;
+    bottom: 0;
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
+    background: var(--card);
+    border-top: 1px solid var(--line);
   }
 }
 

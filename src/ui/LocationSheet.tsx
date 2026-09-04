@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { LOCATIONS, type GameState } from '@/engine'
 import { useGame } from '@/state/GameContext'
-import { ChevronDownIcon } from './Icon'
+import { ChevronDownIcon, CloseIcon } from './Icon'
 import { LOCATION_ICONS } from './icons'
 import { LocationPanelBody } from './LocationPanel'
 import { useModalDialog } from './useModalDialog'
@@ -50,10 +50,21 @@ function LocationHeading({ game }: { game: GameState }) {
  * `.modal` pattern (and useModalDialog's focus trap / Escape / focus restore)
  * that Help and WeekReportModal already rely on — instead of the hand-rolled
  * fixed overlay this replaced, which kept re-growing dismiss/z-order/coverage
- * bugs the standard modal never had. */
+ * bugs the standard modal never had.
+ *
+ * Two guarantees the dock alone can't provide once this covers it (full
+ * viewport, above the dock): an always-enabled close button in the header —
+ * unlike Help/WeekReportModal's single always-enabled action, a location can
+ * have zero enabled action buttons (everything at a shop already owned),
+ * which would otherwise leave useModalDialog with nothing to focus or trap
+ * Tab around; and a sticky End Week footer, since arriving somewhere new
+ * auto-opens this sheet and would otherwise hide the dock's copy right when
+ * a player might want to skip the location entirely. */
 function LocationActionsSheet({ game, onClose }: { game: GameState; onClose: () => void }) {
+  const { dispatchGame } = useGame()
   const loc = LOCATIONS[game.player.location]
   const dialogRef = useModalDialog(onClose)
+  const p = game.player
 
   useEffect(() => {
     const prev = document.body.style.overflow
@@ -80,8 +91,25 @@ function LocationActionsSheet({ game, onClose }: { game: GameState; onClose: () 
       >
         <div className="location-modal-header">
           <LocationHeading game={game} />
+          <button
+            type="button"
+            className="location-modal-close"
+            aria-label="Close"
+            onClick={onClose}
+          >
+            <CloseIcon size={16} />
+          </button>
         </div>
         <LocationPanelBody game={game} />
+        <div className="location-modal-footer">
+          <button
+            type="button"
+            className="location-dock-end-week"
+            onClick={() => dispatchGame({ type: 'endWeek' })}
+          >
+            End week {p.timeLeft > 0 ? `(${p.timeLeft}h left)` : ''}
+          </button>
+        </div>
       </div>
     </div>
   )

@@ -27,18 +27,24 @@ test('travel opens the location sheet, actions keep it open, and End Week is alw
     .click()
   await expect(sheet).toBeVisible()
 
-  // Backdrop tap dismisses, freeing the board again.
-  await page.locator('.modal-backdrop').click({ position: { x: 5, y: 5 } })
+  // The header Close button must be a real, clickable dismiss path — not
+  // just the backdrop (a Copilot review finding: a location with zero
+  // enabled action buttons would otherwise leave no in-dialog way out).
+  await sheet.getByRole('button', { name: /^Close$/ }).click()
   await expect(sheet).not.toBeVisible()
 
   // Board tiles are tappable behind the dock; work a shift at the new job.
   await page.getByRole('button', { name: /Burger Barn/ }).click()
-  await expect(page.getByRole('dialog', { name: /Burger Barn/ })).toBeVisible()
+  const burgerBarnSheet = page.getByRole('dialog', { name: /Burger Barn/ })
+  await expect(burgerBarnSheet).toBeVisible()
   await page.getByRole('button', { name: /^Work \d+h/ }).click()
-  await page.locator('.modal-backdrop').click({ position: { x: 5, y: 5 } })
 
-  // The dock's End Week must be genuinely clickable — nothing covering it.
-  await page.getByRole('button', { name: /End week/ }).click()
+  // End Week must be reachable *from inside the open dialog* — a second
+  // Copilot review finding: the dialog fully covers the dock, and travel
+  // auto-opens it, so without an in-dialog End Week action the "always
+  // tappable, never covered" guarantee broke the moment a player arrived
+  // somewhere new and wanted to skip straight to ending the week.
+  await burgerBarnSheet.getByRole('button', { name: /^End week/ }).click()
   const skip = page.getByRole('button', { name: /Skip/ })
   if (await skip.isVisible().catch(() => false)) await skip.click()
   await expect(page.getByRole('dialog', { name: /Week 1 report/i })).toBeVisible()

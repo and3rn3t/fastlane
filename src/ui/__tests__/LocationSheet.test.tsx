@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { newGame, type GameState } from '@/engine'
 import { GameProvider, SAVE_KEY, useGame } from '@/state/GameContext'
@@ -167,6 +167,47 @@ describe('LocationSheet on mobile (dock + modal actions sheet)', () => {
     expect(screen.getByTestId('phase').textContent).toBe('playing')
 
     fireEvent.click(screen.getByRole('button', { name: /^End week/i }))
+
+    expect(screen.getByTestId('phase').textContent).toBe('weekReport')
+  })
+
+  it('has an always-enabled Close button in the dialog header, regardless of what the body renders', () => {
+    // Copilot review finding: unlike Help/WeekReportModal, a location can
+    // render zero enabled action buttons (e.g. every item at a shop already
+    // owned) — without a close button that doesn't depend on body content,
+    // useModalDialog finds nothing to focus or trap Tab around, leaving
+    // keyboard/AT users with no discoverable way to dismiss the dialog.
+    render(
+      <GameProvider>
+        <LocationSheet game={freshGame()} />
+      </GameProvider>
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Home/i }))
+    const closeButton = screen.getByRole('button', { name: /^Close$/i })
+    expect(closeButton).toBeTruthy()
+    expect((closeButton as HTMLButtonElement).disabled).toBe(false)
+
+    fireEvent.click(closeButton)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('keeps an End Week action reachable and functional inside the dialog while it is open', () => {
+    // Copilot review finding: the dialog (z-index 13) fully covers the dock
+    // (z-index 6), and travel auto-opens it — so without an End Week action
+    // inside the dialog itself, the "persistent, never covered" guarantee
+    // this redesign is built around breaks the moment a player arrives
+    // somewhere new and wants to just end the week.
+    localStorage.setItem(SAVE_KEY, JSON.stringify(freshGame()))
+    render(
+      <GameProvider>
+        <LiveGameHarness />
+      </GameProvider>
+    )
+    fireEvent.click(screen.getByRole('button', { name: /Home/i }))
+    const dialog = screen.getByRole('dialog', { name: /Home/i })
+    expect(dialog).toBeTruthy()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: /^End week/i }))
 
     expect(screen.getByTestId('phase').textContent).toBe('weekReport')
   })
