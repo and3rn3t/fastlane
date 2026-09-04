@@ -6,6 +6,7 @@ export const MEAL_TIME = 2
 export const CLASS_TIME = 8
 export const RELAX_CAP = 10
 export const EVICTION_WEEKS = 3
+export const APPLY_JOB_TIME = 2
 
 export const MEAL_PRICE = 9
 export const GROCERY_PRICE_MEGAMART = 4

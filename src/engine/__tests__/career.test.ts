@@ -11,12 +11,15 @@ function game(goals: Goals = easyGoals, seed = 42): GameState {
 
 describe('bestQualifiedJob', () => {
   it('returns the highest-prestige job the player already qualifies for', () => {
-    // A fresh player already meets fry-cook's/stocker's requirements (no
-    // job needed) — of everything they qualify for, the highest-prestige
-    // one should win, not just the first match.
+    // A fresh player (dress 20, education 0, experience 0) qualifies for
+    // exactly three jobs with no job needed: fry-cook (prestige 5), janitor
+    // (6), and stocker (8, minDress 10 — the only requirement it has, which
+    // starting dress already clears). Of those, stocker should win — a
+    // regression that returned any of the other two, or picked whichever
+    // came first in JOBS instead of sorting by prestige, would slip past a
+    // looser "just not null" assertion.
     const job = bestQualifiedJob(game(), 'player')
-    expect(job).not.toBeNull()
-    expect(job?.prestige).toBeGreaterThan(0)
+    expect(job?.id).toBe('stocker')
   })
 
   it('returns null once already at the top of the ladder — nothing outranks Professor (88)', () => {

@@ -3,7 +3,8 @@ import { useState } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import App from '@/App'
-import { GameProvider } from '@/state/GameContext'
+import { newGame } from '@/engine'
+import { GameProvider, SAVE_KEY } from '@/state/GameContext'
 import { reportError } from '@/telemetry'
 
 // virtual:pwa-register/react does real navigator.serviceWorker/workbox-window
@@ -146,14 +147,15 @@ describe('App', () => {
     expect(screen.getByText(/You went hungry last week/)).toBeTruthy()
   })
 
-  it('shows a job-switch nudge for a free upgrade, and "Switch now" travels there', () => {
+  it('shows a job-switch nudge for a free upgrade; "Switch now" travels, then applies', () => {
     renderApp()
     fireEvent.click(screen.getByText(/Start new game/))
     fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
 
-    // A fresh, job-less player already qualifies for Stocker at MegaMart
-    // (no requirements) — the nudge should surface it alongside the
-    // unrelated food hint, not replace it.
+    // A fresh, job-less player has a real requirement for Stocker (minDress
+    // 10) — they qualify only because starting Dress (20) already clears
+    // it, not because the job is requirement-free. The nudge should
+    // surface it alongside the unrelated food hint, not replace it.
     expect(screen.getByText(/You now qualify for Stocker at MegaMart/)).toBeTruthy()
     expect(screen.getByText(/Running low on food/)).toBeTruthy()
 
@@ -162,10 +164,43 @@ describe('App', () => {
     fireEvent.click(screen.getByRole('button', { name: /Switch now/ }))
     expect(screen.getByText(/Browse openings across town and apply/)).toBeTruthy()
 
-    // Dismissing hides it independently of the food hint.
+    // Now that the player *is* at Employment, the same button's other
+    // branch applies — this is the feature's actual switching behavior, not
+    // just its travel-there fallback. TopBar's "Job" stat is the least
+    // ambiguous place to check this — "Stocker" alone also matches the
+    // (still-visible) Job Board listing title.
+    fireEvent.click(screen.getByRole('button', { name: /Switch now/ }))
+    const jobStat = screen.getByText('Job').closest('.stat')
+    expect(jobStat?.textContent).toContain('Stocker')
+  })
+
+  it('dismisses the job-switch nudge independently of the unrelated food hint', () => {
+    renderApp()
+    fireEvent.click(screen.getByText(/Start new game/))
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+
     fireEvent.click(screen.getByRole('button', { name: /Dismiss job suggestion/i }))
     expect(screen.queryByText(/You now qualify for Stocker at MegaMart/)).toBeNull()
     expect(screen.getByText(/Running low on food/)).toBeTruthy()
+  })
+
+  it('disables "Switch now" once there is not enough time left to act on it', () => {
+    // At home with 0h left, the CTA's fallback (travel to Employment, 1h
+    // from home) doesn't fit — clicking it would otherwise throw the
+    // engine's own "Not enough time left this week" EngineError uncaught.
+    const state = newGame({
+      playerName: 'Tester',
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      seed: 1,
+    })
+    localStorage.setItem(
+      SAVE_KEY,
+      JSON.stringify({ ...state, player: { ...state.player, timeLeft: 0 } })
+    )
+    renderApp()
+    fireEvent.click(screen.getByRole('button', { name: /Got it/ }))
+    const switchButton = screen.getByRole('button', { name: /Switch now/ }) as HTMLButtonElement
+    expect(switchButton.disabled).toBe(true)
   })
 })
 
