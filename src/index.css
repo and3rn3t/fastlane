@@ -152,7 +152,8 @@ input[type='range'] {
   margin: 0 auto;
   padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
     max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
-  min-height: 100vh;
+  min-height: 100vh; /* fallback for browsers without dvh */
+  min-height: 100dvh; /* tracks iOS Safari's dynamic toolbar */
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -440,7 +441,10 @@ input[type='range'] {
   align-items: start;
 }
 
-@media (max-width: 900px) {
+/* Same query as the location dock below and MOBILE_MEDIA_QUERY in
+ * LocationSheet.tsx — three formerly-different breakpoint values (900px here,
+ * 899.98px on the old sheet, `< 900` in JS) are now one. */
+@media (max-width: 899.98px) {
   .game-layout {
     grid-template-columns: 1fr;
   }
@@ -1100,28 +1104,7 @@ details.action-group[open] .disclosure-chevron {
   transform: rotate(180deg);
 }
 
-/* ---------- location sheet ---------- */
-
-/* Hidden by default (desktop): the location panel there is a permanent
- * static card, not a temporary sheet — see `.location-sheet.expanded`'s
- * comment below and the media query for why the dimming/dismiss backdrop
- * only makes sense once the sheet is actually a bottom sheet. */
-.location-sheet-backdrop {
-  display: none;
-}
-
-.location-sheet-handle {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  width: 100%;
-  flex-shrink: 0;
-  text-align: left;
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
+/* ---------- location card / dock / actions sheet ---------- */
 
 .icon-chip {
   display: inline-flex;
@@ -1135,18 +1118,19 @@ details.action-group[open] .disclosure-chevron {
   color: var(--accent);
 }
 
-.location-sheet-heading {
+.location-heading {
   display: flex;
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  text-align: left;
 }
 
-.location-sheet-heading strong {
+.location-heading strong {
   font-size: 0.95rem;
 }
 
-.location-sheet-heading .desc {
+.location-heading .desc {
   font-size: 0.78rem;
   color: var(--ink-soft);
   overflow: hidden;
@@ -1154,118 +1138,114 @@ details.action-group[open] .disclosure-chevron {
   white-space: nowrap;
 }
 
-.location-sheet .disclosure-chevron {
-  flex-shrink: 0;
+.location-card-header,
+.location-modal-header {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
 }
 
-/* Persistent regardless of peek/expanded — replaces the old auto-collapse
- * mechanic as the guaranteed way back to the board on mobile, where the
- * board's own End Week button (`.end-week` below) can sit underneath this
- * sheet's fixed overlay. Deliberately not `.primary`: it's a persistent
- * utility control, not the current location's own action. */
-.location-sheet-end-week {
-  width: 100%;
-  margin-top: 0.6rem;
+.location-card-header {
+  margin-bottom: 0.7rem;
 }
 
-.location-sheet.expanded .disclosure-chevron {
-  transform: rotate(180deg);
-}
-
-.location-sheet-peek-action {
-  padding-top: 0.6rem;
-  margin-top: 0.6rem;
-  border-top: 1px solid var(--line);
-}
-
-.location-sheet-body {
-  padding-top: 0.7rem;
-  margin-top: 0.2rem;
-}
-
-.drag-pill {
-  display: none;
-}
-
+/* Not rendered on desktop (the component renders the static card instead),
+ * so no display toggle here — these rules only ever apply under the mobile
+ * media query below, kept together with the rest of the dock's styles. */
 @media (max-width: 899.98px) {
-  .side {
-    padding-bottom: calc(7rem + env(safe-area-inset-bottom));
+  /* The dock is a fixed-height single row (its heading ellipsizes rather
+   * than wraps), so this clearance is deterministic — unlike the old
+   * variable-height peek sheet, whose hardcoded 7rem guess could be
+   * outgrown by a tall peek action and silently cover the event log. */
+  :root {
+    --dock-height: 4.5rem;
   }
 
-  /* Superseded by `.location-sheet-end-week` here: this one can end up
-   * underneath the sheet's fixed overlay below, so it's no longer a
-   * reliable way to end the week at this width — the sheet's persistent
-   * copy, rendered at the same breakpoint, is. */
+  .side {
+    padding-bottom: calc(var(--dock-height) + env(safe-area-inset-bottom) + 0.5rem);
+  }
+
+  /* The dock owns End Week at this width — the board's own copy would sit
+   * behind the fixed dock at the bottom of a scrolled single column. */
   .end-week {
     display: none;
   }
 
-  .location-sheet {
+  .location-dock {
     position: fixed;
     left: 0;
     right: 0;
     bottom: 0;
     z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
     background: color-mix(in srgb, var(--card) 92%, transparent);
     backdrop-filter: blur(24px) saturate(180%);
     -webkit-backdrop-filter: blur(24px) saturate(180%);
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     box-shadow: 0 -8px 24px rgb(16 24 40 / 0.12);
-    padding: 1.1rem max(1rem, env(safe-area-inset-right))
-      max(1rem, calc(env(safe-area-inset-bottom) + 0.75rem)) max(1rem, env(safe-area-inset-left));
+    padding: 0.6rem max(1rem, env(safe-area-inset-right))
+      max(0.6rem, calc(env(safe-area-inset-bottom) + 0.35rem)) max(1rem, env(safe-area-inset-left));
   }
 
-  .drag-pill {
-    display: block;
-    width: 2.5rem;
-    height: 4px;
-    border-radius: 2px;
-    background: var(--line);
-    position: absolute;
-    top: 0.5rem;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-
-  /* Real bug this fixes, reported directly: the sheet's own content height
-   * (not even the 88vh cap below — Home's blurb is ~200px, well under it)
-   * can outgrow the gap between it and whatever sits above on a short
-   * viewport (confirmed on a 667px-tall screen: the expanded sheet's top
-   * edge lands *above* the board's End Week button, covering it with no
-   * way back — elementFromPoint at the button's coordinates resolved to
-   * the sheet's own text, not the button). Shrinking max-height further
-   * wouldn't have helped here since content never hit the old cap; the
-   * actual fix is giving the sheet a real dismiss path once it's covering
-   * the screen, the same way `.modal-backdrop` already does for Help/the
-   * week report — tap anywhere outside to collapse back to peek. */
-  .location-sheet-backdrop {
-    display: block;
-    position: fixed;
-    inset: 0;
-    background: rgb(10 14 22 / 0.35);
-    /* Below .location-sheet (6), above everything else including .topbar
-     * (5) — same full-coverage precedent .modal-backdrop already sets for
-     * an explicitly-opened sheet/modal outranking the rest of the page.
-     * Reaches the same effective z-order as pawn-marker-wrap/.topbar (also
-     * 5) by coming later in source order, not by a higher number — both
-     * are ordinary sibling stacking contexts, so equal z-index resolves by
-     * DOM order here. */
-    z-index: 5;
-    animation: scrim-fade 0.2s ease-out both;
-  }
-
-  .location-sheet.expanded {
-    max-height: 88vh;
+  .location-dock-open {
+    flex: 1;
+    min-width: 0;
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
   }
 
-  .location-sheet.expanded .location-sheet-body {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-    overscroll-behavior-y: contain;
-    -webkit-overflow-scrolling: touch;
+  .location-dock-open .disclosure-chevron {
+    flex-shrink: 0;
+    transform: rotate(180deg); /* points up: the sheet opens upward */
+  }
+
+  /* Deliberately not `.primary`: a persistent utility control, not the
+   * current location's own action. */
+  .location-dock-end-week {
+    flex-shrink: 0;
+  }
+
+  .location-modal .location-modal-header {
+    justify-content: space-between;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--line);
+  }
+
+  /* Always enabled, regardless of what LocationPanelBody renders below (a
+   * location with everything already owned has zero enabled action buttons
+   * — without this, useModalDialog finds nothing to focus or trap Tab
+   * around, leaving keyboard/AT users with no way to dismiss the dialog). */
+  .location-modal-close {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 50%;
+  }
+
+  /* Sticks to the bottom of the modal's own scroll area (nearest scrolling
+   * ancestor for `position: sticky`, since `.modal` itself scrolls) so End
+   * Week stays reachable without scrolling — necessary because arriving
+   * somewhere new auto-opens this sheet, which would otherwise cover the
+   * dock's copy at the exact moment a player might want to skip the
+   * location and just end the week. */
+  .location-modal-footer {
+    position: sticky;
+    bottom: 0;
+    margin-top: 0.6rem;
+    padding-top: 0.6rem;
+    background: var(--card);
+    border-top: 1px solid var(--line);
   }
 }
 
@@ -1352,7 +1332,8 @@ details.action-group[open] .disclosure-chevron {
   padding: 1.5rem;
   max-width: 560px;
   width: 100%;
-  max-height: 80vh;
+  max-height: 80vh; /* fallback for browsers without dvh */
+  max-height: 80dvh;
   overflow-y: auto;
   overscroll-behavior-y: contain;
   -webkit-overflow-scrolling: touch;
@@ -1366,8 +1347,8 @@ details.action-group[open] .disclosure-chevron {
   margin: 0;
 }
 
-/* Below 640px, present as a bottom sheet with vibrancy — the same drag-handle
- * pattern as .panel.sheet — instead of a centered dialog. */
+/* Below 640px, present as a bottom sheet with vibrancy and a drag-handle
+ * grabber instead of a centered dialog. */
 @media (max-width: 640px) {
   .modal-backdrop {
     align-items: flex-end;
@@ -1376,7 +1357,8 @@ details.action-group[open] .disclosure-chevron {
 
   .modal {
     max-width: 100%;
-    max-height: 88vh;
+    max-height: 88vh; /* fallback for browsers without dvh */
+    max-height: 88dvh;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     padding: 1.15rem max(1.25rem, env(safe-area-inset-right))
       max(1.25rem, calc(env(safe-area-inset-bottom) + 1rem)) max(1.25rem, env(safe-area-inset-left));
@@ -1648,7 +1630,7 @@ details.action-group[open] .disclosure-chevron {
   padding-left: max(1rem, env(safe-area-inset-left));
   padding-right: max(1rem, env(safe-area-inset-right));
   font-size: 0.85rem;
-  /* Below .location-sheet (6) and .modal-backdrop (13) — a passive nudge
+  /* Below .location-dock (6) and .modal-backdrop (13) — a passive nudge
    * banner must never paint over an interactive sheet/modal control. */
   z-index: 4;
 }
