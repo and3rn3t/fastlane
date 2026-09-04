@@ -65,6 +65,30 @@ export interface JobDef {
   minSkills?: Partial<Record<SkillId, number>>
 }
 
+/** One per-criterion row of `qualifiesFor()`'s underlying detail — `current`/
+ * `required` let a UI render real progress ("Dress 18/25") instead of flat
+ * pass/fail text. Only emitted for criteria a job actually gates on (e.g. no
+ * row for education when `minEducation` is 0) — see `jobRequirements()` in
+ * actions.ts, the single source of truth `qualifiesFor()` itself derives
+ * `ok`/`reasons` from. */
+export interface JobRequirement {
+  /** Stable identifier: 'education' | 'dress' | 'experience' | 'computer' |
+   * `skill:${SkillId}` — lets a UI key/style rows without parsing `label`. */
+  key: string
+  /** Display label, e.g. "Classes", "Dress", "Computer", "Sales skill". */
+  label: string
+  current: number
+  required: number
+  /** True if this criterion is satisfied — accounts for the layoff
+   * "sympathy hire" carve-out (dress/experience only), so this can be true
+   * even when `current < required`; `waived` distinguishes that case. */
+  met: boolean
+  /** True only when `met` is true solely because of the sympathy-hire
+   * carve-out, not because `current >= required` — lets a UI show *why*
+   * a criterion reads as satisfied despite the raw numbers. */
+  waived?: boolean
+}
+
 export interface ItemDef {
   id: ItemId
   name: string

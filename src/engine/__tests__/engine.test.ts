@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { AI_PROFILES, DIFFICULTY_SKILL, runAIWeek } from '../ai'
-import { EngineError, netWorth, qualifiesFor, wagePerHour } from '../actions'
+import { EngineError, jobRequirements, netWorth, qualifiesFor, wagePerHour } from '../actions'
 import {
   FOOD_NEEDED,
   MARKET_INDEX_MAX,
@@ -200,6 +200,70 @@ describe('skills', () => {
         'store-manager'
       ).ok
     ).toBe(true)
+  })
+})
+
+describe('jobRequirements', () => {
+  it('only emits rows for criteria the job actually gates on', () => {
+    // fry-cook: minDress 10, minEducation 0, minExperience 0, no computer/skills
+    // — only dress should appear, not the three zero/absent requirements.
+    const reqs = jobRequirements(game().player, 'fry-cook')
+    expect(reqs.map((r) => r.key)).toEqual(['dress'])
+  })
+
+  it('reports current/required/met per criterion, not just pass/fail', () => {
+    const p = { ...game().player, dress: 18, education: 5, experience: 30 }
+    const reqs = jobRequirements(p, 'cashier') // minDress 25, minEducation 2, minExperience 20
+    expect(reqs).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ key: 'education', current: 5, required: 2, met: true }),
+        expect.objectContaining({ key: 'dress', current: 18, required: 25, met: false }),
+        expect.objectContaining({ key: 'experience', current: 30, required: 20, met: true }),
+      ])
+    )
+  })
+
+  it('marks a skill requirement with its display name and progress', () => {
+    const p = { ...game().player, dress: 100, education: 100, experience: 1000 }
+    const reqs = jobRequirements(p, 'store-manager')
+    const skillReq = reqs.find((r) => r.key === 'skill:sales')
+    expect(skillReq).toEqual(
+      expect.objectContaining({ label: 'Sales skill', current: 0, required: 40, met: false })
+    )
+  })
+
+  it('marks a computer requirement as a 0/1 boolean, not a raw count', () => {
+    const withoutComputer = jobRequirements(game().player, 'analyst').find(
+      (r) => r.key === 'computer'
+    )
+    expect(withoutComputer).toEqual(
+      expect.objectContaining({ current: 0, required: 1, met: false })
+    )
+  })
+
+  it('marks dress/experience as met-but-waived during a layoff, not silently met', () => {
+    const laidOff = {
+      ...game().player,
+      dress: 0,
+      experience: 0,
+      activeEvents: [{ chainId: 'layoff' as const, stage: 0, weeksInStage: 0 }],
+    }
+    const reqs = jobRequirements(laidOff, 'cashier')
+    const dressReq = reqs.find((r) => r.key === 'dress')
+    const expReq = reqs.find((r) => r.key === 'experience')
+    expect(dressReq).toEqual(
+      expect.objectContaining({ current: 0, required: 25, met: true, waived: true })
+    )
+    expect(expReq).toEqual(
+      expect.objectContaining({ current: 0, required: 20, met: true, waived: true })
+    )
+  })
+
+  it('qualifiesFor stays derived from jobRequirements, not a second source of truth', () => {
+    const p = { ...game().player, dress: 5 }
+    const reqs = jobRequirements(p, 'cashier')
+    const qual = qualifiesFor(p, 'cashier')
+    expect(qual.ok).toBe(reqs.every((r) => r.met))
   })
 })
 

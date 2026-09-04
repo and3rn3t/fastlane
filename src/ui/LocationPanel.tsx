@@ -25,6 +25,7 @@ import {
   hasItem,
   itemById,
   jobById,
+  jobRequirements,
   maxLoan,
   price,
   qualifiesFor,
@@ -36,6 +37,7 @@ import { useGame } from '@/state/GameContext'
 import {
   BankIcon,
   BriefcaseIcon,
+  CheckIcon,
   ChevronDownIcon,
   DollarIcon,
   GradCapIcon,
@@ -146,6 +148,7 @@ function JobBoard({ game }: { game: GameState }) {
     <>
       {JOBS.map((job) => {
         const qual = qualifiesFor(p, job.id)
+        const reqs = jobRequirements(p, job.id)
         const isCurrent = p.jobId === job.id
         return (
           <div className="job-listing" key={job.id}>
@@ -157,20 +160,18 @@ function JobBoard({ game }: { game: GameState }) {
                 ${wagePerHour(game, job.id, isCurrent ? p.promotionLevel : 0).toFixed(2)}/h ·
                 prestige{' '}
                 {job.prestige + (isCurrent ? p.promotionLevel * PROMOTION_PRESTIGE_BONUS : 0)}
-                {job.minEducation > 0 && ` · ${job.minEducation} classes`}
-                {job.minDress > 0 && ` · dress ${job.minDress}`}
-                {job.minExperience > 0 && ` · ${job.minExperience}h exp`}
-                {job.minSkills &&
-                  Object.entries(job.minSkills).map(([skillId, needed]) => (
-                    <span key={skillId}>
-                      {' '}
-                      · {needed} {skillId} skill
+              </div>
+              {reqs.length > 0 && (
+                <div className="job-requirements">
+                  {reqs.map((r) => (
+                    <span key={r.key} className={r.met ? 'req met' : 'req unmet'}>
+                      {r.met ? <CheckIcon size={11} /> : <LockIcon size={11} />}{' '}
+                      {r.key === 'computer'
+                        ? r.label
+                        : `${r.label} ${Math.round(r.current)}/${r.required}`}
+                      {r.waived && ' (waived)'}
                     </span>
                   ))}
-              </div>
-              {!qual.ok && (
-                <div className="locked">
-                  <LockIcon size={12} /> {qual.reasons.join(', ')}
                 </div>
               )}
             </div>
