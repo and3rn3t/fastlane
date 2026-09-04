@@ -4,6 +4,7 @@ export * from './engine'
 export {
   EngineError,
   qualifiesFor,
+  jobRequirements,
   netWorth,
   foodShortfall,
   hasItem,

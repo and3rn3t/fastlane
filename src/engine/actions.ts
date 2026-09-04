@@ -30,6 +30,7 @@ import {
   SKILL_TRAIN_GAIN,
   SKILL_TRAIN_PRICE,
   SKILL_TRAIN_TIME,
+  SKILLS,
   TUITION,
   itemById,
   jobById,
@@ -41,6 +42,7 @@ import type {
   ApartmentTier,
   GameState,
   ItemId,
+  JobRequirement,
   LocationId,
   PlayerKey,
   PlayerState,
@@ -142,25 +144,99 @@ export function work(state: GameState, key: PlayerKey, hours: number) {
   }
 }
 
-export function qualifiesFor(p: PlayerState, jobId: string): { ok: boolean; reasons: string[] } {
+// Reason text a UI displayed before jobRequirements() existed — preserved
+// verbatim (word-for-word) so qualifiesFor()'s `reasons` stays byte-identical
+// for existing callers/tests even though it's now derived, not hand-written.
+function reasonText(r: JobRequirement): string {
+  switch (r.key) {
+    case 'education':
+      return `needs ${r.required} classes`
+    case 'dress':
+      return `needs dress ${r.required}`
+    case 'experience':
+      return `needs ${r.required}h experience`
+    case 'computer':
+      return 'needs a computer'
+    default:
+      // `skill:${SkillId}` — SKILLS' own ids are lowercase, matching the
+      // original hand-written `needs ${needed} ${skillId} skill` text.
+      return `needs ${r.required} ${r.key.slice('skill:'.length)} skill`
+  }
+}
+
+/** Per-criterion detail behind `qualifiesFor()` — one row per requirement a
+ * job actually gates on, `{ current, required, met }` instead of just a
+ * pass/fail reason string, so a UI can render real progress ("Dress 18/25").
+ * The single source of truth: `qualifiesFor()` below derives `ok`/`reasons`
+ * from this, rather than duplicating the same threshold checks twice. */
+export function jobRequirements(p: PlayerState, jobId: string): JobRequirement[] {
   const job = jobById(jobId)
-  const reasons: string[] = []
+  const reqs: JobRequirement[] = []
   // A layoff chain waives dress/experience (but not education, computer, or
   // skills) for its duration — a "sympathy hire" recognizing that a good
   // reference and a clean resume matter more right after a layoff than
   // whether your suit is sharp or you've clocked enough hours somewhere new.
   const sympathyHire = p.activeEvents.some((e) => e.chainId === 'layoff')
-  if (p.education < job.minEducation) reasons.push(`needs ${job.minEducation} classes`)
-  if (!sympathyHire && p.dress < job.minDress) reasons.push(`needs dress ${job.minDress}`)
-  if (!sympathyHire && p.experience < job.minExperience) {
-    reasons.push(`needs ${job.minExperience}h experience`)
+
+  if (job.minEducation > 0) {
+    reqs.push({
+      key: 'education',
+      label: 'Classes',
+      current: p.education,
+      required: job.minEducation,
+      met: p.education >= job.minEducation,
+    })
   }
-  if (job.requiresComputer && !hasItem(p, 'computer')) reasons.push('needs a computer')
+  if (job.minDress > 0) {
+    const rawMet = p.dress >= job.minDress
+    reqs.push({
+      key: 'dress',
+      label: 'Dress',
+      current: p.dress,
+      required: job.minDress,
+      met: rawMet || sympathyHire,
+      waived: !rawMet && sympathyHire ? true : undefined,
+    })
+  }
+  if (job.minExperience > 0) {
+    const rawMet = p.experience >= job.minExperience
+    reqs.push({
+      key: 'experience',
+      label: 'Experience',
+      current: p.experience,
+      required: job.minExperience,
+      met: rawMet || sympathyHire,
+      waived: !rawMet && sympathyHire ? true : undefined,
+    })
+  }
+  if (job.requiresComputer) {
+    const owned = hasItem(p, 'computer')
+    reqs.push({
+      key: 'computer',
+      label: 'Computer',
+      current: owned ? 1 : 0,
+      required: 1,
+      met: owned,
+    })
+  }
   if (job.minSkills) {
     for (const [skillId, needed] of Object.entries(job.minSkills) as Array<[SkillId, number]>) {
-      if (p.skills[skillId] < needed) reasons.push(`needs ${needed} ${skillId} skill`)
+      reqs.push({
+        key: `skill:${skillId}`,
+        label: `${SKILLS.find((s) => s.id === skillId)?.name ?? skillId} skill`,
+        current: p.skills[skillId],
+        required: needed,
+        met: p.skills[skillId] >= needed,
+      })
     }
   }
+  return reqs
+}
+
+export function qualifiesFor(p: PlayerState, jobId: string): { ok: boolean; reasons: string[] } {
+  const reasons = jobRequirements(p, jobId)
+    .filter((r) => !r.met)
+    .map(reasonText)
   return { ok: reasons.length === 0, reasons }
 }
 

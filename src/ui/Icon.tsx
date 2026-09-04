@@ -79,6 +79,14 @@ export function LockIcon({ size = 16, className }: IconProps) {
   )
 }
 
+export function CheckIcon({ size = 16, className }: IconProps) {
+  return (
+    <svg {...base(size)} className={className} aria-hidden>
+      <path d="M5 12.5l4.5 4.5L19 7" />
+    </svg>
+  )
+}
+
 export function CopyIcon({ size = 16, className }: IconProps) {
   return (
     <svg {...base(size)} className={className} aria-hidden>

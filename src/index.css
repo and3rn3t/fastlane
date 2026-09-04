@@ -1033,6 +1033,28 @@ details.panel[open] .disclosure-chevron {
   gap: 0.3rem;
 }
 
+.job-requirements {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.7rem;
+  margin-top: 0.15rem;
+}
+
+.job-requirements .req {
+  font-size: 0.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.job-requirements .req.met {
+  color: var(--good);
+}
+
+.job-requirements .req.unmet {
+  color: var(--ink-soft);
+}
+
 /* ---------- grouped-list action sections ---------- */
 
 .action-group {
