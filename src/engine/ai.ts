@@ -31,6 +31,7 @@ import {
   CASINO_MAX_BET,
   CASINO_MIN_BET,
   DOCTOR_PRICE,
+  GROCERY_PRICE_MEGAMART,
   HEALTH_SICK_THRESHOLD,
   ITEMS,
   RENT,
@@ -161,7 +162,7 @@ export function applyMomentum(profile: AiProfile, momentum: RileyMomentum): AiPr
 
 /** Cash the AI tries to keep on hand for rent and food before splurging. */
 function reserve(state: GameState, profile: AiProfile): number {
-  return act.price(state, RENT.basic) * profile.reserveMultiplier + 60
+  return act.seasonalPrice(state, RENT.basic, 'rent') * profile.reserveMultiplier + 60
 }
 
 // Above-Normal skill (Hard) intentionally has no extra lever beyond zero
@@ -197,7 +198,7 @@ function ensureFood(state: GameState, key: PlayerKey): boolean {
   const p = get(state, key)
   const needed = act.foodShortfall(p)
   if (needed === 0) return false
-  const unitCost = act.price(state, 4)
+  const unitCost = act.seasonalPrice(state, GROCERY_PRICE_MEGAMART, 'grocery')
   if (p.cash < unitCost * needed + 10) return false
   if (!goTo(state, key, 'megamart')) return false
   const stockUp = act.hasItem(p, 'fridge') ? needed + 6 : needed
@@ -211,7 +212,7 @@ function ensureFood(state: GameState, key: PlayerKey): boolean {
 function ensureHousing(state: GameState, key: PlayerKey): boolean {
   const p = get(state, key)
   if (p.apartment === 'none') {
-    if (p.cash < act.price(state, RENT.basic) * 1.5) return false
+    if (p.cash < act.seasonalPrice(state, RENT.basic, 'rent') * 1.5) return false
     if (!goTo(state, key, 'rentoffice')) return false
     return attempt(() => act.rentApartment(state, key, 'basic'))
   }

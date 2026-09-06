@@ -27,6 +27,7 @@ import {
   PROMOTION_WAGE_BONUS,
   RELAX_CAP,
   RENT,
+  SEASON_MULTIPLIERS,
   SKILL_GAIN_PER_HOUR,
   SKILL_TRAIN_GAIN,
   SKILL_TRAIN_PRICE,
@@ -36,6 +37,7 @@ import {
   itemById,
   jobById,
   maxLoan,
+  seasonForWeek,
   travelCost,
 } from './data'
 import { roll } from './rng'
@@ -58,6 +60,18 @@ function require_(cond: boolean, message: string): asserts cond {
 
 export function price(state: GameState, base: number): number {
   return Math.round(base * state.economy.priceIndex)
+}
+
+/** Same as price(), plus the current season's grocery/rent swing — kept
+ * separate from price() since most categories (meals, tuition, items, …)
+ * have no seasonal component. */
+export function seasonalPrice(
+  state: GameState,
+  base: number,
+  category: 'grocery' | 'rent'
+): number {
+  const seasonal = SEASON_MULTIPLIERS[seasonForWeek(state.week)][category]
+  return Math.round(base * state.economy.priceIndex * seasonal)
 }
 
 export function wagePerHour(state: GameState, jobId: string, promotionLevel = 0): number {
@@ -312,7 +326,7 @@ export function buyGroceries(state: GameState, key: PlayerKey, units: number) {
   )
   const unitPrice = p.location === 'megamart' ? GROCERY_PRICE_MEGAMART : GROCERY_PRICE_MARKET
   spendTime(p, 1)
-  spendCash(p, price(state, unitPrice) * units)
+  spendCash(p, seasonalPrice(state, unitPrice, 'grocery') * units)
   p.groceries += units
   log(state, key, `Bought ${units} unit${units === 1 ? '' : 's'} of groceries`)
 }
@@ -446,7 +460,7 @@ export function rentApartment(
   require_(p.location === 'rentoffice', 'Rent at the Rent Office')
   require_(p.apartment !== tier, 'Already renting that apartment')
   // First week's rent due up front.
-  const firstWeek = price(state, RENT[tier])
+  const firstWeek = seasonalPrice(state, RENT[tier], 'rent')
   spendTime(p, 2)
   spendCash(p, firstWeek)
   p.apartment = tier
