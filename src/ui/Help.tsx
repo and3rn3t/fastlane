@@ -53,7 +53,8 @@ export function Help({ onClose }: { onClose: () => void }) {
               Clothes wear out — your Dress score drops 3 every week. Better jobs require a minimum
               Dress, Education, and Experience. Buy outfits at Sharp Threads to stay qualified.
               Staying at a job and showing up earns promotions over time — Career can grow without
-              switching jobs.
+              switching jobs. Check job listings at the Job Center, or from Home once you own a
+              phone.
             </p>
           </section>
           <section>
@@ -76,11 +77,12 @@ export function Help({ onClose }: { onClose: () => void }) {
             </p>
           </section>
           <section>
-            <h3>🎰 The Casino</h3>
+            <h3>🎰 The Casino & Lottery</h3>
             <p className="blurb">
-              Lucky Star Casino lets you bet on the wheel for a quick payout — but the odds favor
-              the house, on purpose. Only a Gambler Riley ever plays it; other playstyles treat it
-              as a player-only risk, not a strategy.
+              Lucky Star Casino lets you bet on the wheel for a quick payout, and MegaMart sells
+              lottery tickets for a shot at its jackpot — both favor the house, on purpose. Only a
+              Gambler Riley ever plays the Casino; other playstyles (and the Lottery, always) are a
+              player-only risk, not a strategy.
             </p>
           </section>
           <section>

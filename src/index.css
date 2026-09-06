@@ -40,6 +40,9 @@
     --accent: #4566ff;
     --accent-rgb: 69 102 255;
     --shadow: 0 1px 3px rgb(0 0 0 / 0.4), 0 4px 14px rgb(0 0 0 / 0.3);
+    /* Bumped lightness vs. the light-mode value, same recipe as the --accent/
+     * --cat-* retunes — #c9a227 reads muddy against the dark card. */
+    --gold: #e0b23a;
     /* Re-picked (not an automatic flip of the light pair) — #d9822b fails the
      * dark-mode OKLCH lightness band against the card surface; #cc7a1f passes. */
     --chart-you: #6d87ff;
@@ -336,12 +339,6 @@ input[type='range'] {
   height: 44px;
   padding: 0;
   border-radius: 50%;
-}
-
-.menu-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
 }
 
 .topbar-row {
@@ -681,26 +678,6 @@ input[type='range'] {
   }
 }
 
-@keyframes cta-glow {
-  0%,
-  100% {
-    box-shadow: 0 8px 20px rgb(var(--accent-rgb) / 0.38);
-  }
-  50% {
-    box-shadow: 0 8px 26px rgb(var(--accent-rgb) / 0.58);
-  }
-}
-
-@keyframes badge-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgb(var(--accent-rgb) / 0.45);
-  }
-  50% {
-    box-shadow: 0 0 0 5px rgb(var(--accent-rgb) / 0);
-  }
-}
-
 @keyframes sheet-up {
   from {
     transform: translateY(32px);
@@ -719,36 +696,6 @@ input[type='range'] {
   to {
     opacity: 1;
   }
-}
-
-/* Staggered entrance cascade — apply `.stagger` to a container and each
- * direct child fades/rises in ~70ms after the last, up to 8 children. */
-.stagger > * {
-  animation: fade-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.stagger > *:nth-child(1) {
-  animation-delay: 0s;
-}
-.stagger > *:nth-child(2) {
-  animation-delay: 0.07s;
-}
-.stagger > *:nth-child(3) {
-  animation-delay: 0.14s;
-}
-.stagger > *:nth-child(4) {
-  animation-delay: 0.21s;
-}
-.stagger > *:nth-child(5) {
-  animation-delay: 0.28s;
-}
-.stagger > *:nth-child(6) {
-  animation-delay: 0.35s;
-}
-.stagger > *:nth-child(7) {
-  animation-delay: 0.42s;
-}
-.stagger > *:nth-child(8) {
-  animation-delay: 0.49s;
 }
 
 @media (max-width: 480px) {
