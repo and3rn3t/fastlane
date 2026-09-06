@@ -94,6 +94,37 @@ export const MAX_PROMOTIONS = 3
 export const PROMOTION_WAGE_BONUS = 0.15
 export const PROMOTION_PRESTIGE_BONUS = 4
 
+export type Season = 'spring' | 'summer' | 'fall' | 'winter'
+
+const SEASON_CYCLE: Season[] = ['spring', 'summer', 'fall', 'winter']
+export const SEASON_LENGTH_WEEKS = 3
+
+/** Derives a season from the week counter — a fixed 12-week cycle (4
+ * seasons × 3 weeks), week 1 = the start of spring. Pure, no state read. */
+export function seasonForWeek(week: number): Season {
+  const index = Math.floor((week - 1) / SEASON_LENGTH_WEEKS) % SEASON_CYCLE.length
+  return SEASON_CYCLE[index]
+}
+
+/** Grocery/rent cost swing per season, applied on top of (not folded into)
+ * the global priceIndex — a HEADLINES price swing and a season stack
+ * independently. Winter heating and summer cooling bite hardest. */
+export const SEASON_MULTIPLIERS: Record<Season, { grocery: number; rent: number }> = {
+  spring: { grocery: 0.97, rent: 1.0 },
+  summer: { grocery: 1.02, rent: 1.03 },
+  fall: { grocery: 1.0, rent: 1.0 },
+  winter: { grocery: 1.06, rent: 1.1 },
+}
+
+/** Shown once, on the first week of each season, in place of that week's
+ * usual random HEADLINES roll — see driftEconomy in week.ts. */
+export const SEASON_HEADLINES: Record<Season, string> = {
+  spring: '🌱 Spring arrives — grocery prices ease up.',
+  summer: '☀️ Summer heat rolls in — cooling costs nudge rent and groceries up.',
+  fall: '🍂 Fall settles in — prices level off.',
+  winter: '❄️ Winter sets in — heating drives rent up, groceries cost more too.',
+}
+
 export const LOCATIONS: Record<LocationId, LocationDef> = {
   home: {
     id: 'home',

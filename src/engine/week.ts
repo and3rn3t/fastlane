@@ -1,7 +1,7 @@
 // End-of-week processing: upkeep for both players, economy drift, random
 // events, the rival's simulated week, and the victory check.
 
-import { foodShortfall, hasItem, netWorth, price } from './actions'
+import { foodShortfall, hasItem, netWorth, seasonalPrice } from './actions'
 import {
   CREDIT_GAIN_ON_PAYMENT,
   CREDIT_LOSS_ON_MISS,
@@ -28,9 +28,11 @@ import {
   PROMOTION_PRESTIGE_BONUS,
   PROMOTION_TENURE_WEEKS,
   RENT,
+  SEASON_HEADLINES,
   WEEK_TIME,
   itemById,
   jobById,
+  seasonForWeek,
 } from './data'
 import { roll, rollInt } from './rng'
 import type { ActiveEvent, GameState, Goals, PlayerKey, PlayerState } from './types'
@@ -181,7 +183,7 @@ function upkeep(state: GameState, key: PlayerKey) {
 
   // Rent accrues; miss enough weeks and you're out.
   if (p.apartment !== 'none') {
-    const rent = price(state, RENT[p.apartment])
+    const rent = seasonalPrice(state, RENT[p.apartment], 'rent')
     p.rentDue += rent
     if (p.rentDue > rent) {
       p.weeksBehindOnRent += 1
@@ -379,18 +381,28 @@ function resolveActiveEvents(state: GameState, key: PlayerKey) {
 }
 
 function driftEconomy(state: GameState) {
-  const headline = HEADLINES[rollInt(state, HEADLINES.length)]
+  // A season boundary gets its own headline in place of that week's usual
+  // random roll — the grocery/rent multiplier itself is read directly off
+  // seasonForWeek() wherever those prices are charged (seasonalPrice()),
+  // not applied here, so it takes effect immediately even off a fresh save.
+  const enteringSeason = seasonForWeek(state.week + 1)
+  const seasonChanged = enteringSeason !== seasonForWeek(state.week)
   const v = state.rules.economyVolatility
-  if (headline.priceDelta) state.economy.priceIndex *= 1 + headline.priceDelta * v
-  if (headline.wageDelta) state.economy.wageIndex *= 1 + headline.wageDelta * v
-  if (headline.interestDelta) {
-    state.economy.interestRate = Math.max(
-      0.002,
-      Math.min(0.012, state.economy.interestRate + headline.interestDelta * v)
-    )
+  if (seasonChanged) {
+    state.headline = SEASON_HEADLINES[enteringSeason]
+  } else {
+    const headline = HEADLINES[rollInt(state, HEADLINES.length)]
+    if (headline.priceDelta) state.economy.priceIndex *= 1 + headline.priceDelta * v
+    if (headline.wageDelta) state.economy.wageIndex *= 1 + headline.wageDelta * v
+    if (headline.interestDelta) {
+      state.economy.interestRate = Math.max(
+        0.002,
+        Math.min(0.012, state.economy.interestRate + headline.interestDelta * v)
+      )
+    }
+    if (headline.marketDelta) state.economy.marketIndex *= 1 + headline.marketDelta * v
+    state.headline = headline.text
   }
-  if (headline.marketDelta) state.economy.marketIndex *= 1 + headline.marketDelta * v
-  state.headline = headline.text
   // Clamp so a long game can't run away.
   state.economy.priceIndex = Math.min(1.6, Math.max(0.7, state.economy.priceIndex))
   state.economy.wageIndex = Math.min(1.6, Math.max(0.7, state.economy.wageIndex))
@@ -399,7 +411,7 @@ function driftEconomy(state: GameState) {
     Math.max(MARKET_INDEX_MIN, state.economy.marketIndex)
   )
   state.economy.lotteryJackpot = Math.round(state.economy.lotteryJackpot * 1.1)
-  log(state, 'world', headline.text)
+  log(state, 'world', state.headline)
 }
 
 /**

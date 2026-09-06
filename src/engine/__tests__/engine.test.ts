@@ -1,19 +1,31 @@
 import { describe, expect, it } from 'vitest'
 import { AI_PROFILES, DIFFICULTY_SKILL, runAIWeek } from '../ai'
-import { EngineError, jobRequirements, netWorth, qualifiesFor, wagePerHour } from '../actions'
+import {
+  EngineError,
+  jobRequirements,
+  netWorth,
+  qualifiesFor,
+  seasonalPrice,
+  wagePerHour,
+} from '../actions'
 import { bestQualifiedJob, nextTargetJob } from '../career'
 import {
   FOOD_NEEDED,
+  GROCERY_PRICE_MEGAMART,
   JOBS,
   MARKET_INDEX_MAX,
   MARKET_INDEX_MIN,
+  RENT,
   RULE_PRESETS,
+  SEASON_LENGTH_WEEKS,
+  SEASON_MULTIPLIERS,
   SKILL_GAIN_PER_HOUR,
   SKILL_TRAIN_GAIN,
   SKILL_TRAIN_PRICE,
   WEEK_TIME,
   jobById,
   maxLoan,
+  seasonForWeek,
   travelCost,
 } from '../data'
 import { applyAction, newGame } from '../engine'
@@ -436,6 +448,67 @@ describe('end of week', () => {
     expect(s.player.timeLeft).toBe(WEEK_TIME)
     expect(s.player.location).toBe('home')
     expect(s.week).toBe(2)
+  })
+})
+
+describe('seasons', () => {
+  it('cycles spring/summer/fall/winter in fixed 3-week blocks, wrapping at week 13', () => {
+    expect(SEASON_LENGTH_WEEKS).toBe(3)
+    expect(seasonForWeek(1)).toBe('spring')
+    expect(seasonForWeek(3)).toBe('spring')
+    expect(seasonForWeek(4)).toBe('summer')
+    expect(seasonForWeek(6)).toBe('summer')
+    expect(seasonForWeek(7)).toBe('fall')
+    expect(seasonForWeek(9)).toBe('fall')
+    expect(seasonForWeek(10)).toBe('winter')
+    expect(seasonForWeek(12)).toBe('winter')
+    expect(seasonForWeek(13)).toBe('spring') // wraps into a second cycle
+  })
+
+  it('seasonalPrice scales grocery/rent by the current season on top of priceIndex', () => {
+    const s = game()
+    s.week = 10 // winter
+    expect(seasonalPrice(s, GROCERY_PRICE_MEGAMART, 'grocery')).toBe(
+      Math.round(GROCERY_PRICE_MEGAMART * SEASON_MULTIPLIERS.winter.grocery)
+    )
+    expect(seasonalPrice(s, RENT.basic, 'rent')).toBe(
+      Math.round(RENT.basic * SEASON_MULTIPLIERS.winter.rent)
+    )
+    s.economy.priceIndex = 1.2
+    expect(seasonalPrice(s, RENT.basic, 'rent')).toBe(
+      Math.round(RENT.basic * 1.2 * SEASON_MULTIPLIERS.winter.rent)
+    )
+  })
+
+  it('charges seasonal rent when leasing and when rent accrues at week end', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'rentoffice' })
+    s.week = 10 // winter — rent costs more
+    const cashBefore = s.player.cash
+    s = applyAction(s, { type: 'rentApartment', tier: 'basic' })
+    const winterFirstWeek = cashBefore - s.player.cash
+    expect(winterFirstWeek).toBe(seasonalPrice(s, RENT.basic, 'rent'))
+    expect(winterFirstWeek).toBeGreaterThan(RENT.basic) // pricier than the flat base rate
+  })
+
+  it('replaces one week in four with a season-transition headline instead of the usual roll', () => {
+    // Goals no game can meet within 13 weeks — this test cares about the
+    // headline sequence, not the outcome, and a mid-loop win would make
+    // further endWeek calls throw (the game is already over).
+    const noWinGoals: Goals = { wealth: 1_000_000, happiness: 1000, education: 1000, career: 1000 }
+    let s = game(noWinGoals)
+    const headlinesAtSeasonBoundaries: string[] = []
+    for (let week = 1; week <= 13; week++) {
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+      // A transition fires ending week 3, 6, 9, 12 (entering summer/fall/winter/spring).
+      if ([3, 6, 9, 12].includes(week)) headlinesAtSeasonBoundaries.push(s.headline)
+    }
+    expect(headlinesAtSeasonBoundaries).toEqual([
+      '☀️ Summer heat rolls in — cooling costs nudge rent and groceries up.',
+      '🍂 Fall settles in — prices level off.',
+      '❄️ Winter sets in — heating drives rent up, groceries cost more too.',
+      '🌱 Spring arrives — grocery prices ease up.',
+    ])
   })
 })
 
