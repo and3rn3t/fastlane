@@ -13,6 +13,7 @@ import {
   HEALTH_LOW_THRESHOLD,
   HEALTH_OVERWORK_RATE,
   HEALTH_SICK_THRESHOLD,
+  HOLIDAY_BEATS,
   INHERITANCE_DELAY_WEEKS,
   INHERITANCE_MIN,
   INHERITANCE_RANGE,
@@ -33,6 +34,8 @@ import {
   itemById,
   jobById,
   seasonForWeek,
+  weekInCycle,
+  type HolidayBeat,
 } from './data'
 import { roll, rollInt } from './rng'
 import type { ActiveEvent, GameState, Goals, PlayerKey, PlayerState } from './types'
@@ -380,15 +383,49 @@ function resolveActiveEvents(state: GameState, key: PlayerKey) {
   p.activeEvents = remaining
 }
 
+/** Per-player log line for a fixed-week holiday beat — kept out of
+ * HOLIDAY_BEATS (data.ts) so that table stays pure data, matching how
+ * reasonText() in actions.ts hand-writes text for a data-driven id instead
+ * of storing format functions alongside the data. */
+function holidayPersonalLine(beat: HolidayBeat, name: string, appliedDelta: number): string {
+  switch (beat.id) {
+    case 'spring-cleaning':
+      return `${name} picked up $${appliedDelta} from spring cleaning`
+    case 'tax-week':
+      return `${name} paid $${-appliedDelta} in taxes`
+    case 'holiday-bonus':
+      return `${name} got a $${appliedDelta} holiday bonus`
+  }
+}
+
+/** Applies a fixed-week beat's cash effect to both players symmetrically,
+ * capping a cost so it can never take a player negative. */
+function applyHolidayBeat(state: GameState, beat: HolidayBeat) {
+  for (const key of ['player', 'riley'] as const) {
+    const p = state[key]
+    const appliedDelta = beat.cashDelta >= 0 ? beat.cashDelta : -Math.min(-beat.cashDelta, p.cash)
+    p.cash += appliedDelta
+    log(state, key, holidayPersonalLine(beat, p.name, appliedDelta))
+  }
+}
+
 function driftEconomy(state: GameState) {
-  // A season boundary gets its own headline in place of that week's usual
-  // random roll — the grocery/rent multiplier itself is read directly off
-  // seasonForWeek() wherever those prices are charged (seasonalPrice()),
-  // not applied here, so it takes effect immediately even off a fresh save.
-  const enteringSeason = seasonForWeek(state.week + 1)
+  // A season boundary, and a fixed-week holiday beat, each get their own
+  // headline in place of that week's usual random roll — the grocery/rent
+  // multiplier itself is read directly off seasonForWeek() wherever those
+  // prices are charged (seasonalPrice()), not applied here, so it takes
+  // effect immediately even off a fresh save. HOLIDAY_BEATS' weeks are
+  // chosen to never land on a season-transition week, so this ordering
+  // (holiday first) never actually has to arbitrate a real conflict.
+  const upcomingWeek = state.week + 1
+  const enteringSeason = seasonForWeek(upcomingWeek)
   const seasonChanged = enteringSeason !== seasonForWeek(state.week)
+  const holidayBeat = HOLIDAY_BEATS[weekInCycle(upcomingWeek)]
   const v = state.rules.economyVolatility
-  if (seasonChanged) {
+  if (holidayBeat) {
+    applyHolidayBeat(state, holidayBeat)
+    state.headline = holidayBeat.text
+  } else if (seasonChanged) {
     state.headline = SEASON_HEADLINES[enteringSeason]
   } else {
     const headline = HEADLINES[rollInt(state, HEADLINES.length)]

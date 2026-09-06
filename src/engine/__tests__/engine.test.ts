@@ -12,6 +12,7 @@ import { bestQualifiedJob, nextTargetJob } from '../career'
 import {
   FOOD_NEEDED,
   GROCERY_PRICE_MEGAMART,
+  HOLIDAY_BEATS,
   JOBS,
   MARKET_INDEX_MAX,
   MARKET_INDEX_MIN,
@@ -512,6 +513,75 @@ describe('seasons', () => {
   })
 })
 
+describe('holiday one-offs', () => {
+  it('positions every beat away from a season-transition week', () => {
+    for (const cycleWeek of Object.keys(HOLIDAY_BEATS).map(Number)) {
+      expect([1, 4, 7, 10]).not.toContain(cycleWeek)
+    }
+  })
+
+  it('fires spring cleaning, tax week, and the holiday bonus at their fixed weeks, and recurs next cycle', () => {
+    const noWinGoals: Goals = { wealth: 1_000_000, happiness: 1000, education: 1000, career: 1000 }
+    let s = game(noWinGoals)
+    // Isolate the beats' own cash deltas from personalEvent/street-robbery
+    // noise — same guards as the tax-week cap test below.
+    s.rules = { ...s.rules, eventFrequency: 0 }
+    s.player.apartment = 'secure'
+    s.riley.apartment = 'secure'
+    const beats: Array<{ week: number; headline: string; playerCashDelta: number }> = []
+    let prevCash = s.player.cash
+    for (let week = 1; week <= 24; week++) {
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+      if ([1, 2, 10, 13, 14, 22].includes(week)) {
+        beats.push({ week, headline: s.headline, playerCashDelta: s.player.cash - prevCash })
+      }
+      prevCash = s.player.cash
+    }
+    // First cycle: spring cleaning (+15) entering week 2, tax week (-60)
+    // entering week 3, holiday bonus (+80) entering week 11.
+    expect(beats[0]).toMatchObject({
+      week: 1,
+      headline: '🧹 Spring cleaning week — everyone declutters and pockets a little extra.',
+      playerCashDelta: 15,
+    })
+    expect(beats[1]).toMatchObject({
+      week: 2,
+      headline: '🧾 Tax week — everyone owes the city a cut.',
+      playerCashDelta: -60,
+    })
+    expect(beats[2]).toMatchObject({
+      week: 10,
+      headline: '🎁 Holiday bonus season — a little extra shows up in every paycheck.',
+      playerCashDelta: 80,
+    })
+    // Second cycle (weeks 13-24) repeats identically.
+    expect(beats[3]).toMatchObject({ ...beats[0], week: 13 })
+    expect(beats[4]).toMatchObject({ ...beats[1], week: 14 })
+    expect(beats[5]).toMatchObject({ ...beats[2], week: 22 })
+  })
+
+  it("logs each player's own line, and caps tax week so it can never go negative", () => {
+    let s = game()
+    // engine.ts's 'endWeek' case runs Riley's full AI turn *before* week.ts's
+    // endWeek (and therefore driftEconomy) — so unlike the player, Riley's
+    // cash isn't a fixed starting value here; only the player side (who
+    // takes no autonomous actions) gives a fully deterministic tax amount.
+    s.rules = { ...s.rules, eventFrequency: 0 }
+    s.player.apartment = 'secure' // street robbery only rolls for a non-secure apartment
+    s.week = 2 // entering week 3 = tax week
+    s.player.cash = 40 // less than the $60 tax
+    s = applyAction(s, { type: 'endWeek' })
+    expect(s.player.cash).toBe(0) // capped, not negative
+    expect(
+      s.lastReport?.entries.some((e) => e.actor === 'player' && e.text.includes('taxes'))
+    ).toBe(true)
+    expect(s.lastReport?.entries.some((e) => e.actor === 'riley' && e.text.includes('taxes'))).toBe(
+      true
+    )
+  })
+})
+
 describe('durable goods', () => {
   it('gates senior office jobs on owning a computer', () => {
     const s = applyAction(game(), { type: 'travel', to: 'employment' })
@@ -519,16 +589,20 @@ describe('durable goods', () => {
   })
 
   it('an uninsured item can be stolen from an unsecured home', () => {
-    // Seed found by brute force: bike goes missing on the 6th endWeek.
-    // burglaryUpkeep's roll() is only spent when Riley actually owns a
-    // stealable item that week, so any change to *when* Riley buys things
-    // shifts how many rolls Riley's own upkeep consumes, which shifts the
-    // shared rngSeed stream the player's own rolls draw from later in the
-    // same week — expect this count to drift again after any future AI
-    // change; re-run a brute-force search rather than guessing.
+    // Seed found by brute force: bike goes missing on the 5th endWeek (was
+    // the 6th before Wave 7's Holiday one-offs — HOLIDAY_BEATS skips the
+    // usual HEADLINES roll on two more weeks per 12-week cycle, shifting the
+    // shared rngSeed stream, same category of drift as the comment below
+    // already warns about). burglaryUpkeep's roll() is only spent when
+    // Riley actually owns a stealable item that week, so any change to
+    // *when* Riley buys things shifts how many rolls Riley's own upkeep
+    // consumes, which shifts the shared rngSeed stream the player's own
+    // rolls draw from later in the same week — expect this count to drift
+    // again after any future AI or economy change; re-run a brute-force
+    // search rather than guessing.
     let s = applyAction(game(easyGoals, 2), { type: 'travel', to: 'gadgets' })
     s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 5; i++) {
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
@@ -539,7 +613,8 @@ describe('durable goods', () => {
   it('insurance protects durable goods from that same theft', () => {
     // Actions never touch the RNG stream (only week.ts's upkeep/personalEvent/
     // driftEconomy do), so working first to afford both purchases doesn't
-    // change the endWeek-by-endWeek roll sequence from the test above.
+    // change the endWeek-by-endWeek roll sequence from the test above — same
+    // 5-week window as that test, for the same reason (see its comment).
     let s = applyAction(game(easyGoals, 2), { type: 'travel', to: 'employment' })
     s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
     s = applyAction(s, { type: 'travel', to: 'burgers' })
@@ -548,7 +623,7 @@ describe('durable goods', () => {
     s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
     s = applyAction(s, { type: 'travel', to: 'bank' })
     s = applyAction(s, { type: 'buyItem', itemId: 'insurance' })
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 5; i++) {
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
@@ -709,6 +784,10 @@ describe('event chains', () => {
     // `s.rules.eventFrequency = 0` would zero it for every later test in this
     // file too, silencing personal events file-wide instead of just here.
     s.rules = { ...s.rules, eventFrequency: 0 }
+    // Off week 1 (Wave 7's Holiday one-offs fires a cash-changing beat
+    // entering week 2, unrelated to this chain) so the cash assertions
+    // below isolate the inheritance payout, not incidental week-tied noise.
+    s.week = 5
     s.player.activeEvents = [{ chainId: 'inheritance', stage: 0, weeksInStage: 0 }]
 
     const cashBeforeDelayWeek = s.player.cash
@@ -964,9 +1043,11 @@ describe('AI personalities', () => {
   })
 
   it('Hustler works more hours than Balanced given the same seed', () => {
-    // Seed found by brute force: a clear gap by week 8.
-    const balanced = run(12, 'balanced', 8)
-    const hustler = run(12, 'hustler', 8)
+    // Seed found by brute force: a clear gap by week 8. (Was seed 12 before
+    // Wave 7's Holiday one-offs shifted the shared rngSeed stream — see the
+    // durable-goods theft test's comment for why this keeps happening.)
+    const balanced = run(4, 'balanced', 8)
+    const hustler = run(4, 'hustler', 8)
     expect(hustler.riley.experience).toBeGreaterThan(balanced.riley.experience)
   })
 

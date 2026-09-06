@@ -125,6 +125,42 @@ export const SEASON_HEADLINES: Record<Season, string> = {
   winter: '❄️ Winter sets in — heating drives rent up, groceries cost more too.',
 }
 
+/** A week's position within its 12-week season cycle (1-12), recurring every
+ * cycle for the rest of the game — same wraparound as seasonForWeek. */
+export function weekInCycle(week: number): number {
+  return ((week - 1) % (SEASON_LENGTH_WEEKS * SEASON_CYCLE.length)) + 1
+}
+
+export interface HolidayBeat {
+  id: 'spring-cleaning' | 'tax-week' | 'holiday-bonus'
+  text: string
+  /** Applied to both players' cash symmetrically, capped so it can never
+   * take a player negative — see driftEconomy in week.ts. */
+  cashDelta: number
+}
+
+/** Fixed-week flavor beats layered onto the season cycle, keyed by
+ * weekInCycle — positioned away from 1/4/7/10 (each season's first week,
+ * where SEASON_HEADLINES already claims that week's single-line headline)
+ * so the two systems never compete for the same week. */
+export const HOLIDAY_BEATS: Record<number, HolidayBeat> = {
+  2: {
+    id: 'spring-cleaning',
+    text: '🧹 Spring cleaning week — everyone declutters and pockets a little extra.',
+    cashDelta: 15,
+  },
+  3: {
+    id: 'tax-week',
+    text: '🧾 Tax week — everyone owes the city a cut.',
+    cashDelta: -60,
+  },
+  11: {
+    id: 'holiday-bonus',
+    text: '🎁 Holiday bonus season — a little extra shows up in every paycheck.',
+    cashDelta: 80,
+  },
+}
+
 export const LOCATIONS: Record<LocationId, LocationDef> = {
   home: {
     id: 'home',
