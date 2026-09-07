@@ -4,6 +4,10 @@ node_modules/
 __pycache__/
 *.pyc
 vendor/
+# pnpm is the only supported package manager here (see AGENTS.md) — an
+# accidental `npm install` must never commit a competing lockfile.
+package-lock.json
+yarn.lock
 
 # Build output
 dist/
