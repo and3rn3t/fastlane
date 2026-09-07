@@ -161,6 +161,53 @@ export const HOLIDAY_BEATS: Record<number, HolidayBeat> = {
   },
 }
 
+// Percentage/point deltas, not multipliers directly — driftEconomy() (week.ts)
+// scales each by rules.economyVolatility before applying it, so Brutal/Zen
+// presets don't need their own copy of this table.
+export interface Headline {
+  text: string
+  priceDelta?: number
+  wageDelta?: number
+  interestDelta?: number
+  marketDelta?: number
+  /** Relative pick weight — defaults to HEADLINE_DEFAULT_WEIGHT. The wilder
+   * boom/bust entries below use a small fraction of that so they hit far
+   * less often than an everyday swing, not equally often. */
+  weight?: number
+}
+
+export const HEADLINE_DEFAULT_WEIGHT = 1
+
+export const HEADLINES: Headline[] = [
+  { text: 'Steady week in the city.' },
+  { text: 'Inflation ticks up — prices rise.', priceDelta: 0.05 },
+  { text: 'Retail price war! Prices dip.', priceDelta: -0.05 },
+  { text: 'Labor shortage — wages climb.', wageDelta: 0.05 },
+  { text: 'Layoffs downtown — wages soften.', wageDelta: -0.04 },
+  { text: 'Fed hikes rates — savers rejoice.', interestDelta: 0.002 },
+  { text: 'Rates cut — savings earn less.', interestDelta: -0.002 },
+  { text: 'Stocks rally on strong earnings.', marketDelta: 0.06 },
+  { text: 'Market selloff spooks investors.', marketDelta: -0.06 },
+  // Rarer, bigger-swing "real boom/bust year" entries — same mechanism,
+  // more variety at the tail, per Wave 7's "Wilder global headlines."
+  {
+    text: '💥 Boom year — wages surge and the market takes off.',
+    wageDelta: 0.12,
+    marketDelta: 0.15,
+    weight: 0.15,
+  },
+  {
+    text: '📉 Recession hits — wages stall and stocks slide.',
+    wageDelta: -0.1,
+    marketDelta: -0.18,
+    weight: 0.15,
+  },
+  { text: '🔥 Inflation spike — prices jump hard.', priceDelta: 0.12, weight: 0.12 },
+  { text: '🧊 Deflation scare — prices tumble.', priceDelta: -0.1, weight: 0.12 },
+  { text: '💣 Market crash — investors flee stocks overnight.', marketDelta: -0.3, weight: 0.08 },
+  { text: '🐂 Bull run — stocks go vertical.', marketDelta: 0.3, weight: 0.08 },
+]
+
 export const LOCATIONS: Record<LocationId, LocationDef> = {
   home: {
     id: 'home',

@@ -8,6 +8,8 @@ import {
   DRESS_WEAR_PER_WEEK,
   EVICTION_WEEKS,
   FOOD_NEEDED,
+  HEADLINE_DEFAULT_WEIGHT,
+  HEADLINES,
   HEALTH_CHEAP_FOOD_DRAIN,
   HEALTH_LOW_HAPPINESS_PENALTY,
   HEALTH_LOW_THRESHOLD,
@@ -35,6 +37,7 @@ import {
   jobById,
   seasonForWeek,
   weekInCycle,
+  type Headline,
   type HolidayBeat,
 } from './data'
 import { roll, rollInt } from './rng'
@@ -257,26 +260,20 @@ function upkeep(state: GameState, key: PlayerKey) {
   p.location = 'home'
 }
 
-// Percentage/point deltas, not multipliers directly — driftEconomy() scales
-// each by rules.economyVolatility before applying it, so Brutal/Zen presets
-// don't need their own copy of this table.
-const HEADLINES: Array<{
-  text: string
-  priceDelta?: number
-  wageDelta?: number
-  interestDelta?: number
-  marketDelta?: number
-}> = [
-  { text: 'Steady week in the city.' },
-  { text: 'Inflation ticks up — prices rise.', priceDelta: 0.05 },
-  { text: 'Retail price war! Prices dip.', priceDelta: -0.05 },
-  { text: 'Labor shortage — wages climb.', wageDelta: 0.05 },
-  { text: 'Layoffs downtown — wages soften.', wageDelta: -0.04 },
-  { text: 'Fed hikes rates — savers rejoice.', interestDelta: 0.002 },
-  { text: 'Rates cut — savings earn less.', interestDelta: -0.002 },
-  { text: 'Stocks rally on strong earnings.', marketDelta: 0.06 },
-  { text: 'Market selloff spooks investors.', marketDelta: -0.06 },
-]
+/** Weighted pick over HEADLINES (data.ts), still exactly one roll() call —
+ * same RNG-consumption shape as the old uniform rollInt(), so this doesn't
+ * add its own extra shift to the shared rngSeed stream on top of a weight
+ * change. Selection logic only — the data itself lives in data.ts per
+ * AGENTS.md's "game-balance changes go in data.ts" convention. */
+function pickHeadline(state: GameState): Headline {
+  const totalWeight = HEADLINES.reduce((sum, h) => sum + (h.weight ?? HEADLINE_DEFAULT_WEIGHT), 0)
+  let r = roll(state) * totalWeight
+  for (const h of HEADLINES) {
+    r -= h.weight ?? HEADLINE_DEFAULT_WEIGHT
+    if (r < 0) return h
+  }
+  return HEADLINES.at(-1)! // float-rounding fallback
+}
 
 /** True if a player is already mid-chain for the given chain — chains don't
  * stack (no double-layoff), so a case that would start one falls through to
@@ -428,7 +425,7 @@ function driftEconomy(state: GameState) {
   } else if (seasonChanged) {
     state.headline = SEASON_HEADLINES[enteringSeason]
   } else {
-    const headline = HEADLINES[rollInt(state, HEADLINES.length)]
+    const headline = pickHeadline(state)
     if (headline.priceDelta) state.economy.priceIndex *= 1 + headline.priceDelta * v
     if (headline.wageDelta) state.economy.wageIndex *= 1 + headline.wageDelta * v
     if (headline.interestDelta) {
