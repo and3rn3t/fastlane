@@ -8,6 +8,8 @@ import {
   DRESS_WEAR_PER_WEEK,
   EVICTION_WEEKS,
   FOOD_NEEDED,
+  HEADLINE_DEFAULT_WEIGHT,
+  HEADLINES,
   HEALTH_CHEAP_FOOD_DRAIN,
   HEALTH_LOW_HAPPINESS_PENALTY,
   HEALTH_LOW_THRESHOLD,
@@ -35,6 +37,7 @@ import {
   jobById,
   seasonForWeek,
   weekInCycle,
+  type Headline,
   type HolidayBeat,
 } from './data'
 import { roll, rollInt } from './rng'
@@ -257,56 +260,11 @@ function upkeep(state: GameState, key: PlayerKey) {
   p.location = 'home'
 }
 
-// Percentage/point deltas, not multipliers directly — driftEconomy() scales
-// each by rules.economyVolatility before applying it, so Brutal/Zen presets
-// don't need their own copy of this table.
-interface Headline {
-  text: string
-  priceDelta?: number
-  wageDelta?: number
-  interestDelta?: number
-  marketDelta?: number
-  /** Relative pick weight — defaults to 1 (see HEADLINE_DEFAULT_WEIGHT).
-   * The wilder boom/bust entries below use a small fraction of that so
-   * they hit far less often than an everyday swing, not equally often. */
-  weight?: number
-}
-
-const HEADLINE_DEFAULT_WEIGHT = 1
-
-const HEADLINES: Headline[] = [
-  { text: 'Steady week in the city.' },
-  { text: 'Inflation ticks up — prices rise.', priceDelta: 0.05 },
-  { text: 'Retail price war! Prices dip.', priceDelta: -0.05 },
-  { text: 'Labor shortage — wages climb.', wageDelta: 0.05 },
-  { text: 'Layoffs downtown — wages soften.', wageDelta: -0.04 },
-  { text: 'Fed hikes rates — savers rejoice.', interestDelta: 0.002 },
-  { text: 'Rates cut — savings earn less.', interestDelta: -0.002 },
-  { text: 'Stocks rally on strong earnings.', marketDelta: 0.06 },
-  { text: 'Market selloff spooks investors.', marketDelta: -0.06 },
-  // Rarer, bigger-swing "real boom/bust year" entries — same mechanism,
-  // more variety at the tail, per Wave 7's "Wilder global headlines."
-  {
-    text: '💥 Boom year — wages surge and the market takes off.',
-    wageDelta: 0.12,
-    marketDelta: 0.15,
-    weight: 0.15,
-  },
-  {
-    text: '📉 Recession hits — wages stall and stocks slide.',
-    wageDelta: -0.1,
-    marketDelta: -0.18,
-    weight: 0.15,
-  },
-  { text: '🔥 Inflation spike — prices jump hard.', priceDelta: 0.12, weight: 0.12 },
-  { text: '🧊 Deflation scare — prices tumble.', priceDelta: -0.1, weight: 0.12 },
-  { text: '💣 Market crash — investors flee stocks overnight.', marketDelta: -0.3, weight: 0.08 },
-  { text: '🐂 Bull run — stocks go vertical.', marketDelta: 0.3, weight: 0.08 },
-]
-
-/** Weighted pick over HEADLINES, still exactly one roll() call — same RNG-
- * consumption shape as the old uniform rollInt(), so this doesn't add its
- * own extra shift to the shared rngSeed stream on top of a weight change. */
+/** Weighted pick over HEADLINES (data.ts), still exactly one roll() call —
+ * same RNG-consumption shape as the old uniform rollInt(), so this doesn't
+ * add its own extra shift to the shared rngSeed stream on top of a weight
+ * change. Selection logic only — the data itself lives in data.ts per
+ * AGENTS.md's "game-balance changes go in data.ts" convention. */
 function pickHeadline(state: GameState): Headline {
   const totalWeight = HEADLINES.reduce((sum, h) => sum + (h.weight ?? HEADLINE_DEFAULT_WEIGHT), 0)
   let r = roll(state) * totalWeight
