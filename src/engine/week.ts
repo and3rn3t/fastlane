@@ -260,13 +260,21 @@ function upkeep(state: GameState, key: PlayerKey) {
 // Percentage/point deltas, not multipliers directly — driftEconomy() scales
 // each by rules.economyVolatility before applying it, so Brutal/Zen presets
 // don't need their own copy of this table.
-const HEADLINES: Array<{
+interface Headline {
   text: string
   priceDelta?: number
   wageDelta?: number
   interestDelta?: number
   marketDelta?: number
-}> = [
+  /** Relative pick weight — defaults to 1 (see HEADLINE_DEFAULT_WEIGHT).
+   * The wilder boom/bust entries below use a small fraction of that so
+   * they hit far less often than an everyday swing, not equally often. */
+  weight?: number
+}
+
+const HEADLINE_DEFAULT_WEIGHT = 1
+
+const HEADLINES: Headline[] = [
   { text: 'Steady week in the city.' },
   { text: 'Inflation ticks up — prices rise.', priceDelta: 0.05 },
   { text: 'Retail price war! Prices dip.', priceDelta: -0.05 },
@@ -276,7 +284,38 @@ const HEADLINES: Array<{
   { text: 'Rates cut — savings earn less.', interestDelta: -0.002 },
   { text: 'Stocks rally on strong earnings.', marketDelta: 0.06 },
   { text: 'Market selloff spooks investors.', marketDelta: -0.06 },
+  // Rarer, bigger-swing "real boom/bust year" entries — same mechanism,
+  // more variety at the tail, per Wave 7's "Wilder global headlines."
+  {
+    text: '💥 Boom year — wages surge and the market takes off.',
+    wageDelta: 0.12,
+    marketDelta: 0.15,
+    weight: 0.15,
+  },
+  {
+    text: '📉 Recession hits — wages stall and stocks slide.',
+    wageDelta: -0.1,
+    marketDelta: -0.18,
+    weight: 0.15,
+  },
+  { text: '🔥 Inflation spike — prices jump hard.', priceDelta: 0.12, weight: 0.12 },
+  { text: '🧊 Deflation scare — prices tumble.', priceDelta: -0.1, weight: 0.12 },
+  { text: '💣 Market crash — investors flee stocks overnight.', marketDelta: -0.3, weight: 0.08 },
+  { text: '🐂 Bull run — stocks go vertical.', marketDelta: 0.3, weight: 0.08 },
 ]
+
+/** Weighted pick over HEADLINES, still exactly one roll() call — same RNG-
+ * consumption shape as the old uniform rollInt(), so this doesn't add its
+ * own extra shift to the shared rngSeed stream on top of a weight change. */
+function pickHeadline(state: GameState): Headline {
+  const totalWeight = HEADLINES.reduce((sum, h) => sum + (h.weight ?? HEADLINE_DEFAULT_WEIGHT), 0)
+  let r = roll(state) * totalWeight
+  for (const h of HEADLINES) {
+    r -= h.weight ?? HEADLINE_DEFAULT_WEIGHT
+    if (r < 0) return h
+  }
+  return HEADLINES.at(-1)! // float-rounding fallback
+}
 
 /** True if a player is already mid-chain for the given chain — chains don't
  * stack (no double-layoff), so a case that would start one falls through to
@@ -428,7 +467,7 @@ function driftEconomy(state: GameState) {
   } else if (seasonChanged) {
     state.headline = SEASON_HEADLINES[enteringSeason]
   } else {
-    const headline = HEADLINES[rollInt(state, HEADLINES.length)]
+    const headline = pickHeadline(state)
     if (headline.priceDelta) state.economy.priceIndex *= 1 + headline.priceDelta * v
     if (headline.wageDelta) state.economy.wageIndex *= 1 + headline.wageDelta * v
     if (headline.interestDelta) {

@@ -1168,3 +1168,43 @@ describe('rule presets', () => {
     expect(avgDrift(RULE_PRESETS.brutal)).toBeGreaterThan(avgDrift(RULE_PRESETS.zen))
   })
 })
+
+describe('wilder global headlines', () => {
+  it('fires the new boom/bust headlines meaningfully less often than an everyday one, aggregated across seeds', () => {
+    // A single-seed comparison would be as fragile as the Casino RNG-sharing
+    // note elsewhere in this file warns about — aggregate over many
+    // seeds/weeks instead, same approach as the Brutal-vs-Zen tests above.
+    // Goals no game can meet in 24 weeks, so a mid-loop win never cuts a
+    // seed's sample short (same reasoning as the seasons describe block).
+    const noWinGoals: Goals = { wealth: 1_000_000, happiness: 1000, education: 1000, career: 1000 }
+    const WILDER_MARKERS = ['💥', '📉', '🔥', '🧊', '💣', '🐂']
+    let wilderCount = 0
+    let steadyCount = 0
+    for (let seed = 0; seed < 30; seed++) {
+      let s = newGame({ playerName: 'T', goals: noWinGoals, seed })
+      for (let w = 0; w < 24; w++) {
+        s = applyAction(s, { type: 'endWeek' })
+        if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+        if (WILDER_MARKERS.some((m) => s.headline.includes(m))) wilderCount++
+        if (s.headline === 'Steady week in the city.') steadyCount++
+      }
+    }
+    expect(wilderCount).toBeGreaterThan(0) // the mechanism actually fires
+    expect(wilderCount).toBeLessThan(steadyCount) // combined rare weight (0.7) < one common entry's (1)
+  })
+
+  it("applies a wilder headline's wage/market swing to the shared economy indices", () => {
+    // Deterministic seed/week found by brute force where the very next
+    // driftEconomy() call lands on the Boom year headline.
+    let s = newGame({ playerName: 'T', goals: easyGoals, seed: 156 })
+    s.week = 4 // an ordinary week — not a season-transition or holiday week
+    const priceIndexBefore = s.economy.priceIndex
+    const wageIndexBefore = s.economy.wageIndex
+    const marketIndexBefore = s.economy.marketIndex
+    s = applyAction(s, { type: 'endWeek' })
+    expect(s.headline).toBe('💥 Boom year — wages surge and the market takes off.')
+    expect(s.economy.wageIndex).toBeGreaterThan(wageIndexBefore)
+    expect(s.economy.marketIndex).toBeGreaterThan(marketIndexBefore)
+    expect(s.economy.priceIndex).toBe(priceIndexBefore) // Boom year has no priceDelta
+  })
+})
