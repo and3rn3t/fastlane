@@ -1279,21 +1279,21 @@ describe('expanded personal events (Wave 7)', () => {
       },
       'car broke down': { week: 8, cashDelta: -100, happinessDelta: 0 },
       'surprise $': { week: 11, cashDelta: 43, happinessDelta: 0 },
+      'jury duty': { week: 17, cashDelta: 0, happinessDelta: 0, hours: 8 },
+      'incredibly lucky': { week: 19, cashDelta: 336, happinessDelta: LUCKY_FIND_HAPPINESS_BONUS },
       'costly mistake': {
-        week: 16,
-        cashDelta: -245,
+        week: 55,
+        cashDelta: -287,
         happinessDelta: -COSTLY_MISTAKE_HAPPINESS_PENALTY,
       },
-      'incredibly lucky': { week: 20, cashDelta: 289, happinessDelta: LUCKY_FIND_HAPPINESS_BONUS },
-      'jury duty': { week: 29, cashDelta: 0, happinessDelta: 0, hours: 11 },
       'lost their wallet': {
-        week: 77,
-        cashDelta: -41,
+        week: 113,
+        cashDelta: -27,
         happinessDelta: -LOST_WALLET_HAPPINESS_PENALTY,
       },
     }
     let s = newGame({ playerName: 'T', goals: noWinGoals, seed: 0, rules: highFrequencyRules })
-    for (let w = 1; w <= 77; w++) {
+    for (let w = 1; w <= 113; w++) {
       neutralizeConfounds(s)
       const cashBefore = s.player.cash
       const happinessBefore = s.player.happiness
@@ -1352,11 +1352,11 @@ describe('expanded personal events (Wave 7)', () => {
   it("caps a cash-cost outcome at the player's available cash, never going negative", () => {
     // Same cap pattern as the doctor's bill (case 1) and Holiday one-offs'
     // tax week — targets the known costly-mistake week from the first test
-    // above ($245 cost) with far less cash than that on hand.
+    // above ($287 cost) with far less cash than that on hand.
     let s = newGame({ playerName: 'T', goals: noWinGoals, seed: 0, rules: highFrequencyRules })
-    for (let w = 1; w <= 16; w++) {
+    for (let w = 1; w <= 55; w++) {
       neutralizeConfounds(s)
-      if (w === 16) s.player.cash = 10 // below the $245 this week is about to cost
+      if (w === 55) s.player.cash = 10 // below the $287 this week is about to cost
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
@@ -1364,6 +1364,6 @@ describe('expanded personal events (Wave 7)', () => {
       (e) => e.actor === 'player' && e.text.includes('costly mistake')
     )
     expect(mistake).toBeDefined()
-    expect(s.player.cash).toBe(0) // capped, not -235
+    expect(s.player.cash).toBe(0) // capped, not -277
   })
 })
