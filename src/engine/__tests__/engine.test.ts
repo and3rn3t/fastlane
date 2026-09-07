@@ -589,20 +589,20 @@ describe('durable goods', () => {
   })
 
   it('an uninsured item can be stolen from an unsecured home', () => {
-    // Seed found by brute force: bike goes missing on the 5th endWeek (was
-    // the 6th before Wave 7's Holiday one-offs — HOLIDAY_BEATS skips the
-    // usual HEADLINES roll on two more weeks per 12-week cycle, shifting the
-    // shared rngSeed stream, same category of drift as the comment below
-    // already warns about). burglaryUpkeep's roll() is only spent when
-    // Riley actually owns a stealable item that week, so any change to
-    // *when* Riley buys things shifts how many rolls Riley's own upkeep
-    // consumes, which shifts the shared rngSeed stream the player's own
-    // rolls draw from later in the same week — expect this count to drift
-    // again after any future AI or economy change; re-run a brute-force
-    // search rather than guessing.
-    let s = applyAction(game(easyGoals, 2), { type: 'travel', to: 'gadgets' })
+    // Seed/week found by brute force: the player's own bike goes missing by
+    // the 3rd endWeek (was seed 2/5 weeks before Wave 7's Expand
+    // personalEvent() grew the outcome pool from 7 to 15, changing which
+    // case a given roll() value lands on — same category of drift as
+    // Holiday one-offs hit before it, see the git history on this test).
+    // burglaryUpkeep's roll() is only spent when a player actually owns a
+    // stealable item that week, so any change to *when* either side buys or
+    // loses things shifts how many rolls get consumed, which shifts the
+    // shared rngSeed stream every other roll draws from later — expect this
+    // to drift again after any future AI/economy change; re-run a
+    // brute-force search rather than guessing.
+    let s = applyAction(game(easyGoals, 8), { type: 'travel', to: 'gadgets' })
     s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
@@ -614,8 +614,8 @@ describe('durable goods', () => {
     // Actions never touch the RNG stream (only week.ts's upkeep/personalEvent/
     // driftEconomy do), so working first to afford both purchases doesn't
     // change the endWeek-by-endWeek roll sequence from the test above — same
-    // 5-week window as that test, for the same reason (see its comment).
-    let s = applyAction(game(easyGoals, 2), { type: 'travel', to: 'employment' })
+    // 3-week window as that test, for the same reason (see its comment).
+    let s = applyAction(game(easyGoals, 8), { type: 'travel', to: 'employment' })
     s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
     s = applyAction(s, { type: 'travel', to: 'burgers' })
     s = applyAction(s, { type: 'work', hours: 40 })
@@ -623,7 +623,7 @@ describe('durable goods', () => {
     s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
     s = applyAction(s, { type: 'travel', to: 'bank' })
     s = applyAction(s, { type: 'buyItem', itemId: 'insurance' })
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
@@ -1043,11 +1043,12 @@ describe('AI personalities', () => {
   })
 
   it('Hustler works more hours than Balanced given the same seed', () => {
-    // Seed found by brute force: a clear gap by week 8. (Was seed 12 before
-    // Wave 7's Holiday one-offs shifted the shared rngSeed stream — see the
-    // durable-goods theft test's comment for why this keeps happening.)
-    const balanced = run(4, 'balanced', 8)
-    const hustler = run(4, 'hustler', 8)
+    // Seed found by brute force: a clear gap by week 11. (Was seed 4/week 8
+    // before Wave 7's Expand personalEvent() shifted the shared rngSeed
+    // stream — see the durable-goods theft test's comment for why this
+    // keeps happening.)
+    const balanced = run(2, 'balanced', 11)
+    const hustler = run(2, 'hustler', 11)
     expect(hustler.riley.experience).toBeGreaterThan(balanced.riley.experience)
   })
 
@@ -1130,6 +1131,15 @@ describe('rule presets', () => {
       'felt a cold coming on',
       'was laid off',
       'left them something in their will',
+      // Wave 7's Expand personalEvent() additions:
+      'lost their wallet',
+      "'s post went viral",
+      'jury duty',
+      'car broke down',
+      'surprise $',
+      'fix something around the apartment',
+      'incredibly lucky',
+      'costly mistake',
     ]
     function countPersonalEvents(rules: typeof RULE_PRESETS.classic): number {
       let total = 0
@@ -1206,5 +1216,100 @@ describe('wilder global headlines', () => {
     expect(s.economy.wageIndex).toBeGreaterThan(wageIndexBefore)
     expect(s.economy.marketIndex).toBeGreaterThan(marketIndexBefore)
     expect(s.economy.priceIndex).toBe(priceIndexBefore) // Boom year has no priceDelta
+  })
+})
+
+describe('expanded personal events (Wave 7)', () => {
+  // eventFrequency cranked up (triggerChance caps at 0.9) so a fixed,
+  // brute-forced seed hits every new outcome within a bounded number of
+  // weeks instead of needing a separate seed hunted per outcome.
+  const highFrequencyRules = { ...RULE_PRESETS.classic, eventFrequency: 3 }
+  const noWinGoals: Goals = { wealth: 1_000_000, happiness: 1000, education: 1000, career: 1000 }
+
+  function playerEntriesMatching(
+    s: GameState,
+    marker: string
+  ): Array<{ week: number; text: string }> {
+    return s.log.filter((e) => e.actor === 'player' && e.text.includes(marker))
+  }
+
+  it('fires lost wallet, viral windfall, jury duty, car trouble, surprise refund, lucky find, and costly mistake within 44 weeks — seed found by brute force', () => {
+    let s = newGame({ playerName: 'T', goals: noWinGoals, seed: 0, rules: highFrequencyRules })
+    for (let w = 0; w < 44; w++) {
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    }
+
+    const wallet = playerEntriesMatching(s, 'lost their wallet')
+    expect(wallet.length).toBeGreaterThan(0)
+    const walletAmount = Number(wallet[0].text.match(/\$(\d+)/)?.[1])
+    expect(walletAmount).toBeGreaterThanOrEqual(15)
+    expect(walletAmount).toBeLessThanOrEqual(59)
+
+    const viral = playerEntriesMatching(s, "'s post went viral")
+    expect(viral.length).toBeGreaterThan(0)
+    const viralAmount = Number(viral[0].text.match(/\$(\d+)/)?.[1])
+    expect(viralAmount).toBeGreaterThanOrEqual(30)
+    expect(viralAmount).toBeLessThanOrEqual(99)
+
+    const jury = playerEntriesMatching(s, 'jury duty')
+    expect(jury.length).toBeGreaterThan(0)
+    const juryHours = Number(jury[0].text.match(/lost (\d+)h/)?.[1])
+    expect(juryHours).toBeGreaterThanOrEqual(6)
+    expect(juryHours).toBeLessThanOrEqual(15)
+
+    const car = playerEntriesMatching(s, 'car broke down')
+    expect(car.length).toBeGreaterThan(0)
+    const carAmount = Number(car[0].text.match(/\$(\d+)/)?.[1])
+    expect(carAmount).toBeGreaterThanOrEqual(40)
+    expect(carAmount).toBeLessThanOrEqual(119)
+
+    const refund = playerEntriesMatching(s, 'surprise $')
+    expect(refund.length).toBeGreaterThan(0)
+    const refundAmount = Number(refund[0].text.match(/\$(\d+)/)?.[1])
+    expect(refundAmount).toBeGreaterThanOrEqual(25)
+    expect(refundAmount).toBeLessThanOrEqual(79)
+
+    const lucky = playerEntriesMatching(s, 'incredibly lucky')
+    expect(lucky.length).toBeGreaterThan(0)
+    const luckyAmount = Number(lucky[0].text.match(/\$(\d+)/)?.[1])
+    expect(luckyAmount).toBeGreaterThanOrEqual(100)
+    expect(luckyAmount).toBeLessThanOrEqual(399)
+
+    const mistake = playerEntriesMatching(s, 'costly mistake')
+    expect(mistake.length).toBeGreaterThan(0)
+    const mistakeAmount = Number(mistake[0].text.match(/\$(\d+)/)?.[1])
+    expect(mistakeAmount).toBeGreaterThanOrEqual(100)
+    expect(mistakeAmount).toBeLessThanOrEqual(349)
+  })
+
+  it('fires home repair only for a player with a place to fix — seed found by brute force', () => {
+    let s = applyAction(
+      newGame({ playerName: 'T', goals: noWinGoals, seed: 2, rules: highFrequencyRules }),
+      { type: 'travel', to: 'rentoffice' }
+    )
+    s = applyAction(s, { type: 'rentApartment', tier: 'basic' })
+    for (let w = 0; w < 3; w++) {
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    }
+    const repair = playerEntriesMatching(s, 'fix something around the apartment')
+    expect(repair.length).toBeGreaterThan(0)
+    const repairAmount = Number(repair[0].text.match(/\$(\d+)/)?.[1])
+    expect(repairAmount).toBeGreaterThanOrEqual(40)
+    expect(repairAmount).toBeLessThanOrEqual(129)
+  })
+
+  it("caps a cash-cost outcome at the player's available cash, never going negative", () => {
+    // Same cap pattern as the doctor's bill (case 1) and Holiday one-offs'
+    // tax week — a lost wallet/car trouble/home repair/costly mistake can
+    // never push cash below zero.
+    let s = newGame({ playerName: 'T', goals: noWinGoals, seed: 0, rules: highFrequencyRules })
+    s.player.cash = 10 // below every new cash-cost outcome's minimum roll
+    for (let w = 0; w < 44 && s.player.cash === 10; w++) {
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    }
+    expect(s.player.cash).toBeGreaterThanOrEqual(0)
   })
 })

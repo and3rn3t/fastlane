@@ -282,11 +282,16 @@ function hasActiveChain(p: PlayerState, chainId: ActiveEvent['chainId']): boolea
   return p.activeEvents.some((e) => e.chainId === chainId)
 }
 
+/** Total number of one-shot outcomes personalEvent() can roll — kept as a
+ * named constant since resolveActiveEvents's chain triggers (layoff,
+ * inheritance) live inside this same switch and must stay counted too. */
+const PERSONAL_EVENT_OUTCOMES = 15
+
 function personalEvent(state: GameState, key: PlayerKey) {
   const p = state[key]
   const triggerChance = Math.min(0.9, 0.35 * state.rules.eventFrequency)
   if (roll(state) >= triggerChance) return
-  const which = rollInt(state, 7)
+  const which = rollInt(state, PERSONAL_EVENT_OUTCOMES)
   switch (which) {
     case 0: {
       const found = 10 + rollInt(state, 40)
@@ -345,6 +350,72 @@ function personalEvent(state: GameState, key: PlayerKey) {
         p.activeEvents.push({ chainId: 'inheritance', stage: 0, weeksInStage: 0 })
         log(state, key, `${p.name} heard a distant relative left them something in their will.`)
       }
+      break
+    }
+    case 7: {
+      const lost = 15 + rollInt(state, 45)
+      const paid = Math.min(lost, p.cash)
+      p.cash -= paid
+      p.happiness = Math.max(0, p.happiness - 2)
+      log(state, key, `${p.name} lost their wallet with $${paid} in it`)
+      break
+    }
+    case 8: {
+      const tips = 30 + rollInt(state, 70)
+      p.cash += tips
+      p.happiness = Math.min(100, p.happiness + 2)
+      log(state, key, `${p.name}'s post went viral — $${tips} in tips rolled in`)
+      break
+    }
+    case 9: {
+      // Always fires (no threshold gate, unlike the sick-day case above) —
+      // jury duty doesn't care whether you're healthy.
+      const cost = Math.min(6 + rollInt(state, 10), p.timeLeft)
+      p.timeLeft -= cost
+      log(state, key, `${p.name} got called for jury duty and lost ${cost}h`)
+      break
+    }
+    case 10: {
+      const repair = 40 + rollInt(state, 80)
+      const paid = Math.min(repair, p.cash)
+      p.cash -= paid
+      log(state, key, `${p.name}'s car broke down — $${paid} in repairs`)
+      break
+    }
+    case 11: {
+      const refund = 25 + rollInt(state, 55)
+      p.cash += refund
+      log(state, key, `${p.name} got a surprise $${refund} refund in the mail`)
+      break
+    }
+    case 12: {
+      // Only meaningful with an actual place to fix — same no-op-when-
+      // inapplicable pattern as case 2's work bonus (needs a job) and case 5's
+      // layoff (needs a job to lose).
+      if (p.apartment !== 'none') {
+        const repair = 40 + rollInt(state, 90)
+        const paid = Math.min(repair, p.cash)
+        p.cash -= paid
+        log(state, key, `${p.name} had to fix something around the apartment — $${paid}`)
+      }
+      break
+    }
+    case 13: {
+      // Genuinely wild swing, per the roadmap's own phrasing — well past
+      // case 0's ordinary "found cash" range.
+      const windfall = 100 + rollInt(state, 300)
+      p.cash += windfall
+      p.happiness = Math.min(100, p.happiness + 5)
+      log(state, key, `${p.name} got incredibly lucky: found $${windfall}!`)
+      break
+    }
+    case 14: {
+      // The mirror-image wild swing — well past case 1's ordinary doctor bill.
+      const loss = 100 + rollInt(state, 250)
+      const paid = Math.min(loss, p.cash)
+      p.cash -= paid
+      p.happiness = Math.max(0, p.happiness - 6)
+      log(state, key, `${p.name} made a costly mistake and lost $${paid}`)
       break
     }
   }
