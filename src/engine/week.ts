@@ -3,6 +3,11 @@
 
 import { foodShortfall, hasItem, netWorth, seasonalPrice } from './actions'
 import {
+  CAR_TROUBLE_MIN,
+  CAR_TROUBLE_RANGE,
+  COSTLY_MISTAKE_HAPPINESS_PENALTY,
+  COSTLY_MISTAKE_MIN,
+  COSTLY_MISTAKE_RANGE,
   CREDIT_GAIN_ON_PAYMENT,
   CREDIT_LOSS_ON_MISS,
   DRESS_WEAR_PER_WEEK,
@@ -16,22 +21,38 @@ import {
   HEALTH_OVERWORK_RATE,
   HEALTH_SICK_THRESHOLD,
   HOLIDAY_BEATS,
+  HOME_REPAIR_MIN,
+  HOME_REPAIR_RANGE,
   INHERITANCE_DELAY_WEEKS,
   INHERITANCE_MIN,
   INHERITANCE_RANGE,
   ITEM_THEFT_CHANCE,
+  JURY_DUTY_HOURS_RANGE,
+  JURY_DUTY_MIN_HOURS,
   LAYOFF_SYMPATHY_WEEKS,
   LOAN_INTEREST_RATE,
   LOAN_MISSED_WEEKS_FOR_GARNISHMENT,
+  LOST_WALLET_HAPPINESS_PENALTY,
+  LOST_WALLET_MIN,
+  LOST_WALLET_RANGE,
   LOTTERY_WIN_CHANCE,
+  LUCKY_FIND_HAPPINESS_BONUS,
+  LUCKY_FIND_MIN,
+  LUCKY_FIND_RANGE,
   MARKET_INDEX_MAX,
   MARKET_INDEX_MIN,
   MAX_PROMOTIONS,
   OVERWORK_THRESHOLD,
+  PERSONAL_EVENT_OUTCOMES,
   PROMOTION_PRESTIGE_BONUS,
   PROMOTION_TENURE_WEEKS,
   RENT,
   SEASON_HEADLINES,
+  SURPRISE_REFUND_MIN,
+  SURPRISE_REFUND_RANGE,
+  VIRAL_WINDFALL_HAPPINESS_BONUS,
+  VIRAL_WINDFALL_MIN,
+  VIRAL_WINDFALL_RANGE,
   WEEK_TIME,
   itemById,
   jobById,
@@ -282,11 +303,6 @@ function hasActiveChain(p: PlayerState, chainId: ActiveEvent['chainId']): boolea
   return p.activeEvents.some((e) => e.chainId === chainId)
 }
 
-/** Total number of one-shot outcomes personalEvent() can roll — kept as a
- * named constant since resolveActiveEvents's chain triggers (layoff,
- * inheritance) live inside this same switch and must stay counted too. */
-const PERSONAL_EVENT_OUTCOMES = 15
-
 function personalEvent(state: GameState, key: PlayerKey) {
   const p = state[key]
   const triggerChance = Math.min(0.9, 0.35 * state.rules.eventFrequency)
@@ -353,37 +369,37 @@ function personalEvent(state: GameState, key: PlayerKey) {
       break
     }
     case 7: {
-      const lost = 15 + rollInt(state, 45)
+      const lost = LOST_WALLET_MIN + rollInt(state, LOST_WALLET_RANGE)
       const paid = Math.min(lost, p.cash)
       p.cash -= paid
-      p.happiness = Math.max(0, p.happiness - 2)
+      p.happiness = Math.max(0, p.happiness - LOST_WALLET_HAPPINESS_PENALTY)
       log(state, key, `${p.name} lost their wallet with $${paid} in it`)
       break
     }
     case 8: {
-      const tips = 30 + rollInt(state, 70)
+      const tips = VIRAL_WINDFALL_MIN + rollInt(state, VIRAL_WINDFALL_RANGE)
       p.cash += tips
-      p.happiness = Math.min(100, p.happiness + 2)
+      p.happiness = Math.min(100, p.happiness + VIRAL_WINDFALL_HAPPINESS_BONUS)
       log(state, key, `${p.name}'s post went viral — $${tips} in tips rolled in`)
       break
     }
     case 9: {
       // Always fires (no threshold gate, unlike the sick-day case above) —
       // jury duty doesn't care whether you're healthy.
-      const cost = Math.min(6 + rollInt(state, 10), p.timeLeft)
+      const cost = Math.min(JURY_DUTY_MIN_HOURS + rollInt(state, JURY_DUTY_HOURS_RANGE), p.timeLeft)
       p.timeLeft -= cost
       log(state, key, `${p.name} got called for jury duty and lost ${cost}h`)
       break
     }
     case 10: {
-      const repair = 40 + rollInt(state, 80)
+      const repair = CAR_TROUBLE_MIN + rollInt(state, CAR_TROUBLE_RANGE)
       const paid = Math.min(repair, p.cash)
       p.cash -= paid
       log(state, key, `${p.name}'s car broke down — $${paid} in repairs`)
       break
     }
     case 11: {
-      const refund = 25 + rollInt(state, 55)
+      const refund = SURPRISE_REFUND_MIN + rollInt(state, SURPRISE_REFUND_RANGE)
       p.cash += refund
       log(state, key, `${p.name} got a surprise $${refund} refund in the mail`)
       break
@@ -393,7 +409,7 @@ function personalEvent(state: GameState, key: PlayerKey) {
       // inapplicable pattern as case 2's work bonus (needs a job) and case 5's
       // layoff (needs a job to lose).
       if (p.apartment !== 'none') {
-        const repair = 40 + rollInt(state, 90)
+        const repair = HOME_REPAIR_MIN + rollInt(state, HOME_REPAIR_RANGE)
         const paid = Math.min(repair, p.cash)
         p.cash -= paid
         log(state, key, `${p.name} had to fix something around the apartment — $${paid}`)
@@ -401,20 +417,17 @@ function personalEvent(state: GameState, key: PlayerKey) {
       break
     }
     case 13: {
-      // Genuinely wild swing, per the roadmap's own phrasing — well past
-      // case 0's ordinary "found cash" range.
-      const windfall = 100 + rollInt(state, 300)
+      const windfall = LUCKY_FIND_MIN + rollInt(state, LUCKY_FIND_RANGE)
       p.cash += windfall
-      p.happiness = Math.min(100, p.happiness + 5)
+      p.happiness = Math.min(100, p.happiness + LUCKY_FIND_HAPPINESS_BONUS)
       log(state, key, `${p.name} got incredibly lucky: found $${windfall}!`)
       break
     }
     case 14: {
-      // The mirror-image wild swing — well past case 1's ordinary doctor bill.
-      const loss = 100 + rollInt(state, 250)
+      const loss = COSTLY_MISTAKE_MIN + rollInt(state, COSTLY_MISTAKE_RANGE)
       const paid = Math.min(loss, p.cash)
       p.cash -= paid
-      p.happiness = Math.max(0, p.happiness - 6)
+      p.happiness = Math.max(0, p.happiness - COSTLY_MISTAKE_HAPPINESS_PENALTY)
       log(state, key, `${p.name} made a costly mistake and lost $${paid}`)
       break
     }
