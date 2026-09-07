@@ -79,6 +79,43 @@ export const INHERITANCE_DELAY_WEEKS = 2
 export const INHERITANCE_MIN = 200
 export const INHERITANCE_RANGE = 400
 
+/** Total number of one-shot outcomes personalEvent() (week.ts) can roll —
+ * kept as a named constant since resolveActiveEvents's chain triggers
+ * (layoff, inheritance) live inside that same switch and must stay counted
+ * too. Every roll range below follows the same MIN + rollInt(RANGE) shape
+ * as INHERITANCE_MIN/INHERITANCE_RANGE above. */
+export const PERSONAL_EVENT_OUTCOMES = 15
+
+export const LOST_WALLET_MIN = 15
+export const LOST_WALLET_RANGE = 45
+export const LOST_WALLET_HAPPINESS_PENALTY = 2
+
+export const VIRAL_WINDFALL_MIN = 30
+export const VIRAL_WINDFALL_RANGE = 70
+export const VIRAL_WINDFALL_HAPPINESS_BONUS = 2
+
+export const JURY_DUTY_MIN_HOURS = 6
+export const JURY_DUTY_HOURS_RANGE = 10
+
+export const CAR_TROUBLE_MIN = 40
+export const CAR_TROUBLE_RANGE = 80
+
+export const SURPRISE_REFUND_MIN = 25
+export const SURPRISE_REFUND_RANGE = 55
+
+export const HOME_REPAIR_MIN = 40
+export const HOME_REPAIR_RANGE = 90
+
+/** Genuinely wild swings, per the roadmap's own phrasing — well past the
+ * ordinary found-cash/doctor-bill ranges above. */
+export const LUCKY_FIND_MIN = 100
+export const LUCKY_FIND_RANGE = 300
+export const LUCKY_FIND_HAPPINESS_BONUS = 5
+
+export const COSTLY_MISTAKE_MIN = 100
+export const COSTLY_MISTAKE_RANGE = 250
+export const COSTLY_MISTAKE_HAPPINESS_PENALTY = 6
+
 export const CASINO_MIN_BET = 10
 export const CASINO_MAX_BET = 500
 export const CASINO_TIME = 1

@@ -10,10 +10,13 @@ import {
 } from '../actions'
 import { bestQualifiedJob, nextTargetJob } from '../career'
 import {
+  COSTLY_MISTAKE_HAPPINESS_PENALTY,
   FOOD_NEEDED,
   GROCERY_PRICE_MEGAMART,
   HOLIDAY_BEATS,
   JOBS,
+  LOST_WALLET_HAPPINESS_PENALTY,
+  LUCKY_FIND_HAPPINESS_BONUS,
   MARKET_INDEX_MAX,
   MARKET_INDEX_MIN,
   RENT,
@@ -23,11 +26,13 @@ import {
   SKILL_GAIN_PER_HOUR,
   SKILL_TRAIN_GAIN,
   SKILL_TRAIN_PRICE,
+  VIRAL_WINDFALL_HAPPINESS_BONUS,
   WEEK_TIME,
   jobById,
   maxLoan,
   seasonForWeek,
   travelCost,
+  weekInCycle,
 } from '../data'
 import { applyAction, newGame } from '../engine'
 import { careerScore, meetsGoals } from '../week'
@@ -589,20 +594,20 @@ describe('durable goods', () => {
   })
 
   it('an uninsured item can be stolen from an unsecured home', () => {
-    // Seed found by brute force: bike goes missing on the 5th endWeek (was
-    // the 6th before Wave 7's Holiday one-offs — HOLIDAY_BEATS skips the
-    // usual HEADLINES roll on two more weeks per 12-week cycle, shifting the
-    // shared rngSeed stream, same category of drift as the comment below
-    // already warns about). burglaryUpkeep's roll() is only spent when
-    // Riley actually owns a stealable item that week, so any change to
-    // *when* Riley buys things shifts how many rolls Riley's own upkeep
-    // consumes, which shifts the shared rngSeed stream the player's own
-    // rolls draw from later in the same week — expect this count to drift
-    // again after any future AI or economy change; re-run a brute-force
-    // search rather than guessing.
-    let s = applyAction(game(easyGoals, 2), { type: 'travel', to: 'gadgets' })
+    // Seed/week found by brute force: the player's own bike goes missing by
+    // the 3rd endWeek (was seed 2/5 weeks before Wave 7's Expand
+    // personalEvent() grew the outcome pool from 7 to 15, changing which
+    // case a given roll() value lands on — same category of drift as
+    // Holiday one-offs hit before it, see the git history on this test).
+    // burglaryUpkeep's roll() is only spent when a player actually owns a
+    // stealable item that week, so any change to *when* either side buys or
+    // loses things shifts how many rolls get consumed, which shifts the
+    // shared rngSeed stream every other roll draws from later — expect this
+    // to drift again after any future AI/economy change; re-run a
+    // brute-force search rather than guessing.
+    let s = applyAction(game(easyGoals, 8), { type: 'travel', to: 'gadgets' })
     s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
@@ -614,8 +619,8 @@ describe('durable goods', () => {
     // Actions never touch the RNG stream (only week.ts's upkeep/personalEvent/
     // driftEconomy do), so working first to afford both purchases doesn't
     // change the endWeek-by-endWeek roll sequence from the test above — same
-    // 5-week window as that test, for the same reason (see its comment).
-    let s = applyAction(game(easyGoals, 2), { type: 'travel', to: 'employment' })
+    // 3-week window as that test, for the same reason (see its comment).
+    let s = applyAction(game(easyGoals, 8), { type: 'travel', to: 'employment' })
     s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
     s = applyAction(s, { type: 'travel', to: 'burgers' })
     s = applyAction(s, { type: 'work', hours: 40 })
@@ -623,7 +628,7 @@ describe('durable goods', () => {
     s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
     s = applyAction(s, { type: 'travel', to: 'bank' })
     s = applyAction(s, { type: 'buyItem', itemId: 'insurance' })
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 3; i++) {
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
@@ -1043,11 +1048,12 @@ describe('AI personalities', () => {
   })
 
   it('Hustler works more hours than Balanced given the same seed', () => {
-    // Seed found by brute force: a clear gap by week 8. (Was seed 12 before
-    // Wave 7's Holiday one-offs shifted the shared rngSeed stream — see the
-    // durable-goods theft test's comment for why this keeps happening.)
-    const balanced = run(4, 'balanced', 8)
-    const hustler = run(4, 'hustler', 8)
+    // Seed found by brute force: a clear gap by week 11. (Was seed 4/week 8
+    // before Wave 7's Expand personalEvent() shifted the shared rngSeed
+    // stream — see the durable-goods theft test's comment for why this
+    // keeps happening.)
+    const balanced = run(2, 'balanced', 11)
+    const hustler = run(2, 'hustler', 11)
     expect(hustler.riley.experience).toBeGreaterThan(balanced.riley.experience)
   })
 
@@ -1130,6 +1136,15 @@ describe('rule presets', () => {
       'felt a cold coming on',
       'was laid off',
       'left them something in their will',
+      // Wave 7's Expand personalEvent() additions:
+      'lost their wallet',
+      "'s post went viral",
+      'jury duty',
+      'car broke down',
+      'surprise $',
+      'fix something around the apartment',
+      'incredibly lucky',
+      'costly mistake',
     ]
     function countPersonalEvents(rules: typeof RULE_PRESETS.classic): number {
       let total = 0
@@ -1206,5 +1221,149 @@ describe('wilder global headlines', () => {
     expect(s.economy.wageIndex).toBeGreaterThan(wageIndexBefore)
     expect(s.economy.marketIndex).toBeGreaterThan(marketIndexBefore)
     expect(s.economy.priceIndex).toBe(priceIndexBefore) // Boom year has no priceDelta
+  })
+})
+
+describe('expanded personal events (Wave 7)', () => {
+  // eventFrequency cranked up (triggerChance caps at 0.9) so a fixed,
+  // brute-forced seed hits every new outcome within a bounded number of
+  // weeks instead of needing a separate seed hunted per outcome.
+  const highFrequencyRules = { ...RULE_PRESETS.classic, eventFrequency: 3 }
+  const noWinGoals: Goals = { wealth: 1_000_000, happiness: 1000, education: 1000, career: 1000 }
+  // Season transitions (weekInCycle 1/4/7/10) and Holiday one-offs
+  // (2/3/11) override that week's usual roll entirely, and can themselves
+  // move cash — a week landing on one of these could be mistaken for
+  // personalEvent's own effect. Every outcome below was brute-forced to
+  // land on a "free" week outside this set.
+  const RESERVED_CYCLE_POSITIONS = new Set([1, 2, 3, 4, 7, 10, 11])
+  function isFreeWeek(upcomingWeek: number): boolean {
+    return !RESERVED_CYCLE_POSITIONS.has(weekInCycle(upcomingWeek))
+  }
+
+  // Neutralizes every OTHER thing endWeek() can do to cash/happiness/time
+  // for a bare player, so a found/lost amount is provably personalEvent's
+  // own contribution, not incidental noise: hot meals (no hunger penalty,
+  // no cheap-food health drain that would eventually drag happiness down
+  // once health crosses HEALTH_LOW_THRESHOLD), rent never due (secure
+  // apartment, reset every week), and no maturing event chain landing in
+  // the same week (resolveActiveEvents runs before personalEvent and would
+  // otherwise inject its own cash change).
+  function neutralizeConfounds(s: GameState) {
+    s.player.fed = FOOD_NEEDED
+    s.player.apartment = 'secure'
+    s.player.rentDue = 0
+    s.player.weeksBehindOnRent = 0
+    s.player.activeEvents = []
+  }
+
+  // The secure apartment's own constant +2 "comfort" happiness (upkeep())
+  // plus the drift-toward-50 are the only other things that can move
+  // happiness once neutralizeConfounds() holds everything else still.
+  // Predicting that baseline and diffing the real post-endWeek happiness
+  // against it isolates personalEvent's own delta exactly, instead of
+  // just checking direction.
+  function predictedHappinessBeforePersonalEvent(happinessBefore: number): number {
+    const withComfort = Math.min(100, happinessBefore + 2)
+    return Math.round(withComfort + (50 - withComfort) * 0.05)
+  }
+
+  it('fires viral windfall, car trouble, surprise refund, costly mistake, lucky find, jury duty, and lost wallet with exact cash/happiness/time effects — seed found by brute force', () => {
+    const expected: Record<
+      string,
+      { week: number; cashDelta: number; happinessDelta: number; hours?: number }
+    > = {
+      "'s post went viral": {
+        week: 4,
+        cashDelta: 38,
+        happinessDelta: VIRAL_WINDFALL_HAPPINESS_BONUS,
+      },
+      'car broke down': { week: 8, cashDelta: -100, happinessDelta: 0 },
+      'surprise $': { week: 11, cashDelta: 43, happinessDelta: 0 },
+      'jury duty': { week: 17, cashDelta: 0, happinessDelta: 0, hours: 8 },
+      'incredibly lucky': { week: 19, cashDelta: 336, happinessDelta: LUCKY_FIND_HAPPINESS_BONUS },
+      'costly mistake': {
+        week: 55,
+        cashDelta: -287,
+        happinessDelta: -COSTLY_MISTAKE_HAPPINESS_PENALTY,
+      },
+      'lost their wallet': {
+        week: 113,
+        cashDelta: -27,
+        happinessDelta: -LOST_WALLET_HAPPINESS_PENALTY,
+      },
+    }
+    let s = newGame({ playerName: 'T', goals: noWinGoals, seed: 0, rules: highFrequencyRules })
+    for (let w = 1; w <= 113; w++) {
+      neutralizeConfounds(s)
+      const cashBefore = s.player.cash
+      const happinessBefore = s.player.happiness
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+      for (const [marker, exp] of Object.entries(expected)) {
+        if (exp.week !== w) continue
+        expect(isFreeWeek(w + 1)).toBe(true) // sanity: not a holiday/season override week
+        const entry = s.lastReport?.entries.find(
+          (e) => e.actor === 'player' && e.text.includes(marker)
+        )
+        expect(entry).toBeDefined()
+        expect(s.player.cash - cashBefore).toBe(exp.cashDelta)
+        expect(s.player.happiness - predictedHappinessBeforePersonalEvent(happinessBefore)).toBe(
+          exp.happinessDelta
+        )
+        if (exp.hours !== undefined) {
+          expect(s.player.timeLeft).toBe(WEEK_TIME - exp.hours)
+        }
+      }
+    }
+  })
+
+  it('fires home repair only for a player with a place to fix, with an exact cash effect — seed found by brute force', () => {
+    let s = applyAction(
+      newGame({ playerName: 'T', goals: noWinGoals, seed: 5, rules: highFrequencyRules }),
+      { type: 'travel', to: 'rentoffice' }
+    )
+    s = applyAction(s, { type: 'rentApartment', tier: 'basic' })
+    // Weeks 1-4 pass uneventfully (this outcome needs an actual apartment,
+    // so it can't reuse neutralizeConfounds()'s secure-apartment default);
+    // week 5 is the target, isolated the same way — no rent due, no
+    // maturing chain, no hunger — so the cash delta is provably this
+    // outcome's own effect.
+    for (let w = 1; w <= 4; w++) {
+      s.player.fed = FOOD_NEEDED
+      s.player.rentDue = 0
+      s.player.weeksBehindOnRent = 0
+      s.player.activeEvents = []
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    }
+    s.player.fed = FOOD_NEEDED
+    s.player.rentDue = 0
+    s.player.weeksBehindOnRent = 0
+    s.player.activeEvents = []
+    const cashBefore = s.player.cash
+    s = applyAction(s, { type: 'endWeek' })
+    const repair = s.lastReport?.entries.find(
+      (e) => e.actor === 'player' && e.text.includes('fix something around the apartment')
+    )
+    expect(repair).toBeDefined()
+    expect(s.player.cash - cashBefore).toBe(-68)
+  })
+
+  it("caps a cash-cost outcome at the player's available cash, never going negative", () => {
+    // Same cap pattern as the doctor's bill (case 1) and Holiday one-offs'
+    // tax week — targets the known costly-mistake week from the first test
+    // above ($287 cost) with far less cash than that on hand.
+    let s = newGame({ playerName: 'T', goals: noWinGoals, seed: 0, rules: highFrequencyRules })
+    for (let w = 1; w <= 55; w++) {
+      neutralizeConfounds(s)
+      if (w === 55) s.player.cash = 10 // below the $287 this week is about to cost
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    }
+    const mistake = s.lastReport?.entries.find(
+      (e) => e.actor === 'player' && e.text.includes('costly mistake')
+    )
+    expect(mistake).toBeDefined()
+    expect(s.player.cash).toBe(0) // capped, not -277
   })
 })
