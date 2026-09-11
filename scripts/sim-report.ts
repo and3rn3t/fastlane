@@ -2,12 +2,16 @@
 // the same percentiles + goal-breakdown detail `pnpm sim`'s single-cell mode
 // prints, for every cell rather than just one — packaging the matrix, the
 // percentiles, and the goal breakdown into one deterministic job, per Wave
-// 13's "CI-wired balance report" item. Exits non-zero on any flagged cell so
-// a real regression fails the workflow instead of scrolling past in a log
-// nobody reads.
+// 13's "CI-wired balance report" item. Also runs Wave 14's origin matrix
+// (one cell per origin, Riley's origin forced) against the same baseline,
+// since that's this repo's actual acceptance test for shipping origins at
+// all — see docs/ROADMAP.md's Wave 14 preamble. Exits non-zero on any
+// flagged cell so a real regression fails the workflow instead of scrolling
+// past in a log nobody reads.
 //
-// Usage: pnpm sim:report [gameCount]  (default 100/cell — 12 cells, so this
-// already runs 1,200 games; `pnpm sim`'s own default of 200 would mean 2,400)
+// Usage: pnpm sim:report [gameCount]  (default 100/cell — 12 profile×rules
+// cells + 5 origin cells, so this already runs 1,700 games; `pnpm sim`'s own
+// default of 200 would mean 3,400)
 
 import { AI_PROFILES } from '../src/engine/index.ts'
 import {
@@ -17,6 +21,7 @@ import {
   GOAL_KEYS,
   MAX_WEEKS,
   NO_WINNER_GUARD_PCT,
+  ORIGIN_NAMES,
   parseGameCount,
   PROFILE_NAMES,
   RULE_PRESET_NAMES,
@@ -79,8 +84,17 @@ function main() {
           ? baseline
           : runBatch(gameCount, rileyProfile, rulesPreset)
       reportCell(batch, rileyProfile, rulesPreset)
-      flags.push(...flagOutlier(batch, baseline, rileyProfile, rulesPreset))
+      flags.push(...flagOutlier(batch, baseline, `${rileyProfile}/${rulesPreset}`))
     }
+  }
+
+  console.log(`\n${ORIGIN_NAMES.length} origins (Balanced/Classic, Riley's origin forced):`)
+  for (const originId of ORIGIN_NAMES) {
+    const batch = runBatch(gameCount, 'balanced', 'classic', originId)
+    console.log(
+      `  ${originId.padEnd(23)} player: ${batch.playerWinPct.toFixed(1)}%  riley: ${batch.rileyWinPct.toFixed(1)}%`
+    )
+    flags.push(...flagOutlier(batch, baseline, originId))
   }
 
   console.log('')

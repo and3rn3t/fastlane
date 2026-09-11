@@ -36,12 +36,36 @@ export type ApartmentTier = 'none' | 'basic' | 'secure'
  * just "more experience." */
 export type SkillId = 'sales' | 'trades' | 'tech'
 
+/** A small, closed set of starting backgrounds — not a generator, same
+ * discipline as SkillId. Each sets a player's starting cash/education/
+ * skills/items/apartment (see ORIGINS in data.ts) and carries one `traitId`
+ * (plain `string` placeholder — see OriginDef.traitId) whose passive effects
+ * a future Wave 14 row implements. */
+export type OriginId =
+  'first-gen-student' | 'trust-fund-kid' | 'career-changer' | 'veteran' | 'small-town-transplant'
+
 export interface LocationDef {
   id: LocationId
   name: string
   blurb: string
   /** Position around the board loop; travel cost = steps between positions. */
   loopIndex: number
+}
+
+/** A catalog row in ORIGINS (data.ts) — the starting overrides `newPlayer()`
+ * applies for a chosen origin. Absent fields keep the game's normal default
+ * (see newPlayer() in engine.ts). */
+export interface OriginDef {
+  id: OriginId
+  name: string
+  blurb: string
+  cash?: number
+  education?: number
+  skills?: Partial<Record<SkillId, number>>
+  items?: ItemId[]
+  apartment?: ApartmentTier
+  /** Not yet interpreted anywhere — see OriginId's own doc comment. */
+  traitId: string
 }
 
 export interface JobDef {
@@ -178,6 +202,10 @@ export interface PlayerState {
    * a laid-off player or one expecting an inheritance carries this forward
    * week to week instead of the effect resolving in a single one-shot roll. */
   activeEvents: ActiveEvent[]
+  /** Starting background chosen (or, for Riley, seeded-randomly drawn) at
+   * newGame() — see ORIGINS in data.ts. Applied once at construction; the
+   * field itself is just a label, not re-applied on load. */
+  originId: OriginId
 }
 
 /** One entry per event chain currently playing out for a player. `stage`
@@ -238,7 +266,7 @@ export interface WeekSnapshot {
 /** Bump on any GameState/PlayerState shape change and add a migration step in
  * state/GameContext.tsx's MIGRATIONS map — see that file for the full scheme.
  * The engine owns this number since it owns what the shape actually is. */
-export const SAVE_VERSION = 10
+export const SAVE_VERSION = 11
 
 /** Riley's catch-up signal for the *current* game, derived once at game
  * start from the player's rivalry history (src/rivalry.ts) and stored on

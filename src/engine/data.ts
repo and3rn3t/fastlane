@@ -1,4 +1,12 @@
-import type { ItemDef, JobDef, LocationDef, LocationId, RulesConfig, SkillId } from './types'
+import type {
+  ItemDef,
+  JobDef,
+  LocationDef,
+  LocationId,
+  OriginDef,
+  RulesConfig,
+  SkillId,
+} from './types'
 
 export const WEEK_TIME = 60
 export const FOOD_NEEDED = 6
@@ -619,6 +627,55 @@ export const SKILLS: Array<{ id: SkillId; name: string; blurb: string }> = [
   { id: 'tech', name: 'Tech', blurb: 'Built by working First Bank or City University.' },
 ]
 
+/** Starting backgrounds — see OriginId/OriginDef in types.ts. `cash`/
+ * `education`/`skills` are deltas applied on top of newPlayer()'s normal
+ * baseline (so an origin composes with the chosen RulesConfig preset and,
+ * for the human player, any Legacy perk cash bonus, rather than overriding
+ * them); `items`/`apartment` are absolute. 'career-changer' is the neutral
+ * baseline — every field a no-op delta — so newGame() can default to it
+ * without changing today's starting stats for any caller that doesn't pass
+ * an origin explicitly. */
+export const ORIGINS: OriginDef[] = [
+  {
+    id: 'career-changer',
+    name: 'Career Changer',
+    blurb: 'Starting fresh with a clean slate — no head start, no handicap.',
+    traitId: 'adaptable',
+  },
+  {
+    id: 'first-gen-student',
+    name: 'First-Gen Student',
+    blurb: 'Worked through school with no family safety net.',
+    cash: -20,
+    education: 1,
+    skills: { trades: 4 },
+    traitId: 'scrappy',
+  },
+  {
+    id: 'trust-fund-kid',
+    name: 'Trust Fund Kid',
+    blurb: 'Family money smoothed the way — a bit of extra cash to start.',
+    cash: 120,
+    traitId: 'connected',
+  },
+  {
+    id: 'veteran',
+    name: 'Veteran',
+    blurb: 'A modest service stipend and some hands-on trades training.',
+    cash: 40,
+    skills: { trades: 6 },
+    traitId: 'disciplined',
+  },
+  {
+    id: 'small-town-transplant',
+    name: 'Small-Town Transplant',
+    blurb: 'New to the city, but not new to working a counter.',
+    cash: -10,
+    skills: { sales: 4 },
+    traitId: 'resourceful',
+  },
+]
+
 export const ITEMS: ItemDef[] = [
   {
     id: 'outfit-casual',
@@ -715,6 +772,12 @@ export function itemById(id: string): ItemDef {
   const item = ITEMS.find((i) => i.id === id)
   if (!item) throw new Error(`Unknown item: ${id}`)
   return item
+}
+
+export function originById(id: string): OriginDef {
+  const origin = ORIGINS.find((o) => o.id === id)
+  if (!origin) throw new Error(`Unknown origin: ${id}`)
+  return origin
 }
 
 /** Travel cost in time units between two locations (steps around the loop). */

@@ -2,7 +2,16 @@
 
 import * as act from './actions'
 import { AI_PROFILES, applyMomentum, DIFFICULTY_SKILL, runAIWeek } from './ai'
-import { CREDIT_SCORE_START, HEALTH_START, RULE_PRESETS, WEEK_TIME } from './data'
+import {
+  CREDIT_SCORE_START,
+  HEALTH_START,
+  itemById,
+  originById,
+  ORIGINS,
+  RULE_PRESETS,
+  WEEK_TIME,
+} from './data'
+import { rollInt } from './rng'
 import { endWeek } from './week'
 import {
   SAVE_VERSION,
@@ -10,27 +19,46 @@ import {
   type GameAction,
   type GameState,
   type Goals,
+  type ItemId,
+  type OriginId,
   type PlayerState,
   type RileyDifficulty,
   type RileyMomentum,
   type RulesConfig,
 } from './types'
 
-function newPlayer(name: string, isAI: boolean, startingCash: number): PlayerState {
+/** Origin `career-changer` is every field a no-op delta, so this default
+ * reproduces today's exact plain starting stats for any caller that doesn't
+ * pass an origin explicitly. */
+const DEFAULT_ORIGIN: OriginId = 'career-changer'
+
+function newPlayer(
+  name: string,
+  isAI: boolean,
+  startingCash: number,
+  originId: OriginId
+): PlayerState {
+  const origin = originById(originId)
+  const items: ItemId[] = origin.items ? [...origin.items] : []
+  let dress = 20
+  for (const itemId of items) {
+    const item = itemById(itemId)
+    if (item.dress !== undefined) dress = Math.max(dress, item.dress)
+  }
   return {
     name,
     isAI,
     location: 'home',
     timeLeft: WEEK_TIME,
-    cash: startingCash,
+    cash: Math.max(0, startingCash + (origin.cash ?? 0)),
     savings: 0,
     happiness: 50,
-    education: 0,
+    education: Math.max(0, origin.education ?? 0),
     jobId: null,
     experience: 0,
-    dress: 20,
-    items: [],
-    apartment: 'none',
+    dress,
+    items,
+    apartment: origin.apartment ?? 'none',
     rentDue: 0,
     weeksBehindOnRent: 0,
     fed: 0,
@@ -46,9 +74,14 @@ function newPlayer(name: string, isAI: boolean, startingCash: number): PlayerSta
     creditScore: CREDIT_SCORE_START,
     garnished: false,
     loanPaidThisWeek: false,
-    skills: { sales: 0, trades: 0, tech: 0 },
+    skills: {
+      sales: origin.skills?.sales ?? 0,
+      trades: origin.skills?.trades ?? 0,
+      tech: origin.skills?.tech ?? 0,
+    },
     investments: 0,
     activeEvents: [],
+    originId,
   }
 }
 
@@ -68,14 +101,56 @@ export interface NewGameOptions {
    * preset's startingCash for the player only — Riley always starts at the
    * plain preset value, so this never changes Riley's own difficulty. */
   playerCashBonus?: number
+  /** The human player's starting background — see OriginId/ORIGINS in
+   * data.ts. Defaults to DEFAULT_ORIGIN (a no-op) when omitted, e.g. before
+   * an origin picker UI exists. Riley always draws its own origin at random,
+   * seeded off this game's own seed — see below. */
+  playerOriginId?: OriginId
+  /** Forces Riley's origin instead of letting it draw randomly — for sim/test
+   * use only (see scripts/sim.ts's origin matrix); a real game never sets
+   * this. The random draw still runs and still advances rngSeed even when
+   * this is set, so a given seed's week-to-week RNG stream is identical
+   * whether or not this override is used — isolating the origin's own effect
+   * as the only difference between two runs of the same seed. */
+  rileyOriginId?: OriginId
+}
+
+/** Draws Riley's origin against a mutable rng state (advancing its seed by
+ * one step) — the one and only RNG draw newGame() makes at construction
+ * time. Factored out so initialRngSeed() below can reproduce exactly this
+ * transformation without duplicating it. */
+function drawRileyOrigin(rngState: { rngSeed: number }): OriginId {
+  return ORIGINS[rollInt(rngState, ORIGINS.length)].id
+}
+
+/** The `rngSeed` a freshly-constructed `newGame({ seed })` would have,
+ * before any week is played — i.e. `seed` advanced by newGame()'s own
+ * construction-time draws (currently just Riley's origin). Lets a caller
+ * check "does this save's current rngSeed match having just been started
+ * fresh from this exact seed" without replaying full game construction —
+ * e.g. the Daily Challenge deep-link's "is this already today's challenge"
+ * check in App.tsx. Update this alongside newGame() if it ever adds another
+ * construction-time draw. */
+export function initialRngSeed(seed: number): number {
+  const rngState = { rngSeed: seed }
+  drawRileyOrigin(rngState)
+  return rngState.rngSeed
 }
 
 export function newGame(opts: NewGameOptions): GameState {
   const rules = opts.rules ?? RULE_PRESETS.classic
+  // Riley's origin is the game's very first RNG draw, ahead of anything
+  // week.ts does — deliberately, so it stays reproducible from the seed like
+  // everything else in a replay. It also means every seed-dependent test in
+  // this repo shifts by one draw from here on; see Standing Constraints in
+  // docs/ROADMAP.md for why that's expected, not a bug.
+  const rngState = { rngSeed: opts.seed ?? Math.floor(Math.random() * 2 ** 31) }
+  const drawnRileyOriginId = drawRileyOrigin(rngState)
+  const rileyOriginId = opts.rileyOriginId ?? drawnRileyOriginId
   return {
     version: SAVE_VERSION,
     week: 1,
-    rngSeed: opts.seed ?? Math.floor(Math.random() * 2 ** 31),
+    rngSeed: rngState.rngSeed,
     phase: 'playing',
     winner: null,
     goals: opts.goals,
@@ -89,9 +164,10 @@ export function newGame(opts: NewGameOptions): GameState {
     player: newPlayer(
       opts.playerName || 'You',
       false,
-      rules.startingCash + (opts.playerCashBonus ?? 0)
+      rules.startingCash + (opts.playerCashBonus ?? 0),
+      opts.playerOriginId ?? DEFAULT_ORIGIN
     ),
-    riley: newPlayer('Riley', true, rules.startingCash),
+    riley: newPlayer('Riley', true, rules.startingCash, rileyOriginId),
     rileyProfile: opts.rileyProfile ?? 'balanced',
     rileyDifficulty: opts.rileyDifficulty ?? 'normal',
     rileyMomentum: opts.rileyMomentum ?? 'even',
