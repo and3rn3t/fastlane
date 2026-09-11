@@ -120,6 +120,12 @@ function isPlausibleSave(data: unknown): data is Record<string, unknown> {
  * before that existed was necessarily started before any momentum bias could
  * be computed, so it defaults to 'even' — no catch-up bias, identical to how
  * every game before this feature already played.
+ *
+ * 10 → 11: Origin backgrounds added `originId` per player. A save from before
+ * origins existed was necessarily playing the plain, no-delta starting
+ * stats — 'career-changer' is that exact origin (every field a no-op delta),
+ * so backfilling it changes nothing about the save's actual numbers, only
+ * the label.
  */
 function upgradePlayerToV2(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
@@ -179,6 +185,15 @@ function upgradeEconomyToV9(economy: unknown): unknown {
   return { ...e, marketIndex: 1 }
 }
 
+function upgradePlayerToV11(player: unknown): unknown {
+  if (typeof player !== 'object' || player === null) return player
+  const p = player as Record<string, unknown>
+  return {
+    ...p,
+    originId: typeof p.originId === 'string' ? p.originId : 'career-changer',
+  }
+}
+
 const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<string, unknown>> = {
   0: (save) => ({
     ...save,
@@ -225,6 +240,11 @@ const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<strin
   9: (save) => ({
     ...save,
     rileyMomentum: typeof save.rileyMomentum === 'string' ? save.rileyMomentum : 'even',
+  }),
+  10: (save) => ({
+    ...save,
+    player: upgradePlayerToV11(save.player),
+    riley: upgradePlayerToV11(save.riley),
   }),
 }
 

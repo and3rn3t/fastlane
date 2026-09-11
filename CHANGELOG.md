@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `profiles/web/` — canonical eslint/prettier/tsconfig/wrangler configs for React+TS+Vite+Cloudflare repos
 - Doc scaffolds: `docs/ARCHITECTURE-template.md`, `docs/PRD-template.md`, `docs/ROADMAP-template.md` (pull-loop convention), `docs/adr/0000-template.md`
 - `.gitattributes` — LF normalization, binary marks, lockfiles marked linguist-generated
+- Origin backgrounds (Wave 14): 5 starting-background `OriginId`s (`career-changer` neutral, `first-gen-student`, `trust-fund-kid`, `veteran`, `small-town-transplant`), each a `cash`/`education`/`skills` delta plus an inert `traitId` for a future Traits row. `newGame()` applies the human player's (default neutral) and draws Riley's own at random, seeded — the very first RNG draw at construction time. `PlayerState.originId`; save schema bumped to version 11, backfilling `career-changer` on older saves (a real fact, not a guess — that's the exact no-delta stats those saves already have). New `pnpm sim [gameCount] origins` mode (and a matching CI-report section) checks no origin drifts the win rate past the existing guard; caught and fixed a genuinely overpowered first pass (one origin was winning Riley 86% of games) before shipping. Fixed a real regression this uncovered: the Daily Challenge deep-link's "already today's challenge" check compared a save's `rngSeed` straight against the raw date-derived seed, which broke the instant construction started consuming one RNG draw — new `initialRngSeed()` export fixes the comparison
 
 ### Changed
 
@@ -69,6 +70,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SECURITY.md, CODEOWNERS, LICENSE filled with real defaults instead of TODO placeholders
 - devcontainer Node feature and release workflow action versions updated
 - `ai.ts`'s AI policy parameterized from a hardcoded `riley` accessor to `runAIWeek(state, key: PlayerKey)`, so `scripts/sim.ts` can drive either side with the same logic; pure refactor, verified behavior-neutral against the existing seeded-RNG AI tests
+- Data-driven board geometry (Wave 15, first item): `Board.tsx`'s hand-listed 14-entry `PERIMETER` array replaced with `perimeterForSize(LOOP_SIZE)`, which computes the smallest grid whose border fits every location and walks it clockwise. Pure refactor — no gameplay change, no save migration. One historical wrinkle preserved on purpose: Casino, added as the 14th location without renumbering the other 13 `loopIndex` values, occupies the one grid cell a 13-cell walk had left empty rather than its position in a pure walk's sequence — a new test pins the derived output equal to the old literal array, and a live screenshot confirmed the board renders byte-identically, Casino included. Retires the "hardcoded 14-entry array" framing in `docs/ROADMAP.md`'s board-locations Standing Constraint, unblocking Wave 8's Pets and Wave 12's New career path once a bigger grid shape is chosen
 
 ### Removed
 

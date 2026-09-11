@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from 'react'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { dailyChallengeOptions, dailyChallengeSeed } from '@/daily'
+import { initialRngSeed } from '@/engine'
 import { useGame } from '@/state/GameContext'
 import { reportError } from '@/telemetry'
 import { GameScreen } from '@/ui/GameScreen'
@@ -75,7 +76,12 @@ function useDailyChallengeDeepLink() {
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get('daily') !== '1') return
     window.history.replaceState(null, '', window.location.pathname)
-    if (game?.isDailyChallenge && game.rngSeed === dailyChallengeSeed()) return
+    // rngSeed is where the roll() stream currently sits, not the raw seed
+    // newGame() was given — Origin backgrounds added a construction-time
+    // draw (Riley's origin), so a freshly-started game's rngSeed is already
+    // one step advanced from dailyChallengeSeed(). initialRngSeed()
+    // reproduces that same advance for the comparison.
+    if (game?.isDailyChallenge && game.rngSeed === initialRngSeed(dailyChallengeSeed())) return
     if (
       game &&
       !window.confirm("Start today's Daily Challenge? This will abandon your current game.")

@@ -7,7 +7,7 @@ import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { AI_PROFILES, runAIWeek } from '../ai'
 import { EngineError, netWorth } from '../actions'
-import { ITEMS, JOBS, LOCATIONS, WEEK_TIME } from '../data'
+import { ITEMS, JOBS, LOCATIONS, ORIGINS, WEEK_TIME } from '../data'
 import { applyAction, newGame } from '../engine'
 import type { GameAction, GameState, Goals, ItemId, LocationId, PlayerState } from '../types'
 
@@ -171,6 +171,7 @@ function randomPlayerArb(): fc.Arbitrary<PlayerState> {
     }),
     investments: fc.integer({ min: 0, max: 2000 }),
     activeEvents: fc.constant([]),
+    originId: fc.constantFrom(...ORIGINS.map((o) => o.id)),
   })
 }
 

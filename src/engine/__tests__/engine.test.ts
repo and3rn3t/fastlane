@@ -595,17 +595,17 @@ describe('durable goods', () => {
 
   it('an uninsured item can be stolen from an unsecured home', () => {
     // Seed/week found by brute force: the player's own bike goes missing by
-    // the 3rd endWeek (was seed 2/5 weeks before Wave 7's Expand
-    // personalEvent() grew the outcome pool from 7 to 15, changing which
-    // case a given roll() value lands on — same category of drift as
-    // Holiday one-offs hit before it, see the git history on this test).
+    // the 3rd endWeek (was seed 8/3 weeks before Wave 14's Origin backgrounds
+    // added a seeded RNG draw at newGame() construction time — every game's
+    // roll() stream now starts one step later than before, per Standing
+    // Constraints' RNG-draw-count fragility note).
     // burglaryUpkeep's roll() is only spent when a player actually owns a
     // stealable item that week, so any change to *when* either side buys or
     // loses things shifts how many rolls get consumed, which shifts the
     // shared rngSeed stream every other roll draws from later — expect this
     // to drift again after any future AI/economy change; re-run a
     // brute-force search rather than guessing.
-    let s = applyAction(game(easyGoals, 8), { type: 'travel', to: 'gadgets' })
+    let s = applyAction(game(easyGoals, 14), { type: 'travel', to: 'gadgets' })
     s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
     for (let i = 0; i < 3; i++) {
       s = applyAction(s, { type: 'endWeek' })
@@ -645,6 +645,9 @@ describe('casino', () => {
   })
 
   it('a win pays out double the bet; a loss costs the bet — seeds found by brute force', () => {
+    // Lose seed re-found (1 → 5) after Wave 14's Origin backgrounds added a
+    // seeded RNG draw at newGame() construction — see Standing Constraints'
+    // RNG-draw-count fragility note. Win seed 0 happened to still work.
     let win = applyAction(game(easyGoals, 0), { type: 'travel', to: 'casino' })
     const winCashBefore = win.player.cash
     win = applyAction(win, { type: 'playCasino', bet: 50 })
@@ -652,7 +655,7 @@ describe('casino', () => {
     expect(win.lastReport).toBeNull() // resolves immediately, not at week's end
     expect(win.log.some((e) => e.text.includes('won'))).toBe(true)
 
-    let lose = applyAction(game(easyGoals, 1), { type: 'travel', to: 'casino' })
+    let lose = applyAction(game(easyGoals, 5), { type: 'travel', to: 'casino' })
     const loseCashBefore = lose.player.cash
     lose = applyAction(lose, { type: 'playCasino', bet: 50 })
     expect(lose.player.cash).toBe(loseCashBefore - 50)
@@ -1083,21 +1086,28 @@ describe('AI personalities', () => {
 })
 
 describe('newGame playerCashBonus', () => {
+  // seed: 7 — Riley's random origin draw lands on 'career-changer' (index 0
+  // in ORIGINS, every field a no-op delta), so Riley's cash is the plain
+  // preset value with no origin noise, same as before origins existed. An
+  // unseeded newGame() would make riley.cash flaky here since a non-neutral
+  // origin can shift it — see Standing Constraints' RNG-draw-count note.
+  const seed = 7
+
   it('adds bonus only to the player, not Riley', () => {
     const bonus = 50
-    const s = newGame({ playerName: 'Tester', goals: easyGoals, playerCashBonus: bonus })
+    const s = newGame({ playerName: 'Tester', goals: easyGoals, seed, playerCashBonus: bonus })
     expect(s.player.cash).toBe(RULE_PRESETS.classic.startingCash + bonus)
     expect(s.riley.cash).toBe(RULE_PRESETS.classic.startingCash)
   })
 
   it('uses plain starting cash when playerCashBonus is omitted', () => {
-    const s = newGame({ playerName: 'Tester', goals: easyGoals })
+    const s = newGame({ playerName: 'Tester', goals: easyGoals, seed })
     expect(s.player.cash).toBe(RULE_PRESETS.classic.startingCash)
     expect(s.riley.cash).toBe(RULE_PRESETS.classic.startingCash)
   })
 
   it('treats playerCashBonus of 0 the same as omitting it', () => {
-    const s = newGame({ playerName: 'Tester', goals: easyGoals, playerCashBonus: 0 })
+    const s = newGame({ playerName: 'Tester', goals: easyGoals, seed, playerCashBonus: 0 })
     expect(s.player.cash).toBe(RULE_PRESETS.classic.startingCash)
     expect(s.riley.cash).toBe(RULE_PRESETS.classic.startingCash)
   })
@@ -1110,11 +1120,19 @@ describe('rule presets', () => {
   })
 
   it('starting cash follows the chosen preset for both players', () => {
-    const brutal = newGame({ playerName: 'T', goals: easyGoals, rules: RULE_PRESETS.brutal })
+    // seed: 7 — Riley's random origin draw lands on 'career-changer' (a
+    // no-op delta), so riley.cash reads the plain preset value with no
+    // origin noise; see the newGame playerCashBonus describe block above.
+    const brutal = newGame({
+      playerName: 'T',
+      goals: easyGoals,
+      seed: 7,
+      rules: RULE_PRESETS.brutal,
+    })
     expect(brutal.player.cash).toBe(100)
     expect(brutal.riley.cash).toBe(100)
 
-    const zen = newGame({ playerName: 'T', goals: easyGoals, rules: RULE_PRESETS.zen })
+    const zen = newGame({ playerName: 'T', goals: easyGoals, seed: 7, rules: RULE_PRESETS.zen })
     expect(zen.player.cash).toBe(350)
   })
 
@@ -1210,8 +1228,11 @@ describe('wilder global headlines', () => {
 
   it("applies a wilder headline's wage/market swing to the shared economy indices", () => {
     // Deterministic seed/week found by brute force where the very next
-    // driftEconomy() call lands on the Boom year headline.
-    let s = newGame({ playerName: 'T', goals: easyGoals, seed: 156 })
+    // driftEconomy() call lands on the Boom year headline. Re-found (156 →
+    // 194) after Wave 14's Origin backgrounds added a seeded RNG draw at
+    // newGame() construction — see Standing Constraints' RNG-draw-count
+    // fragility note.
+    let s = newGame({ playerName: 'T', goals: easyGoals, seed: 194 })
     s.week = 4 // an ordinary week — not a season-transition or holiday week
     const priceIndexBefore = s.economy.priceIndex
     const wageIndexBefore = s.economy.wageIndex
@@ -1268,6 +1289,14 @@ describe('expanded personal events (Wave 7)', () => {
   }
 
   it('fires viral windfall, car trouble, surprise refund, costly mistake, lucky find, jury duty, and lost wallet with exact cash/happiness/time effects — seed found by brute force', () => {
+    // Re-found (weeks, cash deltas, jury-duty hours) twice: once after Wave
+    // 14's Origin backgrounds added a seeded RNG draw at newGame()
+    // construction, and again after rebalancing the ORIGINS deltas
+    // themselves — Riley's origin changes what her AI does with its turn
+    // (runAIWeek), which changes how many rolls her turn consumes, which
+    // shifts the shared stream for every week after. Same seed (0) still
+    // hits all seven outcomes both times, just at different weeks/amounts;
+    // see Standing Constraints' RNG-draw-count fragility note.
     const expected: Record<
       string,
       { week: number; cashDelta: number; happinessDelta: number; hours?: number }
@@ -1278,22 +1307,22 @@ describe('expanded personal events (Wave 7)', () => {
         happinessDelta: VIRAL_WINDFALL_HAPPINESS_BONUS,
       },
       'car broke down': { week: 8, cashDelta: -100, happinessDelta: 0 },
-      'surprise $': { week: 11, cashDelta: 43, happinessDelta: 0 },
-      'jury duty': { week: 17, cashDelta: 0, happinessDelta: 0, hours: 8 },
-      'incredibly lucky': { week: 19, cashDelta: 336, happinessDelta: LUCKY_FIND_HAPPINESS_BONUS },
+      'surprise $': { week: 101, cashDelta: 74, happinessDelta: 0 },
+      'jury duty': { week: 17, cashDelta: 0, happinessDelta: 0, hours: 12 },
+      'incredibly lucky': { week: 29, cashDelta: 174, happinessDelta: LUCKY_FIND_HAPPINESS_BONUS },
       'costly mistake': {
-        week: 55,
-        cashDelta: -287,
+        week: 11,
+        cashDelta: -155,
         happinessDelta: -COSTLY_MISTAKE_HAPPINESS_PENALTY,
       },
       'lost their wallet': {
-        week: 113,
-        cashDelta: -27,
+        week: 56,
+        cashDelta: -58,
         happinessDelta: -LOST_WALLET_HAPPINESS_PENALTY,
       },
     }
     let s = newGame({ playerName: 'T', goals: noWinGoals, seed: 0, rules: highFrequencyRules })
-    for (let w = 1; w <= 113; w++) {
+    for (let w = 1; w <= 101; w++) {
       neutralizeConfounds(s)
       const cashBefore = s.player.cash
       const happinessBefore = s.player.happiness
@@ -1318,17 +1347,22 @@ describe('expanded personal events (Wave 7)', () => {
   })
 
   it('fires home repair only for a player with a place to fix, with an exact cash effect — seed found by brute force', () => {
+    // Seed/week/cash-delta re-found twice (was seed 5/week 5/-$68, then seed
+    // 0/week 23/-$122) — once after Wave 14's Origin backgrounds added a
+    // seeded RNG draw at newGame() construction, and again after rebalancing
+    // the ORIGINS deltas themselves shifted how many rolls Riley's AI turn
+    // consumes. See Standing Constraints' RNG-draw-count fragility note.
     let s = applyAction(
-      newGame({ playerName: 'T', goals: noWinGoals, seed: 5, rules: highFrequencyRules }),
+      newGame({ playerName: 'T', goals: noWinGoals, seed: 0, rules: highFrequencyRules }),
       { type: 'travel', to: 'rentoffice' }
     )
     s = applyAction(s, { type: 'rentApartment', tier: 'basic' })
-    // Weeks 1-4 pass uneventfully (this outcome needs an actual apartment,
+    // Weeks 1-23 pass uneventfully (this outcome needs an actual apartment,
     // so it can't reuse neutralizeConfounds()'s secure-apartment default);
-    // week 5 is the target, isolated the same way — no rent due, no
+    // week 24 is the target, isolated the same way — no rent due, no
     // maturing chain, no hunger — so the cash delta is provably this
     // outcome's own effect.
-    for (let w = 1; w <= 4; w++) {
+    for (let w = 1; w <= 23; w++) {
       s.player.fed = FOOD_NEEDED
       s.player.rentDue = 0
       s.player.weeksBehindOnRent = 0
@@ -1346,17 +1380,19 @@ describe('expanded personal events (Wave 7)', () => {
       (e) => e.actor === 'player' && e.text.includes('fix something around the apartment')
     )
     expect(repair).toBeDefined()
-    expect(s.player.cash - cashBefore).toBe(-68)
+    expect(s.player.cash - cashBefore).toBe(-66)
   })
 
   it("caps a cash-cost outcome at the player's available cash, never going negative", () => {
     // Same cap pattern as the doctor's bill (case 1) and Holiday one-offs'
     // tax week — targets the known costly-mistake week from the first test
-    // above ($287 cost) with far less cash than that on hand.
+    // above (week 11, $155 cost — re-found alongside it after Wave 14's
+    // Origin backgrounds shifted the RNG stream) with far less cash than
+    // that on hand.
     let s = newGame({ playerName: 'T', goals: noWinGoals, seed: 0, rules: highFrequencyRules })
-    for (let w = 1; w <= 55; w++) {
+    for (let w = 1; w <= 11; w++) {
       neutralizeConfounds(s)
-      if (w === 55) s.player.cash = 10 // below the $287 this week is about to cost
+      if (w === 11) s.player.cash = 10 // below the $155 this week is about to cost
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }

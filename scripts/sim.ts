@@ -16,6 +16,11 @@
 //     reports a compact table instead of one detailed report — pass a
 //     smaller gameCount than the single-cell default given how many cells
 //     there are, e.g. `pnpm sim 50 matrix`.
+//   pnpm sim [gameCount] origins
+//     Runs one cell per origin (Balanced/Classic, Riley's origin forced to
+//     each in turn) against the same balanced/classic baseline the profile
+//     matrix above uses — Wave 14's acceptance test that no single origin
+//     drifts the win rate past the guard.
 
 import {
   AI_PROFILES,
@@ -24,9 +29,11 @@ import {
   newGame,
   runAIWeek,
   RULE_PRESETS,
+  ORIGINS,
   type AiProfileName,
   type GameState,
   type Goals,
+  type OriginId,
   type RulePresetName,
 } from '../src/engine/index.ts'
 
@@ -39,6 +46,7 @@ const STANDARD_GOALS: Goals = { wealth: 4000, happiness: 70, education: 12, care
 export const MAX_WEEKS = 60
 export const RULE_PRESET_NAMES: RulePresetName[] = ['classic', 'brutal', 'zen']
 export const PROFILE_NAMES: AiProfileName[] = ['balanced', 'hustler', 'scholar', 'gambler']
+export const ORIGIN_NAMES: OriginId[] = ORIGINS.map((o) => o.id)
 
 export interface SimResult {
   winner: 'player' | 'riley' | 'none'
@@ -80,19 +88,26 @@ export function crossedGoal(
 function runOneGame(
   seed: number,
   rileyProfile: AiProfileName,
-  rulesPreset: RulePresetName
+  rulesPreset: RulePresetName,
+  rileyOriginId?: OriginId
 ): SimResult {
   // Riley's profile lives on GameState itself — endWeek's 'endWeek' case
   // reads state.rileyProfile and looks up the matching AiProfile, so setting
   // it here is all runAIWeek('riley', ...) inside applyAction needs. Same
   // idea for rules: newGame() already accepts a RulesConfig (Wave 2's Rule
   // presets item) — this just finally threads a non-Classic choice through.
+  // rileyOriginId is left undefined for every existing caller (profile/rules
+  // matrix, single-cell mode) — Riley draws its origin at random exactly
+  // like a real game, so those cells measure balance the way players
+  // actually experience it. Only the origin matrix below forces it, to
+  // isolate one origin's own effect from seed-to-seed draw noise.
   let state: GameState = newGame({
     playerName: 'Sim',
     goals: STANDARD_GOALS,
     seed,
     rileyProfile,
     rules: RULE_PRESETS[rulesPreset],
+    rileyOriginId,
   })
 
   for (let i = 0; i < MAX_WEEKS; i++) {
@@ -205,11 +220,12 @@ export interface BatchSummary {
 export function runBatch(
   gameCount: number,
   rileyProfile: AiProfileName,
-  rulesPreset: RulePresetName
+  rulesPreset: RulePresetName,
+  rileyOriginId?: OriginId
 ): BatchSummary {
   const results: SimResult[] = []
   for (let seed = 0; seed < gameCount; seed++) {
-    results.push(runOneGame(seed, rileyProfile, rulesPreset))
+    results.push(runOneGame(seed, rileyProfile, rulesPreset, rileyOriginId))
   }
   const playerWins = results.filter((r) => r.winner === 'player').length
   const rileyWins = results.filter((r) => r.winner === 'riley').length
@@ -310,22 +326,20 @@ function reportSingleCell(
 export const DRIFT_THRESHOLD_POINTS = 10
 export const NO_WINNER_GUARD_PCT = 3
 
-export function flagOutlier(
-  batch: BatchSummary,
-  baseline: BatchSummary,
-  rileyProfile: AiProfileName,
-  rulesPreset: RulePresetName
-): string[] {
+// `label` identifies the cell in a flag message (e.g. "hustler/brutal" for
+// the profile×rules matrix, an origin id for the origin matrix below) — the
+// comparison itself is generic over what's actually varying.
+export function flagOutlier(batch: BatchSummary, baseline: BatchSummary, label: string): string[] {
   const flags: string[] = []
   const drift = Math.abs(batch.playerWinPct - baseline.playerWinPct)
   if (drift > DRIFT_THRESHOLD_POINTS) {
     flags.push(
-      `⚠ ${rileyProfile}/${rulesPreset}: player win rate drifts ${drift.toFixed(1)} points from the balanced/classic baseline (${baseline.playerWinPct.toFixed(1)}%)`
+      `⚠ ${label}: player win rate drifts ${drift.toFixed(1)} points from the balanced/classic baseline (${baseline.playerWinPct.toFixed(1)}%)`
     )
   }
   if (batch.noWinnerPct > NO_WINNER_GUARD_PCT) {
     flags.push(
-      `⚠ ${rileyProfile}/${rulesPreset}: ${batch.noWinnerPct.toFixed(1)}% of games hit the ${MAX_WEEKS}-week cap with no winner`
+      `⚠ ${label}: ${batch.noWinnerPct.toFixed(1)}% of games hit the ${MAX_WEEKS}-week cap with no winner`
     )
   }
   return flags
@@ -355,7 +369,7 @@ function reportMatrix(gameCount: number) {
       console.log(
         `${rileyProfile.padEnd(11)} ${rulesPreset.padEnd(9)} ${batch.playerWinPct.toFixed(1).padStart(6)}%   ${batch.rileyWinPct.toFixed(1).padStart(5)}%   ${batch.noWinnerPct.toFixed(1).padStart(9)}%   ${fmtWeeks(batch.avgWeeksOverall).padStart(6)}   ${fmtWeeks(batch.weeksP50).padStart(6)}`
       )
-      flags.push(...flagOutlier(batch, baseline, rileyProfile, rulesPreset))
+      flags.push(...flagOutlier(batch, baseline, `${rileyProfile}/${rulesPreset}`))
     }
   }
 
@@ -364,6 +378,39 @@ function reportMatrix(gameCount: number) {
     for (const f of flags) console.log(`  ${f}`)
   } else {
     console.log('\nNo cell drifted more than the guard thresholds.')
+  }
+}
+
+// Wave 14's acceptance test: no single origin, forced onto Riley in an
+// otherwise-plain Balanced/Classic game, may drift the win rate past the
+// same guard the profile×rules matrix uses — against the same balanced/
+// classic baseline (Riley drawing its origin at random, same as real play),
+// not a separate no-origin baseline invented for this check.
+function reportOriginMatrix(gameCount: number) {
+  console.log(
+    `\nFast Lane origin matrix — ${gameCount} games/origin, Balanced/Classic, Riley's origin forced, ` +
+      `${ORIGIN_NAMES.length} origins\n`
+  )
+  const header = 'origin                  player%   riley%   no-winner%   avg wks  p50 wks'
+  console.log(header)
+  console.log('-'.repeat(header.length))
+
+  const flags: string[] = []
+  const baseline = runBatch(gameCount, 'balanced', 'classic')
+
+  for (const originId of ORIGIN_NAMES) {
+    const batch = runBatch(gameCount, 'balanced', 'classic', originId)
+    console.log(
+      `${originId.padEnd(23)} ${batch.playerWinPct.toFixed(1).padStart(6)}%   ${batch.rileyWinPct.toFixed(1).padStart(5)}%   ${batch.noWinnerPct.toFixed(1).padStart(9)}%   ${fmtWeeks(batch.avgWeeksOverall).padStart(6)}   ${fmtWeeks(batch.weeksP50).padStart(6)}`
+    )
+    flags.push(...flagOutlier(batch, baseline, originId))
+  }
+
+  if (flags.length > 0) {
+    console.log('\nFlagged:')
+    for (const f of flags) console.log(`  ${f}`)
+  } else {
+    console.log('\nNo origin drifted more than the guard thresholds.')
   }
 }
 
@@ -394,6 +441,10 @@ function main() {
 
   if (profileArg === 'matrix') {
     reportMatrix(gameCount)
+    return
+  }
+  if (profileArg === 'origins') {
+    reportOriginMatrix(gameCount)
     return
   }
 
