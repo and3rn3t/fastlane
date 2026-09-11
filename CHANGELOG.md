@@ -69,6 +69,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SECURITY.md, CODEOWNERS, LICENSE filled with real defaults instead of TODO placeholders
 - devcontainer Node feature and release workflow action versions updated
 - `ai.ts`'s AI policy parameterized from a hardcoded `riley` accessor to `runAIWeek(state, key: PlayerKey)`, so `scripts/sim.ts` can drive either side with the same logic; pure refactor, verified behavior-neutral against the existing seeded-RNG AI tests
+- Data-driven board geometry (Wave 15, first item): `Board.tsx`'s hand-listed 14-entry `PERIMETER` array replaced with `perimeterForSize(LOOP_SIZE)`, which computes the smallest grid whose border fits every location and walks it clockwise. Pure refactor — no gameplay change, no save migration. One historical wrinkle preserved on purpose: Casino, added as the 14th location without renumbering the other 13 `loopIndex` values, occupies the one grid cell a 13-cell walk had left empty rather than its position in a pure walk's sequence — a new test pins the derived output equal to the old literal array, and a live screenshot confirmed the board renders byte-identically, Casino included. Retires the "hardcoded 14-entry array" framing in `docs/ROADMAP.md`'s board-locations Standing Constraint, unblocking Wave 8's Pets and Wave 12's New career path once a bigger grid shape is chosen
 
 ### Removed
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import {
   LOCATIONS,
+  LOOP_SIZE,
   goalProgress,
   travelCost,
   hasItem,
@@ -12,28 +13,58 @@ import { BriefcaseIcon, DollarIcon, GradCapIcon, HeartIcon } from './Icon'
 import { LOCATION_CATEGORY, LOCATION_ICONS } from './icons'
 import { playMove } from './sound'
 
-// Loop index → cell in a 4×5 grid (4 cols, 5 rows — an extra row rather than
-// column, since a taller board fits a narrow phone screen better than a
-// wider one), walking the perimeter clockwise so board adjacency roughly
-// matches travel cost. The frame has exactly 14 edge cells; Casino
-// (loopIndex 13) fills row 2 col 4, the one slot left empty when the ring
-// only had 13 locations — the board now uses every cell with no gap.
-const PERIMETER: Array<[row: number, col: number]> = [
-  [1, 1],
-  [1, 2],
-  [1, 3],
-  [1, 4],
-  [3, 4],
-  [4, 4],
-  [5, 4],
-  [5, 3],
-  [5, 2],
-  [5, 1],
-  [4, 1],
-  [3, 1],
-  [2, 1],
-  [2, 4],
-]
+/**
+ * Grid shape (rows × cols, rows ≥ cols) whose border has at least `n` cells —
+ * the smallest such rectangle, growing rows before cols so a taller board
+ * (fits a narrow phone screen better) is preferred over a wider one.
+ */
+function gridShapeForSize(n: number): { rows: number; cols: number } {
+  const cols = Math.max(2, Math.ceil(Math.sqrt(n)))
+  let rows = cols
+  while (2 * (rows + cols) - 4 < n) rows++
+  return { rows, cols }
+}
+
+/**
+ * Walks the border of a `rows`×`cols` grid clockwise from the top-left
+ * corner: right along the top row, down the right column, left along the
+ * bottom row, up the left column.
+ */
+function walkPerimeter(rows: number, cols: number): Array<[row: number, col: number]> {
+  const cells: Array<[number, number]> = []
+  for (let c = 1; c <= cols; c++) cells.push([1, c])
+  for (let r = 2; r <= rows; r++) cells.push([r, cols])
+  for (let c = cols - 1; c >= 1; c--) cells.push([rows, c])
+  for (let r = rows - 1; r >= 2; r--) cells.push([r, 1])
+  return cells
+}
+
+/**
+ * Loop index → board cell, derived from `LOOP_SIZE` instead of hand-listed:
+ * the smallest grid whose border fits every location, walked clockwise so
+ * board adjacency roughly matches travel cost (see travelCost() in
+ * engine/data.ts).
+ *
+ * One historical wrinkle, preserved on purpose: when Casino became the 14th
+ * location, the 13 existing `loopIndex` values were left untouched — shifting
+ * them would have silently changed every travel cost and desynced saves —
+ * and Casino was placed into the one grid cell (walk position 4, row 2 col 4)
+ * a 13-cell clockwise walk had left empty, instead of at that position in the
+ * sequence. That single deferred cell is reproduced here explicitly so the
+ * board keeps rendering byte-identically at the current size; it's a one-off
+ * fact about how the 14th location landed, not a rule for any future growth.
+ */
+export function perimeterForSize(n: number): Array<[row: number, col: number]> {
+  const { rows, cols } = gridShapeForSize(n)
+  const walk = walkPerimeter(rows, cols)
+  if (n === 14) {
+    const deferred = walk[4]
+    return [...walk.slice(0, 4), ...walk.slice(5), deferred]
+  }
+  return walk.slice(0, n)
+}
+
+const PERIMETER = perimeterForSize(LOOP_SIZE)
 
 const TRACKS = [
   { key: 'wealth', label: 'Wealth', Icon: DollarIcon, category: 'wealth' },
