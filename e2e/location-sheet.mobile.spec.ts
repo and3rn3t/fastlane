@@ -51,3 +51,47 @@ test('travel opens the location sheet, actions keep it open, and End Week is alw
   await page.getByRole('button', { name: /Start week 2/ }).click()
   await expect(page.getByText(/Week 2/)).toBeVisible()
 })
+
+// Regression test for a real bug found while auditing the mobile UI live:
+// `.location-modal-footer` used to be `position: sticky` inside the same
+// scrolling flex column as the panel's own content, with no compensating
+// bottom padding — so a long panel's last item could scroll to a position
+// directly under the footer, genuinely obscured. The fix split the modal
+// into a non-scrolling header/footer around a `flex:1; overflow-y:auto`
+// body. This spec scrolls that body to its actual end and clicks the last
+// control — Playwright fails the click outright if the footer still
+// intercepts pointer events there, so a regression here fails loudly
+// instead of passing a suite that never scrolled far enough to notice.
+test('a long panel scrolled to the end keeps its last control clear of the sticky End Week footer', async ({
+  page,
+}) => {
+  await page.goto('/')
+
+  await page.getByText('Start new game').click()
+  const gotIt = page.getByRole('button', { name: /Got it/ })
+  if (await gotIt.isVisible().catch(() => false)) await gotIt.click()
+
+  // The Job Board lists every job at every workplace — long enough that its
+  // last listing sits well past one screen height on a 375×667 viewport.
+  await page.getByRole('button', { name: /Job Center/ }).click()
+  const sheet = page.getByRole('dialog', { name: /Job Center/ })
+  await expect(sheet).toBeVisible()
+
+  const body = sheet.locator('.location-modal-body')
+  await body.evaluate((el) => {
+    el.scrollTop = el.scrollHeight
+  })
+
+  // Bounding-box comparison, not a real click: the last listing's own
+  // qualification state (enabled/disabled) is irrelevant to this layout
+  // regression, and a disabled button would make a real click hang on
+  // Playwright's "enabled" actionability check for reasons that have
+  // nothing to do with the footer overlap this spec exists to catch.
+  const lastListing = sheet.locator('.job-listing').last()
+  const lastApplyButton = lastListing.getByRole('button', { name: /Apply/ })
+  await expect(lastApplyButton).toBeVisible()
+  const buttonBox = await lastApplyButton.boundingBox()
+  const footerBox = await sheet.locator('.location-modal-footer').boundingBox()
+  if (!buttonBox || !footerBox) throw new Error('Expected both elements to have a layout box')
+  expect(footerBox.y).toBeGreaterThanOrEqual(buttonBox.y + buttonBox.height)
+})

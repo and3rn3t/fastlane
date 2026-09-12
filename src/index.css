@@ -1174,10 +1174,33 @@ details.action-group[open] .disclosure-chevron {
     flex-shrink: 0;
   }
 
+  /* Header/body/footer as three flex children instead of one scrolling
+   * column — the standard non-overlapping sticky-footer layout. Before
+   * this, `.location-modal` inherited `.modal`'s own `overflow-y: auto`
+   * and the footer was `position: sticky` *inside* that same scrolling
+   * flex column with no compensating bottom padding on the content, so a
+   * long panel's last item (a job listing, the Investing section's
+   * controls) could scroll to a position directly under the footer. */
+  .location-modal {
+    overflow-y: hidden;
+  }
+
   .location-modal .location-modal-header {
+    flex-shrink: 0;
     justify-content: space-between;
     padding-bottom: 0.7rem;
     border-bottom: 1px solid var(--line);
+  }
+
+  /* `min-height: 0` is required for a flex child to actually shrink below
+   * its content size and scroll internally, rather than growing the whole
+   * (now non-scrolling) `.location-modal` column past its `max-height`. */
+  .location-modal-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Always enabled, regardless of what LocationPanelBody renders below (a
@@ -1195,15 +1218,15 @@ details.action-group[open] .disclosure-chevron {
     border-radius: 50%;
   }
 
-  /* Sticks to the bottom of the modal's own scroll area (nearest scrolling
-   * ancestor for `position: sticky`, since `.modal` itself scrolls) so End
-   * Week stays reachable without scrolling — necessary because arriving
-   * somewhere new auto-opens this sheet, which would otherwise cover the
-   * dock's copy at the exact moment a player might want to skip the
-   * location and just end the week. */
+  /* A plain, non-scrolling flex child now (see `.location-modal` above) —
+   * always visible without needing `position: sticky`, so End Week stays
+   * reachable without scrolling and without overlapping `.location-modal-
+   * body`'s own last item. Necessary because arriving somewhere new
+   * auto-opens this sheet, which would otherwise cover the dock's copy at
+   * the exact moment a player might want to skip the location and just
+   * end the week. */
   .location-modal-footer {
-    position: sticky;
-    bottom: 0;
+    flex-shrink: 0;
     margin-top: 0.6rem;
     padding-top: 0.6rem;
     background: var(--card);
