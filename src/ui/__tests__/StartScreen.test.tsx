@@ -34,7 +34,7 @@ describe('StartScreen origin picker', () => {
     expect(savedPlayerOriginId()).toBe('veteran')
   })
 
-  it("does not apply the chosen origin to the Daily Challenge, which stays identical for everyone", () => {
+  it('does not apply the chosen origin to the Daily Challenge, which stays identical for everyone', () => {
     renderStartScreen()
     fireEvent.click(screen.getByRole('button', { name: 'Trust Fund Kid' }))
     fireEvent.click(screen.getByText(/Play today's challenge/))
