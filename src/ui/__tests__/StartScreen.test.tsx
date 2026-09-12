@@ -28,7 +28,10 @@ describe('StartScreen origin picker', () => {
 
   it('selecting a different background updates the shown blurb and threads through to the started game', () => {
     renderStartScreen()
+    fireEvent.click(screen.getByText('Customize match'))
+    fireEvent.click(screen.getByText(/Your background:/))
     fireEvent.click(screen.getByRole('button', { name: 'Veteran' }))
+    expect(screen.getByText('Your background: Veteran')).toBeTruthy()
     expect(screen.getByText(/service stipend/)).toBeTruthy()
     fireEvent.click(screen.getByText(/Start new game/))
     expect(savedPlayerOriginId()).toBe('veteran')

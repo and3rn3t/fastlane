@@ -1,6 +1,6 @@
 import { cleanup, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { newGame, type GameState, type PlayerState } from '@/engine'
+import { JOBS, LOCATIONS, newGame, type GameState, type PlayerState } from '@/engine'
 import { GameProvider } from '@/state/GameContext'
 import { LocationPanelBody } from '@/ui/LocationPanel'
 
@@ -83,6 +83,34 @@ describe('JobBoard requirement checklist', () => {
     expect(row.getByText(/Sales skill 39\/40/)).toBeTruthy()
     expect(row.queryByText(/Sales skill 40\/40/)).toBeNull()
     expect(row.getByText(/^Not met:/)).toBeTruthy()
+  })
+
+  it('renders each workplace header once and keeps jobs under their workplace section', () => {
+    render(
+      <GameProvider>
+        <LocationPanelBody game={employmentGame()} />
+      </GameProvider>
+    )
+    const workplaces = [...new Set(JOBS.map((job) => job.workplace))]
+    for (const workplace of workplaces) {
+      expect(
+        screen.getAllByText(LOCATIONS[workplace].name, {
+          selector: '.section-label',
+        })
+      ).toHaveLength(1)
+    }
+
+    const burgersGroup = screen
+      .getByText(LOCATIONS.burgers.name, { selector: '.section-label' })
+      .closest('.action-group') as HTMLElement
+    const bankGroup = screen
+      .getByText(LOCATIONS.bank.name, { selector: '.section-label' })
+      .closest('.action-group') as HTMLElement
+
+    expect(within(burgersGroup).getByText('Fry Cook', { selector: '.title' })).toBeTruthy()
+    expect(within(bankGroup).getByText('Financial Analyst', { selector: '.title' })).toBeTruthy()
+    expect(within(burgersGroup).queryByText('Financial Analyst', { selector: '.title' })).toBeNull()
+    expect(within(bankGroup).queryByText('Fry Cook', { selector: '.title' })).toBeNull()
   })
 
   it('marks a waived requirement during a layoff as met, with a "(waived)" note', () => {
