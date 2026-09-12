@@ -31,11 +31,19 @@
   --chart-riley: #d9822b;
   /* Goal category colors — light-mode oklch, consistent lightness/chroma,
    * hues spaced away from --accent/--good/--warn/--bad so nothing collides.
-   * --cat-wealth aliases --good on purpose (money=green is the obvious read). */
+   * --cat-wealth aliases --good on purpose (money=green is the obvious read).
+   * career/edu/happy darkened from their original 64%/60%/66% lightness —
+   * Wave 22 PR review (Copilot) caught --cat-career failing WCAG AA as text
+   * (3.07:1 against --card-soft); computed by hand (canvas-rasterized sRGB,
+   * same relative-luminance method as the --good/--bad/--gold retunes) found
+   * edu (4.19:1) and happy (3.41:1) were failing the exact same way, just
+   * not yet used as direct text at the time they were picked. Same hue kept,
+   * lightness dropped only as far as needed for ≥4.5:1 against the harder of
+   * --card/--card-soft; dark-mode pair below already passes and is untouched. */
   --cat-wealth: var(--good);
-  --cat-career: oklch(64% 0.13 195);
-  --cat-edu: oklch(60% 0.16 292);
-  --cat-happy: oklch(66% 0.18 340);
+  --cat-career: oklch(52% 0.13 195);
+  --cat-edu: oklch(56% 0.16 292);
+  --cat-happy: oklch(57% 0.18 340);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -1529,7 +1537,15 @@ details.action-group[open] .disclosure-chevron {
   position: fixed;
   bottom: max(1.2rem, calc(env(safe-area-inset-bottom) + 0.8rem));
   left: 50%;
-  transform: translateX(-50%);
+  /* The individual `translate` property, not `transform: translateX(-50%)`
+   * — PR review (Copilot) caught that fade-up's `transform: translateY(...)`
+   * keyframe would otherwise replace this centering transform outright
+   * rather than compose with it, leaving the toast's left edge pinned to
+   * 50% once the entrance animation finished. `translate`/`transform` are
+   * separate CSS properties that compose independently, so the horizontal
+   * centering here and fade-up's vertical animation below no longer fight
+   * over the same property. */
+  translate: -50% 0;
   background: var(--bad);
   color: white;
   padding: 0.6rem 0.6rem 0.6rem 1.1rem;
