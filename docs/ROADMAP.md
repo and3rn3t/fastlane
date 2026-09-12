@@ -349,7 +349,7 @@ A fresh, Wave-11-style audit of `src/ui/*` and `src/index.css` since Wave 11 shi
 
 ### Wave 23 — Mobile Interaction Patterns
 
-> The most speculative wave here by design — these are structural bets on interaction models the app doesn't have at all today, not fixes to something already built. **Pull Wave 21 first.** None of these are worth doing on top of a board that still has a clearance bug, and at least one (the tab bar) would touch the same `LocationSheet`/dock architecture Wave 21's fixes touch — sequencing them the other way risks redoing work.
+> The most speculative wave here by design — these are structural bets on interaction models the app doesn't have at all today, not fixes to something already built. **Pull Wave 21 first.** At least one row here (the tab bar) would touch the same `LocationSheet`/dock architecture Wave 21's fixes touch — sequencing them the other way risks redoing work.
 >
 > **Every row below needs an explicit design decision confirmed with the user before real implementation starts** — these are bigger, more subjective architecture changes than anything else on this roadmap, closer in kind to Wave 19's "biggest engine change" framing than a typical UI row.
 
