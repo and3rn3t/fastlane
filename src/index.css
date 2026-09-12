@@ -1507,10 +1507,28 @@ details.action-group[open] .disclosure-chevron {
   color: var(--accent);
 }
 
+/* Capped instead of wrapping freely — a live mobile audit found a fresh
+ * game's food hint wrapping to 3 lines, and combined with the qualify-nudge
+ * banner (`.hint-bar` used by both HintBar and JobSwitchNudge) stacking
+ * below it, pushed the board far enough down that its bottom row sat
+ * partially under the fixed mobile dock. 2 lines, not 1: most hint copy
+ * (`hintCopy()` in HintBar.tsx) runs 60-90+ characters — long enough that a
+ * 1-line clamp would routinely cut off the actionable half of the sentence
+ * (e.g. "Running low on food —" with the actual "go to MegaMart or Burger
+ * Barn" guidance clipped), the opposite of what a hint bar is for. Both
+ * banners still show when relevant — this only caps height, it doesn't
+ * suppress either one (see docs/ROADMAP-ARCHIVE.md's Wave 21 note on why
+ * that alternative was rejected: it reverses an explicit Wave 12 design
+ * decision and breaks two existing tests). */
 .hint-bar .text {
   flex: 1;
+  min-width: 0;
   font-size: 0.85rem;
   color: var(--ink-soft);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .hint-dismiss {
