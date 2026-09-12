@@ -266,7 +266,10 @@ export function StartScreen() {
         {ROWS.map((row) => (
           <div className="goal-row" key={row.key}>
             <span className={`goal-row-label cat-${row.category}`}>
-              <row.Icon size={15} /> {row.label}
+              <span className={`icon-chip-sm cat-${row.category}`}>
+                <row.Icon size={13} />
+              </span>
+              {row.label}
             </span>
             <input
               type="range"
