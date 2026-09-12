@@ -1113,6 +1113,21 @@ details.action-group[open] .disclosure-chevron {
   white-space: nowrap;
 }
 
+/* The mobile dock trigger's own copy of `.location-heading` (above) stays
+ * single-line on purpose — the dock is a fixed `--dock-height` row, and a
+ * taller description would grow it past that, reintroducing the same
+ * fixed-element-with-no-reserved-space bug class Wave 21 already fixed
+ * once for the sticky footer. The modal header has real room, though, so
+ * let it wrap to two lines instead of silently truncating real flavor
+ * text — found live on at least the Casino and Clinic dialogs, where the
+ * cut-off sentence never appears anywhere else in the panel. */
+.location-modal-header .location-heading .desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
+}
+
 .location-card-header,
 .location-modal-header {
   display: flex;
