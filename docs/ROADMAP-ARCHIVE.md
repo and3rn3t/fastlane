@@ -653,6 +653,48 @@ Wrapped "Your background", "Rules", "Riley's playstyle", and "Riley's difficulty
 
 Scoped the fix to `.location-modal-header` specifically (`display: -webkit-box; -webkit-line-clamp: 2; white-space: normal`) rather than the shared base rule — the mobile dock trigger's own copy of the same heading component needs to stay single-line, since the dock is a fixed `--dock-height` row and a taller description would grow it past that, reintroducing the same fixed-element-with-no-reserved-space bug class already fixed once for the sticky footer. Verified live: both dialogs now show their full sentence on two lines; the dock trigger's computed `white-space` is still `nowrap`, confirming it's unaffected.
 
+## Wave 24 — Friction Diagnostics
+
+<a id="wave-24-friction-diagnostics-sim-per-requirement-stall-reporting"></a>
+
+### Sim: per-requirement stall reporting
+
+**✅ 2026-09-11** · Size M
+
+`jobRequirements()` (`actions.ts`) was already the one source of truth every other system (the AI, the hint bar, the job-switch nudge) reads to know what's blocking a job — but it's stateless, reporting only what's unmet _right now_. Nothing anywhere remembered how long a requirement had stayed unmet, which is the actual thing a player experiences as "stuck."
+
+Added to `scripts/sim.ts`: a `StallTracker` per side, updated once per week (entering the week, before that week's actions run) via `nextTargetJob()` + `jobRequirements()` — the same pair `pursueCareer()` already uses, so this can never disagree with what the AI itself is targeting. A streak increments while exactly one requirement stays unmet on the same target job; anything else (job changes, blocker changes, zero or 2+ unmet) flushes it into a per-game `Record<string, RequirementStallDetail>` (`{ totalWeeks, maxStreak }`), keyed by `JobRequirement.key` (`'dress'`, `'education'`, `'skill:sales'`, etc.). `runBatch()` aggregates across the batch into a new `stallBreakdown: { player, riley }` on `BatchSummary`, with a `longStallGamePct` per key — the share of games where that requirement's streak reached `LONG_STALL_WEEKS` (10) at least once, the threshold that separates "briefly a bit short" from a genuine wall. Printed in both `pnpm sim`'s single-cell report and `sim-report.ts`'s per-cell CI output. No `SAVE_VERSION` change — entirely sim-script-local, no engine or save-format touch.
+
+<a id="wave-24-friction-diagnostics-dress-upkeep-vs-job-tier-reachability"></a>
+
+### Dress upkeep vs. job-tier reachability
+
+**✅ 2026-09-11** · Size S
+
+The question that started this wave: does clothing wear-down (`DRESS_WEAR_PER_WEEK = 3`, jobs gating up to `minDress: 90`, a worn-out item dropping `dress` to 10) structurally block reaching top-tier jobs? Ran `pnpm sim:report` (100-150 games/cell) across all 12 `AI_PROFILES × RULE_PRESETS` combinations using the per-requirement stall reporting above.
+
+**Finding: no.** `dress`'s long-stall rate was 0% in 11 of 12 cells and 1% in the twelfth (hustler/brutal) — nowhere close to a structural wall. `education`, by contrast, hit a 10+ week stall in 2-17% of games depending on the cell (worst in the zen preset, where slower economic pressure means less cash gets redirected into classes) — the real, previously invisible bottleneck. No `data.ts` tuning was made: there was no evidence to justify it, and this row's output — the sim numbers above — is the deliverable, per the wave's own "if it isn't structural, the sim output is the finding" framing. Recorded here so the dress question doesn't get re-litigated from anecdote alone; a future session revisiting career pacing should look at `education` first.
+
+<a id="wave-24-friction-diagnostics-sim-bottleneck-rate-ci-guardrail"></a>
+
+### Sim: bottleneck-rate CI guardrail
+
+**✅ 2026-09-11** · Size S
+
+A structural twin of the existing `flagOutlier()` (win-rate drift, Wave 14): `flagStallOutlier(batch, baseline, label)` in `scripts/sim.ts` compares each requirement key's `longStallGamePct` against the balanced/classic baseline, flagging anything drifting more than a new `STALL_RATE_DRIFT_THRESHOLD_PCT` (15 points) — player-side only, since this is about player experience specifically and Riley's AI works around stalls in ways (a fixed dress→computer→education→skill clearing order in `pursueCareer()`) a human doesn't necessarily discover. Wired into `sim-report.ts`'s `main()` loop alongside the existing `flagOutlier()` call (same `flags` array, same non-zero exit on any flag) and into `sim.ts`'s own `reportMatrix()` for the `pnpm sim <n> matrix` path. A future `data.ts` tune that pushes any requirement's stall rate too far from baseline now fails CI the same way an unbalanced win rate already does — this class of regression can no longer land silently.
+
+<a id="wave-24-friction-diagnostics-sim-cold-path-engagement-report"></a>
+
+### Sim: cold-path engagement report
+
+**✅ 2026-09-11** · Size S/M
+
+**First approach was wrong and caught before shipping:** the original plan sampled `state.player.location`/`state.riley.location` once per week, entering the loop — but `week.ts:281` unconditionally resets `p.location = 'home'` at the end of every week, so that snapshot always read 'home' regardless of where the week's actions actually happened. Confirmed live: an early run showed "home" at 44.2% and every other location at a flat 0.0%, not even summing to 100% (the denominator, `gameCount * MAX_WEEKS`, was also wrong once games started ending before the week cap).
+
+Rebuilt on log-scanning instead, the same technique `stats.ts`'s incident tally already uses: every per-action log entry already carries the actor's location at the time (`LogEntry.location`, stamped by `actions.ts`'s own `log()` helper) — including `travel()` itself, stamped with the destination. `tallyLocationActions()` scans a finished game's log once at game end and tallies real per-location action counts, no engine changes needed. Combined player + Riley into one `combineLocationActions()` before ranking — a location cold for the fixed-Balanced player (Casino, since Balanced never gambles) can be very much in use under a different Riley profile (Gambler), and only the combined view tells "nobody plays this way" apart from "this one profile doesn't."
+
+**Finding:** `market` and `pawn` sit at 0.0% engagement combined across every profile × rules cell, including Gambler (which does use Casino, ~0.3-0.6% combined) — two locations nobody's AI ever touches, a real discoverability/value signal worth a design look, distinct from anything requirement-gating would catch. `home` is also surprisingly low (~0.5%) since most home-eligible actions (`relax`) rarely win the AI's utility scoring against other candidates.
+
 ## Wave context notes (archived)
 
 > Audit and "current state" notes written while these waves were in flight. Kept for the reasoning, not as pending work.

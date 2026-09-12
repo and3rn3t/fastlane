@@ -26,14 +26,19 @@ import {
   AI_PROFILES,
   applyAction,
   goalProgress,
+  jobRequirements,
+  LOCATIONS,
   newGame,
+  nextTargetJob,
   runAIWeek,
   RULE_PRESETS,
   ORIGINS,
   type AiProfileName,
   type GameState,
   type Goals,
+  type LocationId,
   type OriginId,
+  type PlayerKey,
   type RulePresetName,
 } from '../src/engine/index.ts'
 
@@ -67,6 +72,101 @@ export interface SimResult {
   rileyInvestmentValue: number
   rileyLayoffs: number
   rileyInheritances: number
+  // Wave 24 — Friction Diagnostics: per-`JobRequirement.key` stall detail for
+  // this one game, see updateStallTracker() below.
+  playerStalls: Record<string, RequirementStallDetail>
+  rileyStalls: Record<string, RequirementStallDetail>
+  // Wave 24 — how many logged actions each side performed at each location
+  // over the whole game — see tallyLocationActions() below. Not a "visit
+  // count" in the click-through sense, but the closest thing this sim has to
+  // one: every actions.ts function that changes state logs through the same
+  // log() helper, which stamps the actor's *current* location on every
+  // entry (including travel() itself, stamped with the destination) — so
+  // this reflects real usage, not just passing through.
+  playerLocationActions: Record<LocationId, number>
+  rileyLocationActions: Record<LocationId, number>
+}
+
+// A requirement (e.g. 'dress', 'skill:sales') counts as "stalled" for a week
+// when it's the *sole* remaining unmet JobRequirement on whichever job
+// nextTargetJob() currently has the player/Riley aimed at — the exact
+// "everything else is ready, only this is missing" state a player actually
+// feels as being blocked. `maxStreak` (not just `totalWeeks`) is what the
+// CI guardrail below cares about: a requirement stalled for 3 weeks twice is
+// a different, less alarming shape than one 6-week stretch even though the
+// total is the same.
+export interface RequirementStallDetail {
+  totalWeeks: number
+  maxStreak: number
+}
+
+interface StallTracker {
+  jobId: string | null
+  key: string | null
+  streak: number
+  totals: Record<string, RequirementStallDetail>
+}
+
+function newStallTracker(): StallTracker {
+  return { jobId: null, key: null, streak: 0, totals: {} }
+}
+
+function flushStreak(t: StallTracker): void {
+  if (t.key && t.streak > 0) {
+    const detail = t.totals[t.key] ?? { totalWeeks: 0, maxStreak: 0 }
+    detail.totalWeeks += t.streak
+    detail.maxStreak = Math.max(detail.maxStreak, t.streak)
+    t.totals[t.key] = detail
+  }
+  t.jobId = null
+  t.key = null
+  t.streak = 0
+}
+
+// Called once per week, with the state as it stands *entering* that week —
+// same "before this week's actions" timing previewNextAction()-style
+// diagnostics use elsewhere, so a stall streak reads as "N weeks where nothing
+// changed" rather than crediting a week where the requirement was actually
+// cleared. A streak resets (and flushes into `totals`) whenever the target
+// job changes, the sole blocker changes, or more/fewer than exactly one
+// requirement is unmet — this only tracks the specific "one thing away"
+// state, not general career-prep progress.
+function updateStallTracker(t: StallTracker, state: GameState, key: PlayerKey): void {
+  const target = nextTargetJob(state, key)
+  if (!target) {
+    flushStreak(t)
+    return
+  }
+  const unmet = jobRequirements(state[key], target.id).filter((r) => !r.met)
+  if (unmet.length === 1 && target.id === t.jobId && unmet[0].key === t.key) {
+    t.streak++
+    return
+  }
+  flushStreak(t)
+  if (unmet.length === 1) {
+    t.jobId = target.id
+    t.key = unmet[0].key
+    t.streak = 1
+  }
+}
+
+function emptyLocationTally(): Record<LocationId, number> {
+  const tally = {} as Record<LocationId, number>
+  for (const id of Object.keys(LOCATIONS) as LocationId[]) tally[id] = 0
+  return tally
+}
+
+// Scans this one game's finished log for one actor's location on every
+// entry that has one (every per-action player/riley entry does — see
+// LogEntry's own doc comment in types.ts — world/upkeep entries don't).
+// Run once at game end rather than incrementally per week, since the log
+// already holds the complete, final record.
+function tallyLocationActions(state: GameState, key: PlayerKey): Record<LocationId, number> {
+  const tally = emptyLocationTally()
+  for (const entry of state.log) {
+    if (entry.actor === key && entry.location) tally[entry.location]++
+  }
+  return tally
 }
 
 // Only a goal that was actually below threshold going into the winning week
@@ -110,6 +210,23 @@ function runOneGame(
     rileyOriginId,
   })
 
+  const playerStallTracker = newStallTracker()
+  const rileyStallTracker = newStallTracker()
+
+  const finish = (): Pick<
+    SimResult,
+    'playerStalls' | 'rileyStalls' | 'playerLocationActions' | 'rileyLocationActions'
+  > => {
+    flushStreak(playerStallTracker)
+    flushStreak(rileyStallTracker)
+    return {
+      playerStalls: playerStallTracker.totals,
+      rileyStalls: rileyStallTracker.totals,
+      playerLocationActions: tallyLocationActions(state, 'player'),
+      rileyLocationActions: tallyLocationActions(state, 'riley'),
+    }
+  }
+
   for (let i = 0; i < MAX_WEEKS; i++) {
     // Snapshot each side's goal progress *before* this week resolves, so if
     // this turns out to be the winning week we still have the "just before
@@ -119,6 +236,11 @@ function runOneGame(
       player: goalProgress(state.player, state.goals, state.economy.marketIndex),
       riley: goalProgress(state.riley, state.goals, state.economy.marketIndex),
     }
+    // Wave 24: read stall state as the week begins, before this week's
+    // actions can change it — same "entering the week" timing as
+    // priorProgress above.
+    updateStallTracker(playerStallTracker, state, 'player')
+    updateStallTracker(rileyStallTracker, state, 'riley')
     // Player side always runs Balanced — a fixed opponent is what makes the
     // win rate a meaningful signal for whatever Riley profile is under test.
     runAIWeek(state, 'player', AI_PROFILES.balanced)
@@ -132,11 +254,23 @@ function runOneGame(
               priorProgress[winner],
               goalProgress(state[winner], state.goals, state.economy.marketIndex)
             )
-      return { winner, weeks: state.week - 1, winningGoal, ...rileySystemUsage(state) }
+      return {
+        winner,
+        weeks: state.week - 1,
+        winningGoal,
+        ...rileySystemUsage(state),
+        ...finish(),
+      }
     }
     state = applyAction(state, { type: 'dismissReport' })
   }
-  return { winner: 'none', weeks: MAX_WEEKS, winningGoal: null, ...rileySystemUsage(state) }
+  return {
+    winner: 'none',
+    weeks: MAX_WEEKS,
+    winningGoal: null,
+    ...rileySystemUsage(state),
+    ...finish(),
+  }
 }
 
 function rileySystemUsage(
@@ -197,6 +331,60 @@ function tallyGoals(results: SimResult[], winner: 'player' | 'riley'): GoalTally
   return tally
 }
 
+// A stall streak reaching this many consecutive weeks is treated as a real
+// structural wall rather than a self-correcting dip — same order of
+// magnitude as DRIFT_THRESHOLD_POINTS below, chosen for the same reason:
+// short of this, "the player was briefly a bit short on X" is normal play,
+// not a diagnostic finding.
+export const LONG_STALL_WEEKS = 10
+
+export interface StallKeyStats {
+  totalWeeks: number
+  avgWeeksPerGame: number
+  // % of games in the batch where this requirement's stall streak reached
+  // LONG_STALL_WEEKS at least once — the rate the CI guardrail watches,
+  // since one outlier game dominating totalWeeks shouldn't read the same as
+  // a requirement that's *routinely* a wall.
+  longStallGamePct: number
+}
+export type StallBreakdown = Record<string, StallKeyStats>
+
+function tallyStalls(results: SimResult[], side: 'player' | 'riley'): StallBreakdown {
+  const perGame = results.map((r) => (side === 'player' ? r.playerStalls : r.rileyStalls))
+  const keys = new Set<string>()
+  for (const g of perGame) for (const key of Object.keys(g)) keys.add(key)
+
+  const out: StallBreakdown = {}
+  for (const key of keys) {
+    let totalWeeks = 0
+    let longStallGames = 0
+    for (const g of perGame) {
+      const detail = g[key]
+      if (!detail) continue
+      totalWeeks += detail.totalWeeks
+      if (detail.maxStreak >= LONG_STALL_WEEKS) longStallGames++
+    }
+    out[key] = {
+      totalWeeks,
+      avgWeeksPerGame: totalWeeks / results.length,
+      longStallGamePct: (longStallGames / results.length) * 100,
+    }
+  }
+  return out
+}
+
+function tallyLocationActionsAcrossBatch(
+  results: SimResult[],
+  side: 'player' | 'riley'
+): Record<LocationId, number> {
+  const tally = emptyLocationTally()
+  for (const r of results) {
+    const perGame = side === 'player' ? r.playerLocationActions : r.rileyLocationActions
+    for (const id of Object.keys(tally) as LocationId[]) tally[id] += perGame[id]
+  }
+  return tally
+}
+
 export interface BatchSummary {
   gameCount: number
   results: SimResult[]
@@ -215,6 +403,11 @@ export interface BatchSummary {
   // so callers can divide by whichever denominator (gameCount vs. that
   // side's own win count) makes sense for their report.
   goalBreakdown: { player: GoalTally; riley: GoalTally }
+  // Wave 24 — Friction Diagnostics: per-JobRequirement.key stall stats (see
+  // updateStallTracker()) and per-location logged-action counts (see
+  // tallyLocationActions()), aggregated across every game in the batch.
+  stallBreakdown: { player: StallBreakdown; riley: StallBreakdown }
+  locationActions: { player: Record<LocationId, number>; riley: Record<LocationId, number> }
 }
 
 export function runBatch(
@@ -244,6 +437,14 @@ export function runBatch(
     goalBreakdown: {
       player: tallyGoals(results, 'player'),
       riley: tallyGoals(results, 'riley'),
+    },
+    stallBreakdown: {
+      player: tallyStalls(results, 'player'),
+      riley: tallyStalls(results, 'riley'),
+    },
+    locationActions: {
+      player: tallyLocationActionsAcrossBatch(results, 'player'),
+      riley: tallyLocationActionsAcrossBatch(results, 'riley'),
     },
   }
 }
@@ -315,6 +516,55 @@ function reportSingleCell(
   console.log(
     `  Event chains — avg layoffs: ${average(results.map((r) => r.rileyLayoffs)).toFixed(2)}, avg inheritances: ${average(results.map((r) => r.rileyInheritances)).toFixed(2)}`
   )
+
+  printStallBreakdown(batch)
+  printLocationBreakdown(batch)
+}
+
+// Sorted descending by longStallGamePct — the requirement most often a real
+// wall (per LONG_STALL_WEEKS) leads, not just whichever has the most total
+// weeks (a requirement gated on many low-tier jobs could rack up totalWeeks
+// from lots of brief, unremarkable dips without ever being a genuine wall).
+function printStallBreakdown(batch: BatchSummary) {
+  const entries = Object.entries(batch.stallBreakdown.player).sort(
+    ([, a], [, b]) => b.longStallGamePct - a.longStallGamePct
+  )
+  if (entries.length === 0) return
+  console.log(
+    `\nRequirement stalls — player (weeks as the *sole* unmet requirement on the next target job):`
+  )
+  for (const [key, stats] of entries) {
+    console.log(
+      `  ${key.padEnd(16)} avg ${stats.avgWeeksPerGame.toFixed(1)} wks/game, ` +
+        `${stats.longStallGamePct.toFixed(1)}% of games hit a ${LONG_STALL_WEEKS}+ week stall`
+    )
+  }
+}
+
+// Player + Riley combined — a location only "cold" for the fixed-Balanced
+// player (casino, since Balanced never gambles) can still be very much in
+// use under a different Riley profile (Gambler). Combining sides is what
+// tells "nobody plays this way" apart from "this AI profile doesn't."
+export function combineLocationActions(
+  batch: Pick<BatchSummary, 'locationActions'>
+): Record<LocationId, number> {
+  const combined = emptyLocationTally()
+  for (const id of Object.keys(combined) as LocationId[]) {
+    combined[id] = batch.locationActions.player[id] + batch.locationActions.riley[id]
+  }
+  return combined
+}
+
+// Least-visited locations first — a coarse discoverability/engagement
+// signal, not a requirement-gating one (see the SimResult doc comment on
+// playerLocationActions for what "logged action" means here).
+function printLocationBreakdown(batch: BatchSummary) {
+  const entries = Object.entries(combineLocationActions(batch)).sort(([, a], [, b]) => a - b)
+  const totalActions = entries.reduce((sum, [, n]) => sum + n, 0)
+  console.log(`\nLocation engagement — player + riley (share of logged actions at each location):`)
+  for (const [id, n] of entries) {
+    console.log(`  ${id.padEnd(12)} ${((n / totalActions) * 100).toFixed(1)}%`)
+  }
 }
 
 // Flags an outlier cell against the Balanced/Classic baseline the same way
@@ -345,6 +595,39 @@ export function flagOutlier(batch: BatchSummary, baseline: BatchSummary, label: 
   return flags
 }
 
+// Wave 24's CI guardrail: a structural twin of flagOutlier() above, but for
+// stall rate instead of win rate — a future data.ts tune that pushes any
+// single requirement's long-stall rate too far from baseline fails
+// pnpm sim:report the same way an unbalanced win rate does today, so this
+// class of regression can't land silently. Player-side only: the dress
+// question (and this class of issue generally) is about player experience,
+// and Riley's AI actively works around stalls in ways a human doesn't
+// necessarily discover — see pursueCareer()'s fixed clearing order.
+export const STALL_RATE_DRIFT_THRESHOLD_PCT = 15
+
+export function flagStallOutlier(
+  batch: BatchSummary,
+  baseline: BatchSummary,
+  label: string
+): string[] {
+  const flags: string[] = []
+  const keys = new Set([
+    ...Object.keys(batch.stallBreakdown.player),
+    ...Object.keys(baseline.stallBreakdown.player),
+  ])
+  for (const key of keys) {
+    const batchPct = batch.stallBreakdown.player[key]?.longStallGamePct ?? 0
+    const basePct = baseline.stallBreakdown.player[key]?.longStallGamePct ?? 0
+    const drift = Math.abs(batchPct - basePct)
+    if (drift > STALL_RATE_DRIFT_THRESHOLD_PCT) {
+      flags.push(
+        `⚠ ${label}: player "${key}" long-stall rate drifts ${drift.toFixed(1)} points from the balanced/classic baseline (${basePct.toFixed(1)}%)`
+      )
+    }
+  }
+  return flags
+}
+
 function reportMatrix(gameCount: number) {
   console.log(
     `\nFast Lane balance matrix — ${gameCount} games/cell, Standard goals, AI vs AI, ` +
@@ -369,7 +652,11 @@ function reportMatrix(gameCount: number) {
       console.log(
         `${rileyProfile.padEnd(11)} ${rulesPreset.padEnd(9)} ${batch.playerWinPct.toFixed(1).padStart(6)}%   ${batch.rileyWinPct.toFixed(1).padStart(5)}%   ${batch.noWinnerPct.toFixed(1).padStart(9)}%   ${fmtWeeks(batch.avgWeeksOverall).padStart(6)}   ${fmtWeeks(batch.weeksP50).padStart(6)}`
       )
-      flags.push(...flagOutlier(batch, baseline, `${rileyProfile}/${rulesPreset}`))
+      const label = `${rileyProfile}/${rulesPreset}`
+      flags.push(
+        ...flagOutlier(batch, baseline, label),
+        ...flagStallOutlier(batch, baseline, label)
+      )
     }
   }
 
