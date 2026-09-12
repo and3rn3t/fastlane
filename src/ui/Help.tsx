@@ -51,10 +51,13 @@ export function Help({ onClose }: { onClose: () => void }) {
             <h3>👔 Dress & jobs</h3>
             <p className="blurb">
               Clothes wear out — your Dress score drops 3 every week. Better jobs require a minimum
-              Dress, Education, and Experience. Buy outfits at Sharp Threads to stay qualified.
-              Staying at a job and showing up earns promotions over time — Career can grow without
-              switching jobs. Check job listings at the Job Center, or from Home once you own a
-              phone.
+              Dress, Education, and Experience — senior office roles also need a Computer at home,
+              and a few top-tier jobs need a minimum level in a specific skill (built by working a
+              job that trains it, or training directly at City University). Job listings show
+              exactly which requirements you're still short on. Buy outfits at Sharp Threads to stay
+              qualified. Staying at a job and showing up earns promotions over time — Career can
+              grow without switching jobs. Check job listings at the Job Center, or from Home once
+              you own a phone — once you qualify for a better one, a banner will let you know.
             </p>
           </section>
           <section>

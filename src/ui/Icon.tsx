@@ -96,27 +96,6 @@ export function CopyIcon({ size = 16, className }: IconProps) {
   )
 }
 
-export function ListIcon({ size = 18, className }: IconProps) {
-  return (
-    <svg {...base(size)} className={className} aria-hidden>
-      <path d="M9 6h10M9 12h10M9 18h10" />
-      <circle cx="5" cy="6" r="1" fill="currentColor" stroke="none" />
-      <circle cx="5" cy="12" r="1" fill="currentColor" stroke="none" />
-      <circle cx="5" cy="18" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  )
-}
-
-export function CalendarIcon({ size = 18, className }: IconProps) {
-  return (
-    <svg {...base(size)} className={className} aria-hidden>
-      <rect x="4" y="6" width="16" height="14" rx="2.5" />
-      <path d="M4 10h16M8 4v4M16 4v4" />
-      <circle cx="9" cy="14" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  )
-}
-
 export function ChevronDownIcon({ size = 14, className }: IconProps) {
   return (
     <svg
@@ -132,25 +111,6 @@ export function ChevronDownIcon({ size = 14, className }: IconProps) {
       aria-hidden
     >
       <path d="M6 9l6 6 6-6" />
-    </svg>
-  )
-}
-
-export function ChevronRightIcon({ size = 14, className }: IconProps) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-      aria-hidden
-    >
-      <path d="M9 6l6 6-6 6" />
     </svg>
   )
 }

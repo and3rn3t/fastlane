@@ -8,9 +8,15 @@
   --accent: #4968f5;
   --accent-rgb: 73 104 245;
   --accent-ink: #ffffff;
-  --good: #2fa36b;
+  /* Darkened vs. the original #2fa36b — that value was only 3.20:1 against
+   * this card, failing WCAG AA text contrast (4.5:1). #268558 clears 4.5:1
+   * here; the dark-mode override below reuses the original value instead,
+   * since #2fa36b already clears 4.5:1 against the dark card on its own. */
+  --good: #268558;
   --warn: #d9822b;
-  --bad: #d64545;
+  /* Darkened slightly vs. the original #d64545 (4.38:1 here, just under
+   * WCAG AA's 4.5:1) — see the dark-mode override below for its own value. */
+  --bad: #d54141;
   --gold: #c9a227;
   --radius: 14px;
   --radius-lg: 20px;
@@ -43,6 +49,15 @@
     /* Bumped lightness vs. the light-mode value, same recipe as the --accent/
      * --cat-* retunes — #c9a227 reads muddy against the dark card. */
     --gold: #e0b23a;
+    /* Re-picked, not shared with the light pair: #268558 (this session's new
+     * light-mode --good) fails against the dark card (3.52:1), so dark mode
+     * keeps the *original* pre-fix value instead, which already clears
+     * 4.5:1 here on its own. #d64545 (the original --bad) also fails here
+     * (3.68:1); #dc6060 clears it. Neither had a dark-mode value before this
+     * session — both text uses (job-requirement chips, low-stat warnings,
+     * cash-delta flashes) were silently failing AA in dark mode. */
+    --good: #2fa36b;
+    --bad: #dc6060;
     /* Re-picked (not an automatic flip of the light pair) — #d9822b fails the
      * dark-mode OKLCH lightness band against the card surface; #cc7a1f passes. */
     --chart-you: #6d87ff;

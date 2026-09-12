@@ -521,6 +521,16 @@ New `OriginId` union (`types.ts`) — 5 backgrounds: `career-changer` (neutral �
 
 **Found a real, significant imbalance on the first pass, before this row existed to catch it:** the origin deltas as first written (Origin backgrounds row above) were far too strong — `pnpm sim 50 origins` showed Riley forced into `first-gen-student` winning 86% of games vs. a ~44% baseline (a free +6 education and +8 trades skill at week 0 compounds hard over a ~26-week game). Rebalanced to much smaller deltas (education/skill deltas roughly halved or more; `trust-fund-kid` dropped its bundled free outfit + secure apartment down to cash-only) and re-verified at `pnpm sim 300 origins`: no origin drifts past `DRIFT_THRESHOLD_POINTS` (10). This is the exact scenario the wave's own preamble warned about — sim-checking before calling the wave done, not after.
 
+<a id="wave-14-origins-traits-origin-picker-ui"></a>
+
+### Origin picker UI
+
+**✅ 2026-09-11** · Size M
+
+A "Your background" section in `StartScreen.tsx`'s existing "Customize match" `<details>` disclosure, following the exact shape already used two sections below it for Riley's playstyle/difficulty: a row of toggle buttons (`aria-pressed`, `.presets`) plus a `<p className="blurb">` showing the selected origin's plain-language description — no new CSS. `newGame()` already accepted `NewGameOptions.playerOriginId` (defaulting to the neutral `career-changer` when unset, from the Origin backgrounds row above), so this is purely additive: one new `useState<OriginId>`, one `.map()` over the existing `ORIGINS` table, and threading the selection into the "Start new game" button's `startGame()` call. Deliberately **not** threaded into the Daily Challenge button, matching how it already excludes every other customization (profile/difficulty/rules) so that mode stays identical for every player.
+
+New `StartScreen.test.tsx` (no test file existed for this component before): defaults to `career-changer`, selecting a different origin updates the shown blurb and threads through to the started game's save, and the Daily Challenge path stays unaffected. Verified live: picking Trust Fund Kid and starting a game applied its +$120 cash delta exactly ($200 → $320), zero console errors.
+
 ## Wave 15 — The Living City
 
 <a id="wave-15-the-living-city-data-driven-board-geometry"></a>
@@ -534,6 +544,44 @@ New `OriginId` union (`types.ts`) — 5 backgrounds: `career-changer` (neutral �
 **One historical wrinkle, preserved on purpose, found during implementation:** the literal legacy array was not actually a clean sequential clockwise walk. When Casino became the 14th location, the prior 13 `loopIndex` values were left untouched (renumbering them would have silently shifted every travel cost and desynced saves), and Casino was placed into the one grid cell — walk position 4, row 2 col 4 — a 13-cell clockwise walk had left empty, rather than at that position in the sequence. A naive pure-walk implementation does not reproduce this; `perimeterForSize` special-cases `n === 14` by deferring that one walk-position-4 cell to the end of the array, with the reasoning documented inline rather than silently baked in. A new `src/ui/__tests__/Board.test.tsx` pins `perimeterForSize(14)` equal to the exact legacy 14-tuple array, and a live Playwright screenshot of a started game confirmed the rendered board is visually unchanged (all 14 tiles in their historical positions, Casino included) with zero console errors — the "byte-identical" proof this row required and that no prior test covered.
 
 Retires the "hardcoded 14-entry array" framing in the board-locations Standing Constraint below: adding a location within the current grid's spare capacity is now a `data.ts` change, though the grid itself is still physically full at 14 until a future wave picks a bigger shape.
+
+## Wave 20 — UI/UX Refresh
+
+<a id="wave-20-ui-ux-refresh-good-bad-contrast-retune"></a>
+
+### `--good`/`--bad` contrast retune
+
+**✅ 2026-09-11** · Size S
+
+A fresh audit found `--good`/`--bad` (`src/index.css`) had no dark-mode override at all, and the light-mode values were themselves borderline — independently recomputed via the WCAG relative-luminance formula: `--good` (`#2fa36b`) was 3.20:1 against the light card (fails 4.5:1 AA), `--bad` (`#d64545`) was 4.38:1 against light and 3.68:1 against dark (both fail). Not automated-tool-visible: Lighthouse never triggers a low-stat TopBar value or an unmet job-requirement chip on a fresh game, which is exactly when these colors render. `--warn` was checked too and found clean — grepped every usage and confirmed it's only ever a decorative progress-bar background (`.bar.rival > div`), never text, so text-contrast rules don't apply to it.
+
+Retuned per-mode, same "re-pick, don't flip" approach as Wave 11's `--gold` fix: light `:root` gets `--good: #268558` (4.57:1) and `--bad: #d54141` (4.50:1); new dark-mode entries add `--good: #2fa36b` (the _original_ pre-fix value, which already clears 4.5:1 against the dark card on its own) and `--bad: #dc6060` (4.52:1). Verified the darkened light-mode `--good` would fail if dark mode fell through to it unmodified (3.52:1) — confirming the dark override is required, not optional.
+
+<a id="wave-20-ui-ux-refresh-helptsx-content-gaps"></a>
+
+### Help.tsx content gaps
+
+**✅ 2026-09-11** · Size S
+
+`Help.tsx`'s "Dress & jobs" section only mentioned Dress/Education/Experience job requirements, but `jobRequirements()` also gates on Computer ownership and per-skill minimums — both real, both rendered as 🔒 chips in `JobBoard` since Wave 12, neither explained anywhere. Added a sentence covering both, plus a mention that a banner (the `JobSwitchNudge` component) will flag it once qualified.
+
+<a id="wave-20-ui-ux-refresh-dead-icontsx-exports-removed"></a>
+
+### Dead `Icon.tsx` exports removed
+
+**✅ 2026-09-11** · Size S
+
+`ListIcon`, `CalendarIcon`, `ChevronRightIcon` — confirmed zero call sites anywhere in `src/` (including tests) via grep, dating back to the original Aug 28 HIG redesign commit. Wave 11's "Dead CSS cleanup" pass was scoped to `index.css` selectors, not TS exports, so these survived it untouched until now.
+
+<a id="wave-20-ui-ux-refresh-extract-hintbartsx"></a>
+
+### Extract `HintBar.tsx`
+
+**✅ 2026-09-11** · Size S/M
+
+`GameScreen.tsx` had grown to 5 components (`GameScreen`, `TopBar`, `EventLog`, `HintBar`, `JobSwitchNudge`) and 3 hooks in one 488-line file — Wave 11's own archive note had already flagged this exact bundling as a "minor... pull only if touching that file anyway" risk, and Wave 12 made it more real (not less) by adding `HintBar`/`JobSwitchNudge` directly into the file instead of their own, unlike every sibling modal/panel (`WeekReportModal.tsx`, `LocationSheet.tsx`, `GameOver.tsx`).
+
+Pure move, no behavior change: `HintBar`, `JobSwitchNudge`, `recentFailureHint`, `hintCopy`, and their `DISASTER_KEYWORDS`/`RECENT_FAILURE_COPY` tables moved into a new `src/ui/HintBar.tsx`; `GameScreen.tsx` now imports and renders them as before. `TopBar`/`EventLog`/`GameScreen` itself and the three hooks (`useAutoHelp`, `useDisasterSound`, `useTurnReplay`) stayed put — tightly coupled to `GameScreen`'s own render tree in a way the extracted pieces weren't. Verified live: both hint-bar instances (the food nudge and a qualify-for-Fry-Cook nudge, which can legitimately coexist) still render and dismiss independently, zero console errors; all 241 pre-existing tests passed unchanged, confirming the move introduced no behavior drift.
 
 ## Wave context notes (archived)
 
