@@ -960,8 +960,21 @@ details.panel[open] .disclosure-chevron {
   border-top: 1px solid var(--line);
 }
 
+/* min-width guards against a real layout bug found in a live mobile audit:
+ * without it, whether a row's trailing control ends up inline (sharing the
+ * label's line) or wrapped below it depends purely on whether the label's
+ * and control's combined *unwrapped* widths happen to fit the row — so two
+ * structurally identical rows can render completely differently depending
+ * on label/control text length (confirmed via DOM measurement at Rent
+ * Office's two apartment rows: a shorter label stayed inline and got
+ * squeezed to ~100px, wrapping its own title across 2-3 lines, while a
+ * longer label correctly wrapped the control below and got the full row
+ * width). Guaranteeing the label at least this much room makes the control
+ * wrap below whenever there truly isn't space for both, instead of leaving
+ * it to an unpredictable per-row threshold. */
 .action-row .grow {
   flex: 1;
+  min-width: 10rem;
 }
 
 .action-row .desc {
