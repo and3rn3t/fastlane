@@ -100,18 +100,18 @@ export interface RequirementStallDetail {
   maxStreak: number
 }
 
-interface StallTracker {
+export interface StallTracker {
   jobId: string | null
   key: string | null
   streak: number
   totals: Record<string, RequirementStallDetail>
 }
 
-function newStallTracker(): StallTracker {
+export function newStallTracker(): StallTracker {
   return { jobId: null, key: null, streak: 0, totals: {} }
 }
 
-function flushStreak(t: StallTracker): void {
+export function flushStreak(t: StallTracker): void {
   if (t.key && t.streak > 0) {
     const detail = t.totals[t.key] ?? { totalWeeks: 0, maxStreak: 0 }
     detail.totalWeeks += t.streak
@@ -123,31 +123,62 @@ function flushStreak(t: StallTracker): void {
   t.streak = 0
 }
 
-// Called once per week, with the state as it stands *entering* that week —
-// same "before this week's actions" timing previewNextAction()-style
-// diagnostics use elsewhere, so a stall streak reads as "N weeks where nothing
-// changed" rather than crediting a week where the requirement was actually
-// cleared. A streak resets (and flushes into `totals`) whenever the target
-// job changes, the sole blocker changes, or more/fewer than exactly one
+// Called once per week, with the state as it stands *entering* that week
+// (i.e. the result of the *previous* week's actions) — same timing
+// previewNextAction()-style diagnostics use elsewhere. Because each call is
+// a snapshot of the outcome of the week before it, seeing the *same*
+// blocker on two consecutive calls confirms the earlier of those two weeks
+// ran start-to-finish without resolving it — so a match increments the
+// streak for the week that just completed, not the week currently
+// starting. This is what stops a blocker cleared mid-week from being
+// counted as a whole extra stalled week: streak only ever credits a
+// *confirmed* completed week, one call behind the week actually being
+// observed (caught by review — an earlier version incremented on the
+// observation itself, so nine genuinely-stalled weeks reported as ten).
+// The streak resets (and flushes into `totals`) whenever the target job
+// changes, the sole blocker changes, or more/fewer than exactly one
 // requirement is unmet — this only tracks the specific "one thing away"
-// state, not general career-prep progress.
-function updateStallTracker(t: StallTracker, state: GameState, key: PlayerKey): void {
-  const target = nextTargetJob(state, key)
-  if (!target) {
-    flushStreak(t)
-    return
-  }
-  const unmet = jobRequirements(state[key], target.id).filter((r) => !r.met)
-  if (unmet.length === 1 && target.id === t.jobId && unmet[0].key === t.key) {
+// state, not general career-prep progress. A still-open streak at game end
+// is flushed as-is by the caller: the last observed week is never
+// "confirmed" (there's no following observation to confirm it with), so it
+// is correctly left uncounted rather than guessed at.
+//
+// Deliberately a pure function of the observation itself (a target job id
+// and, if exactly one requirement is unmet on it, that requirement's key),
+// not of GameState — the job-requirement lookup is a one-line concern
+// handled by the caller (observeStall() below); keeping this function free
+// of engine types means the streak state machine can be tested directly
+// with plain values, without building a fixture GameState.
+export function updateStallTracker(
+  t: StallTracker,
+  jobId: string | null,
+  soleBlockerKey: string | null
+): void {
+  if (soleBlockerKey !== null && jobId === t.jobId && soleBlockerKey === t.key) {
     t.streak++
     return
   }
   flushStreak(t)
-  if (unmet.length === 1) {
-    t.jobId = target.id
-    t.key = unmet[0].key
-    t.streak = 1
+  if (soleBlockerKey !== null) {
+    t.jobId = jobId
+    t.key = soleBlockerKey
   }
+}
+
+// The one-line engine lookup updateStallTracker() itself deliberately
+// doesn't do — separated out so that function can stay a pure state
+// machine. Returns the (jobId, soleBlockerKey) pair for whichever job
+// nextTargetJob() has `key` aimed at this week; `soleBlockerKey` is `null`
+// whenever zero or two-or-more requirements are unmet (only the "one thing
+// away" state counts as a stall) or there's no next job at all.
+function observeStall(
+  state: GameState,
+  key: PlayerKey
+): [jobId: string | null, soleBlockerKey: string | null] {
+  const target = nextTargetJob(state, key)
+  if (!target) return [null, null]
+  const unmet = jobRequirements(state[key], target.id).filter((r) => !r.met)
+  return [target.id, unmet.length === 1 ? unmet[0].key : null]
 }
 
 function emptyLocationTally(): Record<LocationId, number> {
@@ -158,10 +189,15 @@ function emptyLocationTally(): Record<LocationId, number> {
 
 // Scans this one game's finished log for one actor's location on every
 // entry that has one (every per-action player/riley entry does — see
-// LogEntry's own doc comment in types.ts — world/upkeep entries don't).
+// LogEntry's own doc comment in types.ts — 'world' entries and upkeep
+// entries don't, and are skipped here rather than miscounted at 'home').
 // Run once at game end rather than incrementally per week, since the log
-// already holds the complete, final record.
-function tallyLocationActions(state: GameState, key: PlayerKey): Record<LocationId, number> {
+// already holds the complete, final record. Takes just the log, not a full
+// GameState, so it's cheap to call with a synthetic log in tests.
+export function tallyLocationActions(
+  state: Pick<GameState, 'log'>,
+  key: PlayerKey
+): Record<LocationId, number> {
   const tally = emptyLocationTally()
   for (const entry of state.log) {
     if (entry.actor === key && entry.location) tally[entry.location]++
@@ -239,8 +275,8 @@ function runOneGame(
     // Wave 24: read stall state as the week begins, before this week's
     // actions can change it — same "entering the week" timing as
     // priorProgress above.
-    updateStallTracker(playerStallTracker, state, 'player')
-    updateStallTracker(rileyStallTracker, state, 'riley')
+    updateStallTracker(playerStallTracker, ...observeStall(state, 'player'))
+    updateStallTracker(rileyStallTracker, ...observeStall(state, 'riley'))
     // Player side always runs Balanced — a fixed opponent is what makes the
     // win rate a meaningful signal for whatever Riley profile is under test.
     runAIWeek(state, 'player', AI_PROFILES.balanced)
@@ -605,6 +641,18 @@ export function flagOutlier(batch: BatchSummary, baseline: BatchSummary, label: 
 // necessarily discover — see pursueCareer()'s fixed clearing order.
 export const STALL_RATE_DRIFT_THRESHOLD_PCT = 15
 
+// The relative check above is blind to a change that shifts every cell —
+// baseline included, since it's recomputed fresh from current code each run
+// — by roughly the same amount: batch and baseline would drift together and
+// show ~0 relative difference even at, say, a 100% stall rate. Same blind
+// spot flagOutlier() already covers for win rate via NO_WINNER_GUARD_PCT's
+// absolute cap alongside its own relative DRIFT_THRESHOLD_POINTS check —
+// this is that same idea for stall rate: an absolute ceiling independent of
+// whatever this run's baseline happens to be. 40% is well above every
+// observed rate at introduction (education topped out at 17%, Wave 24's
+// archive entry), so today's baseline can't trip it by chance.
+export const STALL_RATE_ABSOLUTE_GUARD_PCT = 40
+
 export function flagStallOutlier(
   batch: BatchSummary,
   baseline: BatchSummary,
@@ -622,6 +670,11 @@ export function flagStallOutlier(
     if (drift > STALL_RATE_DRIFT_THRESHOLD_PCT) {
       flags.push(
         `⚠ ${label}: player "${key}" long-stall rate drifts ${drift.toFixed(1)} points from the balanced/classic baseline (${basePct.toFixed(1)}%)`
+      )
+    }
+    if (batchPct > STALL_RATE_ABSOLUTE_GUARD_PCT) {
+      flags.push(
+        `⚠ ${label}: player "${key}" long-stall rate is ${batchPct.toFixed(1)}% — over the absolute ${STALL_RATE_ABSOLUTE_GUARD_PCT}% guard regardless of baseline`
       )
     }
   }

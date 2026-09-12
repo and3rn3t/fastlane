@@ -29,6 +29,7 @@ import {
   PROFILE_NAMES,
   RULE_PRESET_NAMES,
   runBatch,
+  STALL_RATE_ABSOLUTE_GUARD_PCT,
   STALL_RATE_DRIFT_THRESHOLD_PCT,
   type BatchSummary,
   type GoalTally,
@@ -107,9 +108,10 @@ function main() {
       `${PROFILE_NAMES.length}×${RULE_PRESET_NAMES.length} = ${PROFILE_NAMES.length * RULE_PRESET_NAMES.length} cells`
   )
   console.log(
-    `Drift thresholds: >${DRIFT_THRESHOLD_POINTS} points of player win-rate drift, ` +
-      `>${STALL_RATE_DRIFT_THRESHOLD_PCT} points of requirement long-stall-rate drift, ` +
-      `or >${NO_WINNER_GUARD_PCT}% no-winner rate — all from the balanced/classic baseline.`
+    `Drift vs. the balanced/classic baseline: >${DRIFT_THRESHOLD_POINTS} points of player win-rate drift, ` +
+      `or >${STALL_RATE_DRIFT_THRESHOLD_PCT} points of requirement long-stall-rate drift. ` +
+      `Absolute caps regardless of baseline: >${NO_WINNER_GUARD_PCT}% no-winner rate, ` +
+      `or >${STALL_RATE_ABSOLUTE_GUARD_PCT}% long-stall rate on any requirement.`
   )
 
   const baseline = runBatch(gameCount, 'balanced', 'classic')
