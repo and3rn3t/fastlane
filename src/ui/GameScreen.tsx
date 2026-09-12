@@ -162,7 +162,7 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
         </div>
       </div>
       <div className="topbar-stats">
-        <div className="stat cash">
+        <div className="stat cash" data-category="wealth">
           <span className="label">Cash</span>
           <span className="value">
             ${p.cash.toLocaleString()}
@@ -174,11 +174,11 @@ function TopBar({ game, onHelp }: { game: GameState; onHelp: () => void }) {
           </span>
           <DeltaBadge delta={cashDelta} format={(n) => `${n > 0 ? '+' : '-'}$${Math.abs(n)}`} />
         </div>
-        <div className="stat chip">
+        <div className="stat chip" data-category="wealth">
           <span className="label">Net worth</span>
           <span className="value">${netWorth(p, game.economy.marketIndex).toLocaleString()}</span>
         </div>
-        <div className="stat chip">
+        <div className="stat chip" data-category="career">
           <span className="label">Job</span>
           <span className="value">{job ? job.title : '—'}</span>
         </div>

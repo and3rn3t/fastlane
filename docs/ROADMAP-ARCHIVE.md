@@ -653,6 +653,76 @@ Wrapped "Your background", "Rules", "Riley's playstyle", and "Riley's difficulty
 
 Scoped the fix to `.location-modal-header` specifically (`display: -webkit-box; -webkit-line-clamp: 2; white-space: normal`) rather than the shared base rule — the mobile dock trigger's own copy of the same heading component needs to stay single-line, since the dock is a fixed `--dock-height` row and a taller description would grow it past that, reintroducing the same fixed-element-with-no-reserved-space bug class already fixed once for the sticky footer. Verified live: both dialogs now show their full sentence on two lines; the dock trigger's computed `white-space` is still `nowrap`, confirming it's unaffected.
 
+## Wave 22 — Visual Design Refresh
+
+<a id="wave-22-visual-design-refresh-board-tile-visual-depth"></a>
+
+### Board tile visual depth
+
+**✅ 2026-09-12** · Size M
+
+`.tile`'s per-category tint was a single flat `color-mix(in srgb, var(--cat-X) 11%, var(--card))` — readable, but flat next to the vibrancy/blur already on modals and the location dock. Kept `data-category` as the single source of tint per the row's own guardrail (no second color system): each category block now paints a subtle 160deg gradient between a stronger and weaker mix of the same `--cat-*`/`--bad` token instead of one flat mix, so the tint reads as a soft light source rather than a wash.
+
+The bare icon (`color: var(--ink-soft)` or the category color, no background) is now wrapped in a circular chip — `width/height: 30px` (24px under the existing 480px breakpoint), `border-radius: 50%`, background a stronger tint of the same category color (or a neutral `--ink-soft` mix for untinted tiles). This is the "larger/more expressive icon treatment" the row asked for without actually growing the SVG itself (still 20px) — enlarging the raw icon risked overflowing the 24px mobile chip with almost no padding; the colored chip carries the visual weight instead.
+
+Added a new `--card-highlight` token (`rgb(255 255 255 / 0.6)` light, `/ 0.05` dark) applied as `inset 0 1px 0 var(--card-highlight)` alongside the existing `--shadow` — a faint top-edge highlight that reads as a slight raise, cheap enough to apply to any flat card-like surface later without a second shadow system.
+
+Real press feedback: `.tile:active:not(:disabled)` now gets `transform: scale(0.96)` + `filter: brightness(1.08)`, transitioning over the existing `cubic-bezier(0.16, 1, 0.3, 1)` easing already used elsewhere in the file. This is scoped to `.tile` specifically (class selectors outrank the global `button:active:not(:disabled)` rule's `translateY(1px)`) since a board tile benefits from its own tap feedback distinct from a generic button press — the "here" tile stays exempt since it's `disabled` and never receives `:active`.
+
+Verified live via a small Playwright script (not committed — a throwaway driver, same shape as `e2e/smoke.spec.ts`'s game-start sequence): started a game, opened Job Center so the side panel and board render together, and screenshotted at 1280×900 and 390×844 in both `light`/`dark` `colorScheme`. Confirmed the gradients, icon chips, and "here" tile's existing accent outline/pulse all read cleanly in all four combinations — no regression to the pulse/outline treatment, which lives on different properties (`border-color`/`outline`) than the new gradient background. `pnpm lint && pnpm type-check && pnpm test` clean (263 tests, no new ones needed — pure CSS/prop changes, no new behavior to unit test).
+
+<a id="wave-22-visual-design-refresh-richer-statprogress-visualization"></a>
+
+### Richer stat/progress visualization
+
+**✅ 2026-09-12** · Size S/M
+
+Two changes, both extending patterns already established rather than inventing new ones.
+
+**TopBar stat chips.** Of the seven `topbar-stats` chips (Cash, Net worth, Job, Dress, Health, Food, Rent due, plus a conditional Loan), only two map unambiguously onto one of the four `--cat-*` goal colors: Cash and Net worth both feed the Wealth goal directly (`netWorth()`), and Job feeds Career. Dress/Health/Food/Rent/Loan don't belong to a single goal, and already carry a more important signal — the red `.value.low` flag — so tinting them risked diluting that warning with decorative color. Gave `.stat[data-category='wealth']`/`['career']` a colored `.value` plus (for the two that are already `.chip`-styled — Cash isn't, it keeps its distinct larger-font unboxed treatment) a `color-mix` background tint at the same 14% strength the tiles use. `.stat.chip` also picked up the `--card-highlight` inset from the board-tile row above it, so the same faint raised-edge depth now appears on both surfaces instead of only tiles.
+
+**Progress bar fill.** `.bar > div` already animated on mount (`bar-fill`'s scaleX keyframe, `cubic-bezier(0.16, 1, 0.3, 1)`) and smoothed subsequent width changes via a plain `transition: width 300ms` — technically "animated," but with a flatter default easing than the rest of the app's motion language. Changed the transition to reuse the exact same bezier and bumped duration to 450ms, so a week-over-week goal-progress change now reads as a continuation of the same motion the initial fill used, not a visually distinct update. Left the rival bar's flat `--warn` coloring alone — that's the validated `--chart-you`/`--chart-riley` you-vs-rival identity pairing from the End-of-game recap work, a deliberate color meaning of its own, not something this row's "lean on `--cat-*` more" instruction was asking to override.
+
+Verified live (same throwaway Playwright driver as the board-tile row, extended to apply for and work a Burger Barn shift first so Job/Career actually have non-zero state to show): Cash/Net worth render in the wealth green, Job in the career teal/blue, at both breakpoints and both color schemes, with the Career bar visibly filled after the shift. `pnpm lint && pnpm type-check && pnpm test` clean (263 tests, no new ones — pure CSS/JSX prop changes).
+
+**Gap caught in Copilot PR review, fixed before merge:** `.stat[data-category='career'] .value`'s new direct text usage of `--cat-career` was flagged as failing WCAG AA (computed by hand via canvas-rasterized sRGB, the same method Wave 20's `--good`/`--bad` retune used: 3.07:1 against `--card-soft`, needs 4.5:1). Checking the other two category tokens the same way turned up the identical pre-existing bug in `edu` (4.19:1) and `happy` (3.41:1) — not previously caught because neither had been used as direct text color anywhere that got a Lighthouse pass over it before now (`.goal-row-label.cat-*` on `StartScreen` predates this wave). Retuned all three light-mode values down in lightness only (career 64%→52%, edu 60%→56%, happy 66%→57%, same hue/chroma each) until they cleared 4.5:1 against both `--card` and `--card-soft` — dark-mode values were already passing (5.76–6.93:1) and left untouched, matching this codebase's established "dark mode gets brighter, light mode gets darker" pattern for every other WCAG-driven token retune (`--good`/`--bad`/`--gold`). Fixing the shared token rather than only the new stat-chip usage keeps every existing consumer (`.goal-row-label`, tile tints, slider fills) visually consistent instead of creating a second, slightly different "career teal."
+
+<a id="wave-22-visual-design-refresh-motion-micro-interaction-audit"></a>
+
+### Motion & micro-interaction audit
+
+**✅ 2026-09-12** · Size S/M
+
+Inventoried every existing `animation`/`transition` in `index.css` first (`fade-up`, `sheet-up`, `scrim-fade`, `bar-fill`, `delta-rise`, `ring-draw`, `chart-draw`, `tile-pulse`, `pawn-step`, `twinkle`) before looking for gaps, per the row's own instruction not to invent a second motion language. Rather than guessing which UI moments "feel" snappy, checked each transient banner's React source for whether it actually mounts/unmounts (`if (!x) return null`) versus toggling a CSS class on an always-mounted element — only the former can even receive a CSS entrance `animation` at all, since a class-toggle on a persistent node doesn't restart a still-attached animation.
+
+**Three real snaps found, all genuine mount/unmount components with zero entrance animation:**
+
+- `.toast` (`App.tsx`'s `ErrorToast`/`UpdateToast`) — an error or update notice popped into existence at a fixed screen position with no transition.
+- `.hint-bar` (`HintBar.tsx`'s `HintBar` and `JobSwitchNudge`, which share the class) — a fresh suggestion banner (arriving somewhere new, a new week's report landing, newly qualifying for a job) appeared instantly.
+- `.install-prompt` (`InstallPrompt.tsx`) — the bottom-anchored "Add to Home Screen" nudge had the same gap.
+
+**Deliberately not touched, and why:** `.gameover`/`.achievement-unlocked`/`.achievement-badge` render as part of a full page swap (`GameOver`), the same un-animated-page-transition convention `StartScreen` already follows — animating one page-load element while the page around it snaps would be _more_ inconsistent, not less. Goal-progress completion and promotions already ride the existing `.bar > div` width transition (richer stat/progress visualization row, above) and the week-report modal's own `fade-up`/`sheet-up` entrance — there was no separate "completion" moment left bare once those were checked directly against the code.
+
+**Real bug caught in Copilot PR review, fixed before merge:** `.toast` centers itself with `left: 50%; transform: translateX(-50%)`, but `fade-up`'s keyframe also animates `transform` (`translateY(...)`) — the `animation` shorthand's `transform` values fully replace the element's own `transform` declaration rather than composing with it, so once the entrance animation finished (`both` fill mode holding the keyframe's final `transform: translateY(0)`), the toast's horizontal centering silently vanished and its left edge sat pinned at exactly 50% of the viewport instead of centered. Confirmed live: measured the toast's bounding box 1.5s after it appeared (well past the 300ms animation) — before the fix this would have shown a left-edge offset; after switching centering to the individual `translate` property (`translate: -50% 0`, which composes independently of `transform` since the two are separate CSS properties), the box measured dead-center (`x + width/2 === viewport/2`) at rest.
+
+**Fix:** added `animation: fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both` to `.toast` and `.hint-bar` (both read as centered/inline content, the same category `.modal` already uses `fade-up` for) and `animation: sheet-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both` to `.install-prompt` (bottom-anchored, matching the mobile modal sheet's own motion rather than the centered one). Zero new keyframes, zero new easing curves — pure reuse, per the row's constraint.
+
+Verified live (Playwright, not just reading the CSS): started a game and read `.hint-bar`'s computed `animationName` (`fade-up`, confirming it actually applies to the live-mounted element, not just parses); triggered a real `EngineError` toast by buying Gadget City's $380 computer with $200 starting cash and confirmed `.toast`'s computed `animationName` the same way. `pnpm lint && pnpm type-check && pnpm test` clean (263 tests, no new ones — pure CSS addition, no new behavior to unit test).
+
+<a id="wave-22-visual-design-refresh-start-screen-visual-pass"></a>
+
+### Start screen visual pass
+
+**✅ 2026-09-12** · Size M
+
+Waited on Wave 21's "Compact Customize match" (shipped 2026-09-11) per this row's own instruction before touching visual treatment, then applied the same two patterns the rest of this wave established — depth and icon-chip tinting — to `StartScreen.tsx`, the one surface neither had reached yet.
+
+**Depth.** `.action-group` (the shell behind "Customize match" and its nested "Your background"/"Rules"/"Riley's playstyle"/"Riley's difficulty" disclosures) and `.daily-challenge` both gained the same `inset 0 1px 0 var(--card-highlight)` the board tiles and stat chips already picked up earlier in this wave — one token, reused a third time, no new depth language invented. `.action-group` is shared with location panels too (Bank's Loans section, City University), so this reaches beyond just the start screen for free. Also added it to unselected preset/toggle buttons (`.presets button:not(.primary)`) for the same reason it's excluded from `.primary`: a selected toggle is already a solid `--accent` fill, where the same near-transparent highlight would just sit invisibly on top of it — worth calling out since it's the kind of thing that's easy to add everywhere and get subtly wrong on the one variant that's already at full saturation.
+
+**Iconography.** Each of the four goal-slider rows (`ROWS` in `StartScreen.tsx`) already colors its label text and slider fill with the row's `--cat-*` token; the icon itself was still a bare glyph. Wrapped it in a new `.icon-chip-sm` — a smaller sibling of the tile icon chip, same 20% category-tint recipe, sized for an inline label instead of a centered tile. Considered and **rejected** doing the same for the Riley-playstyle picker's existing profile icons (`RILEY_PROFILES`'s `BoltIcon`/`GradCapIcon`/`DiceIcon`/`ScaleIcon`): those icons sit inside toggle buttons that turn solid `--accent` when selected (`.primary`), and a light accent-tinted chip with `color: var(--accent)` text would become a same-hue, low-contrast blob on top of that fill — a real regression on the exact state a player is looking at (their current selection), not a hypothetical one. Left those bare rather than fixing a problem this row didn't have a clean answer for in the same session; a future pass could give `.primary .icon-chip-sm` its own inverted (dark-on-light) treatment if it's worth the extra complexity.
+
+Verified live (Playwright, both collapsed and expanded "Customize match" states) in both themes at desktop and 390×844: the depth reads correctly on the daily-challenge banner and the collapsed disclosure rows, the goal-row icon chips render each of the four category colors clearly at both the desktop 8rem and the mobile 6.5rem label-column width, and closed nested disclosures stay closed (confirmed the screenshot wasn't accidentally showing stale expanded state before trusting it). `pnpm lint && pnpm type-check && pnpm test` clean (263 tests, no new ones — pure CSS/JSX prop changes). **Wave 22 is now complete** (4/4 rows).
+
 ## Wave 24 — Friction Diagnostics
 
 <a id="wave-24-friction-diagnostics-sim-per-requirement-stall-reporting"></a>

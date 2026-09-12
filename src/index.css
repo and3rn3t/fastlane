@@ -21,6 +21,9 @@
   --radius: 14px;
   --radius-lg: 20px;
   --shadow: 0 1px 3px rgb(16 24 40 / 0.08), 0 4px 14px rgb(16 24 40 / 0.06);
+  /* Faint inset top edge that reads as a slight raise on flat surfaces
+   * (board tiles) — subtle enough to disappear on anything already busy. */
+  --card-highlight: rgb(255 255 255 / 0.6);
   /* Chart categorical pair (you/riley) — validated separately from --accent/--warn
    * per-mode via scripts/validate_palette.js against the actual card surface;
    * see docs/ROADMAP.md's End-of-game recap entry for the numbers. */
@@ -28,11 +31,19 @@
   --chart-riley: #d9822b;
   /* Goal category colors — light-mode oklch, consistent lightness/chroma,
    * hues spaced away from --accent/--good/--warn/--bad so nothing collides.
-   * --cat-wealth aliases --good on purpose (money=green is the obvious read). */
+   * --cat-wealth aliases --good on purpose (money=green is the obvious read).
+   * career/edu/happy darkened from their original 64%/60%/66% lightness —
+   * Wave 22 PR review (Copilot) caught --cat-career failing WCAG AA as text
+   * (3.07:1 against --card-soft); computed by hand (canvas-rasterized sRGB,
+   * same relative-luminance method as the --good/--bad/--gold retunes) found
+   * edu (4.19:1) and happy (3.41:1) were failing the exact same way, just
+   * not yet used as direct text at the time they were picked. Same hue kept,
+   * lightness dropped only as far as needed for ≥4.5:1 against the harder of
+   * --card/--card-soft; dark-mode pair below already passes and is untouched. */
   --cat-wealth: var(--good);
-  --cat-career: oklch(64% 0.13 195);
-  --cat-edu: oklch(60% 0.16 292);
-  --cat-happy: oklch(66% 0.18 340);
+  --cat-career: oklch(52% 0.13 195);
+  --cat-edu: oklch(56% 0.16 292);
+  --cat-happy: oklch(57% 0.18 340);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -67,6 +78,7 @@
     --cat-career: oklch(72% 0.13 195);
     --cat-edu: oklch(70% 0.15 292);
     --cat-happy: oklch(72% 0.17 340);
+    --card-highlight: rgb(255 255 255 / 0.05);
   }
 }
 
@@ -308,6 +320,13 @@ input[type='range'] {
   gap: 0.35rem;
 }
 
+/* Depth on the unselected (neutral `--card-soft`) state only — a `.primary`
+ * selected button is already a solid `--accent` fill, where the same faint
+ * highlight would sit invisibly on top of it anyway. */
+.presets button:not(.primary) {
+  box-shadow: inset 0 1px 0 var(--card-highlight);
+}
+
 .start-actions {
   display: flex;
   flex-direction: column;
@@ -430,6 +449,26 @@ input[type='range'] {
   background: var(--card-soft);
   border-radius: 11px;
   padding: 6px 11px;
+  box-shadow: inset 0 1px 0 var(--card-highlight);
+}
+
+/* Lean on the same --cat-* goal-category colors the board tiles and progress
+ * bars already use, but only where a stat maps unambiguously onto one of the
+ * four goals (color carries meaning here, same rule the tiles follow) — Cash
+ * and Net worth both feed the Wealth goal, Job feeds Career. Dress/Health/
+ * Food/Rent/Loan have no single-goal mapping and keep their existing
+ * neutral chip + red-flag `.value.low` treatment untouched. */
+.stat[data-category='wealth'] .value {
+  color: var(--cat-wealth);
+}
+.stat.chip[data-category='wealth'] {
+  background: color-mix(in srgb, var(--cat-wealth) 14%, var(--card-soft));
+}
+.stat[data-category='career'] .value {
+  color: var(--cat-career);
+}
+.stat.chip[data-category='career'] {
+  background: color-mix(in srgb, var(--cat-career) 14%, var(--card-soft));
 }
 
 .sparkle {
@@ -546,14 +585,32 @@ input[type='range'] {
   background: var(--card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow:
+    var(--shadow),
+    inset 0 1px 0 var(--card-highlight);
   text-align: left;
   min-height: 96px;
+  transition:
+    transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 150ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* A tile's own press feedback: brief scale + brightness, beyond the global
+ * button rule's translateY (overridden here since these classes outrank it). */
+.tile:active:not(:disabled) {
+  transform: scale(0.96);
+  filter: brightness(1.08);
 }
 
 .tile .icon {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
   color: var(--ink-soft);
+  background: color-mix(in srgb, var(--ink-soft) 12%, transparent);
 }
 
 .tile .name {
@@ -565,40 +622,94 @@ input[type='range'] {
  * not decoration, so only the four goal-linked locations + the casino's
  * "risk" framing get a color; everything else stays neutral. */
 .tile[data-category='wealth'] {
-  background: color-mix(in srgb, var(--cat-wealth) 11%, var(--card));
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--cat-wealth) 16%, var(--card)) 0%,
+    color-mix(in srgb, var(--cat-wealth) 5%, var(--card)) 100%
+  );
 }
 .tile[data-category='wealth'] .icon {
   color: var(--cat-wealth);
+  background: color-mix(in srgb, var(--cat-wealth) 20%, transparent);
 }
 .tile[data-category='career'] {
-  background: color-mix(in srgb, var(--cat-career) 11%, var(--card));
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--cat-career) 16%, var(--card)) 0%,
+    color-mix(in srgb, var(--cat-career) 5%, var(--card)) 100%
+  );
 }
 .tile[data-category='career'] .icon {
   color: var(--cat-career);
+  background: color-mix(in srgb, var(--cat-career) 20%, transparent);
 }
 .tile[data-category='edu'] {
-  background: color-mix(in srgb, var(--cat-edu) 11%, var(--card));
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--cat-edu) 16%, var(--card)) 0%,
+    color-mix(in srgb, var(--cat-edu) 5%, var(--card)) 100%
+  );
 }
 .tile[data-category='edu'] .icon {
   color: var(--cat-edu);
+  background: color-mix(in srgb, var(--cat-edu) 20%, transparent);
 }
 .tile[data-category='happy'] {
-  background: color-mix(in srgb, var(--cat-happy) 11%, var(--card));
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--cat-happy) 16%, var(--card)) 0%,
+    color-mix(in srgb, var(--cat-happy) 5%, var(--card)) 100%
+  );
 }
 .tile[data-category='happy'] .icon {
   color: var(--cat-happy);
+  background: color-mix(in srgb, var(--cat-happy) 20%, transparent);
 }
 .tile[data-category='risk'] {
-  background: color-mix(in srgb, var(--bad) 11%, var(--card));
+  background: linear-gradient(
+    160deg,
+    color-mix(in srgb, var(--bad) 16%, var(--card)) 0%,
+    color-mix(in srgb, var(--bad) 5%, var(--card)) 100%
+  );
 }
 .tile[data-category='risk'] .icon {
   color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 20%, transparent);
 }
 
 .tile.here {
   border-color: var(--accent);
   outline: 2px solid var(--accent);
   animation: tile-pulse 1.1s ease-out 3;
+}
+
+/* Smaller sibling of the tile icon chip above, same 20% category tint —
+ * for icons inline in text/labels elsewhere (StartScreen's goal rows)
+ * rather than centered alone in a board tile. */
+.icon-chip-sm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.icon-chip-sm.cat-wealth {
+  background: color-mix(in srgb, var(--cat-wealth) 20%, transparent);
+  color: var(--cat-wealth);
+}
+.icon-chip-sm.cat-happy {
+  background: color-mix(in srgb, var(--cat-happy) 20%, transparent);
+  color: var(--cat-happy);
+}
+.icon-chip-sm.cat-edu {
+  background: color-mix(in srgb, var(--cat-edu) 20%, transparent);
+  color: var(--cat-edu);
+}
+.icon-chip-sm.cat-career {
+  background: color-mix(in srgb, var(--cat-career) 20%, transparent);
+  color: var(--cat-career);
 }
 
 @keyframes tile-pulse {
@@ -726,7 +837,8 @@ input[type='range'] {
   }
 
   .tile .icon {
-    font-size: 1.15rem;
+    width: 24px;
+    height: 24px;
   }
 
   .tile .name {
@@ -876,7 +988,10 @@ input[type='range'] {
   height: 100%;
   background: var(--accent);
   border-radius: 6px;
-  transition: width 300ms;
+  /* Same easing as the mount-time bar-fill keyframe below, so a week-over-
+   * week progress change reads as a continuation of that motion instead of
+   * a flatter linear-ish default transition. */
+  transition: width 450ms cubic-bezier(0.16, 1, 0.3, 1);
   transform-origin: left;
   animation: bar-fill 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -1040,6 +1155,10 @@ details.panel[open] .disclosure-chevron {
   background: var(--card-soft);
   border-radius: var(--radius);
   padding: 0.7rem 0.8rem;
+  /* Same faint raised-edge depth the board tiles and stat chips picked up
+   * earlier in this wave — applies everywhere this shell is used (location
+   * panels, StartScreen's "Customize match"), not just here. */
+  box-shadow: inset 0 1px 0 var(--card-highlight);
 }
 
 .action-group > .section-label {
@@ -1418,13 +1537,26 @@ details.action-group[open] .disclosure-chevron {
   position: fixed;
   bottom: max(1.2rem, calc(env(safe-area-inset-bottom) + 0.8rem));
   left: 50%;
-  transform: translateX(-50%);
+  /* The individual `translate` property, not `transform: translateX(-50%)`
+   * — PR review (Copilot) caught that fade-up's `transform: translateY(...)`
+   * keyframe would otherwise replace this centering transform outright
+   * rather than compose with it, leaving the toast's left edge pinned to
+   * 50% once the entrance animation finished. `translate`/`transform` are
+   * separate CSS properties that compose independently, so the horizontal
+   * centering here and fade-up's vertical animation below no longer fight
+   * over the same property. */
+  translate: -50% 0;
   background: var(--bad);
   color: white;
   padding: 0.6rem 0.6rem 0.6rem 1.1rem;
   border-radius: 10px;
   box-shadow: var(--shadow);
   z-index: 20;
+  /* ErrorToast/UpdateToast (App.tsx) both genuinely mount/unmount (`if (!x)
+   * return null`), not just toggle a hidden class, so this correctly replays
+   * every time a toast actually appears — reuses the same fade-up/easing the
+   * modal already uses rather than inventing a third entrance pattern. */
+  animation: fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 /* On mobile, `.toast`'s own bottom offset had no idea `--dock-height`
@@ -1516,6 +1648,12 @@ details.action-group[open] .disclosure-chevron {
   border: 1px solid color-mix(in srgb, var(--accent) 22%, var(--line));
   border-radius: var(--radius);
   padding: 0.5rem 0.5rem 0.5rem 0.85rem;
+  /* HintBar/JobSwitchNudge (HintBar.tsx) both `return null` when there's
+   * nothing to show rather than hiding via CSS, so this genuinely mounts
+   * fresh each time a suggestion appears (arriving somewhere new, a new
+   * week's report, newly qualifying for a job) — same fade-up reuse as
+   * .toast/.modal, not a new keyframe. */
+  animation: fade-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .hint-bar .icon {
@@ -1591,6 +1729,7 @@ details.action-group[open] .disclosure-chevron {
   border: 1px solid var(--accent);
   border-radius: var(--radius);
   padding: 0.8rem 1rem;
+  box-shadow: inset 0 1px 0 var(--card-highlight);
 }
 
 .daily-challenge .grow {
@@ -1699,6 +1838,10 @@ details.action-group[open] .disclosure-chevron {
   /* Below .location-dock (6) and .modal-backdrop (13) — a passive nudge
    * banner must never paint over an interactive sheet/modal control. */
   z-index: 4;
+  /* InstallPrompt.tsx also genuinely mounts/unmounts (`if (!eligible) return
+   * null`); reuses sheet-up rather than fade-up since this bar, like the
+   * mobile modal sheet, is anchored to the bottom edge, not centered content. */
+  animation: sheet-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .install-prompt button {
