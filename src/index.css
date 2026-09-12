@@ -1427,6 +1427,22 @@ details.action-group[open] .disclosure-chevron {
   z-index: 20;
 }
 
+/* On mobile, `.toast`'s own bottom offset had no idea `--dock-height`
+ * (4.5rem, defined above) exists — an EngineError toast (e.g. "Not enough
+ * cash", fired by a Buy button that's only disabled once an item is owned,
+ * never on affordability) rendered squarely on top of the location dock's
+ * fixed bar or an open location sheet's sticky End Week footer, obscuring
+ * the exact control a player would reach for next. Confirmed live at
+ * 390×844: the toast (z-index 20, above the dock/modal's 6/13) covered most
+ * of "End week"'s text. Clearing `--dock-height` puts it above that bar
+ * instead of on top of it, the same way `.side`'s padding-bottom already
+ * does above. */
+@media (max-width: 899.98px) {
+  .toast {
+    bottom: calc(var(--dock-height) + env(safe-area-inset-bottom) + 0.6rem);
+  }
+}
+
 .toast-dismiss {
   flex-shrink: 0;
   width: 44px;
@@ -1539,6 +1555,25 @@ details.action-group[open] .disclosure-chevron {
   border: none;
   color: var(--ink-soft);
   border-radius: 50%;
+}
+
+/* JobSwitchNudge reuses `.hint-bar`/`.text` (including its 2-line clamp,
+ * sized for HintBar's plain icon+text+dismiss row), but also packs in a
+ * "Switch now" button HintBar never had — leaving `.text` a meaningfully
+ * narrower column than the clamp was actually validated against. Found live:
+ * a longer job/workplace pairing ("Janitor at Assembly Works — a step up
+ * from your current job.") clipped mid-word inside the workplace name
+ * itself, not just the trailing flavor clause. Wrapping `.switch-now` onto
+ * its own full-width row (rather than sharing the first line with the text)
+ * roughly doubles the room the clamp has to work with, so truncation — when
+ * it still happens on a longer name — lands on the flavor clause instead of
+ * the job identity. */
+.hint-bar-switch {
+  flex-wrap: wrap;
+}
+
+.hint-bar-switch .switch-now {
+  flex-basis: 100%;
 }
 
 .hint-dismiss:hover:not(:disabled) {

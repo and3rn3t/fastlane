@@ -27,6 +27,7 @@ export function Help({ onClose }: { onClose: () => void }) {
         aria-modal="true"
         aria-label="How to play Fast Lane"
         ref={dialogRef}
+        tabIndex={-1}
       >
         <h2>❓ How to play</h2>
         <div className="help-sections">
