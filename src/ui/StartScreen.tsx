@@ -3,10 +3,12 @@ import {
   CAREER_TARGETS,
   EDUCATION_TARGETS,
   HAPPINESS_TARGETS,
+  ORIGINS,
   RULE_PRESETS,
   WEALTH_TARGETS,
   type AiProfileName,
   type Goals,
+  type OriginId,
   type RileyDifficulty,
   type RulePresetName,
 } from '@/engine'
@@ -145,6 +147,7 @@ export function StartScreen() {
   const [rivalry] = useState(loadRivalry)
   const cashBonus = legacyCashBonus(stats)
   const [name, setName] = useState('')
+  const [originId, setOriginId] = useState<OriginId>('career-changer')
   const [levels, setLevels] = useState<Record<keyof Goals, number>>(PRESETS.Standard)
   const [rileyProfile, setRileyProfile] = useState<AiProfileName>('balanced')
   const [rileyDifficulty, setRileyDifficulty] = useState<RileyDifficulty>('normal')
@@ -211,6 +214,7 @@ export function StartScreen() {
               rileyMomentum: rivalryMomentum(rivalry),
               rules: RULE_PRESETS[rulePreset],
               playerCashBonus: cashBonus,
+              playerOriginId: originId,
             })
           }
         >
@@ -229,6 +233,24 @@ export function StartScreen() {
             onChange={(e) => setName(e.target.value)}
           />
         </label>
+
+        <div>
+          <span>Your background</span>
+          <div className="presets">
+            {ORIGINS.map((origin) => (
+              <button
+                type="button"
+                key={origin.id}
+                className={originId === origin.id ? 'primary' : ''}
+                aria-pressed={originId === origin.id}
+                onClick={() => setOriginId(origin.id)}
+              >
+                {origin.name}
+              </button>
+            ))}
+          </div>
+          <p className="blurb">{ORIGINS.find((origin) => origin.id === originId)!.blurb}</p>
+        </div>
 
         <div>
           <div className="presets">
