@@ -960,8 +960,21 @@ details.panel[open] .disclosure-chevron {
   border-top: 1px solid var(--line);
 }
 
+/* min-width guards against a real layout bug found in a live mobile audit:
+ * without it, whether a row's trailing control ends up inline (sharing the
+ * label's line) or wrapped below it depends purely on whether the label's
+ * and control's combined *unwrapped* widths happen to fit the row — so two
+ * structurally identical rows can render completely differently depending
+ * on label/control text length (confirmed via DOM measurement at Rent
+ * Office's two apartment rows: a shorter label stayed inline and got
+ * squeezed to ~100px, wrapping its own title across 2-3 lines, while a
+ * longer label correctly wrapped the control below and got the full row
+ * width). Guaranteeing the label at least this much room makes the control
+ * wrap below whenever there truly isn't space for both, instead of leaving
+ * it to an unpredictable per-row threshold. */
 .action-row .grow {
   flex: 1;
+  min-width: 10rem;
 }
 
 .action-row .desc {
@@ -1098,6 +1111,21 @@ details.action-group[open] .disclosure-chevron {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The mobile dock trigger's own copy of `.location-heading` (above) stays
+ * single-line on purpose — the dock is a fixed `--dock-height` row, and a
+ * taller description would grow it past that, reintroducing the same
+ * fixed-element-with-no-reserved-space bug class Wave 21 already fixed
+ * once for the sticky footer. The modal header has real room, though, so
+ * let it wrap to two lines instead of silently truncating real flavor
+ * text — found live on at least the Casino and Clinic dialogs, where the
+ * cut-off sentence never appears anywhere else in the panel. */
+.location-modal-header .location-heading .desc {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  white-space: normal;
 }
 
 .location-card-header,
@@ -1479,10 +1507,28 @@ details.action-group[open] .disclosure-chevron {
   color: var(--accent);
 }
 
+/* Capped instead of wrapping freely — a live mobile audit found a fresh
+ * game's food hint wrapping to 3 lines, and combined with the qualify-nudge
+ * banner (`.hint-bar` used by both HintBar and JobSwitchNudge) stacking
+ * below it, pushed the board far enough down that its bottom row sat
+ * partially under the fixed mobile dock. 2 lines, not 1: most hint copy
+ * (`hintCopy()` in HintBar.tsx) runs 60-90+ characters — long enough that a
+ * 1-line clamp would routinely cut off the actionable half of the sentence
+ * (e.g. "Running low on food —" with the actual "go to MegaMart or Burger
+ * Barn" guidance clipped), the opposite of what a hint bar is for. Both
+ * banners still show when relevant — this only caps height, it doesn't
+ * suppress either one (see docs/ROADMAP-ARCHIVE.md's Wave 21 note on why
+ * that alternative was rejected: it reverses an explicit Wave 12 design
+ * decision and breaks two existing tests). */
 .hint-bar .text {
   flex: 1;
+  min-width: 0;
   font-size: 0.85rem;
   color: var(--ink-soft);
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .hint-dismiss {

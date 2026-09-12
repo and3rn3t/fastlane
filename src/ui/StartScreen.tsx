@@ -234,8 +234,9 @@ export function StartScreen() {
           />
         </label>
 
-        <div>
-          <span>Your background</span>
+        <CollapsibleActionGroup
+          label={`Your background: ${ORIGINS.find((origin) => origin.id === originId)!.name}`}
+        >
           <div className="presets">
             {ORIGINS.map((origin) => (
               <button
@@ -250,7 +251,7 @@ export function StartScreen() {
             ))}
           </div>
           <p className="blurb">{ORIGINS.find((origin) => origin.id === originId)!.blurb}</p>
-        </div>
+        </CollapsibleActionGroup>
 
         <div>
           <div className="presets">
@@ -285,8 +286,9 @@ export function StartScreen() {
           </div>
         ))}
 
-        <div>
-          <span>Rules</span>
+        <CollapsibleActionGroup
+          label={`Rules: ${RULE_OPTIONS.find((rule) => rule.id === rulePreset)!.label}`}
+        >
           <div className="presets">
             {RULE_OPTIONS.map((rule) => (
               <button
@@ -301,10 +303,11 @@ export function StartScreen() {
             ))}
           </div>
           <p className="blurb">{RULE_OPTIONS.find((rule) => rule.id === rulePreset)!.blurb}</p>
-        </div>
+        </CollapsibleActionGroup>
 
-        <div>
-          <span>Riley's playstyle</span>
+        <CollapsibleActionGroup
+          label={`Riley's playstyle: ${RILEY_PROFILES.find((prof) => prof.id === rileyProfile)!.label}`}
+        >
           <div className="presets">
             {RILEY_PROFILES.map((prof) => (
               <button
@@ -319,10 +322,11 @@ export function StartScreen() {
             ))}
           </div>
           <p className="blurb">{RILEY_PROFILES.find((prof) => prof.id === rileyProfile)!.blurb}</p>
-        </div>
+        </CollapsibleActionGroup>
 
-        <div>
-          <span>Riley's difficulty</span>
+        <CollapsibleActionGroup
+          label={`Riley's difficulty: ${DIFFICULTY_OPTIONS.find((diff) => diff.id === rileyDifficulty)!.label}`}
+        >
           <div className="presets">
             {DIFFICULTY_OPTIONS.map((diff) => (
               <button
@@ -339,7 +343,7 @@ export function StartScreen() {
           <p className="blurb">
             {DIFFICULTY_OPTIONS.find((diff) => diff.id === rileyDifficulty)!.blurb}
           </p>
-        </div>
+        </CollapsibleActionGroup>
       </CollapsibleActionGroup>
 
       <div className="start-actions">

@@ -597,6 +597,62 @@ Fixed by splitting `.location-modal` into the standard three-part non-overlappin
 
 **A related fix was attempted and reverted in the same session — recorded so it isn't re-tried.** The board's own bottom row also appeared to sit directly under the fixed mobile location dock in screenshots, and the obvious theory — give `.board` the same `--dock-height` bottom padding `.side` already has — was implemented first. Live testing disproved it: scrolling to the bottom of the page already reveals the board's last row with a clean 187px gap (`.side`'s existing padding does its job for the page as a whole; `.board`'s own padding-bottom only adds trailing space that doesn't affect the _initial_ scroll position). The real issue is narrower — hint-bar content stacking above the board on a fresh game pushes its bottom row partially under the dock before any scrolling happens — and belongs to the "Compact hint presentation on arrival" row, not a CSS padding fix here. See `docs/ROADMAP.md`'s Wave 21 preamble for the corrected framing.
 
+<a id="wave-21-mobile-layout-density-fix-actionrow-inconsistent-wrap-behavior"></a>
+
+### Fix `ActionRow` inconsistent wrap behavior
+
+**✅ 2026-09-11** · Size S/M
+
+A second, deeper mobile audit pass root-caused a real layout bug via direct DOM measurement, not just a screenshot impression: `.action-row`'s `flex-wrap` layout made whether the trailing control ended up inline (sharing the label's line) or wrapped below it depend purely on whether the label's and control's combined _unwrapped_ widths happened to fit the row. At Rent Office, two structurally identical rows rendered completely differently — "Basic apartment" (label+button = 340px, fit the 350px row) kept the button inline, squeezing the `flex:1` label to ~90px so it wrapped its own title across 2-3 lines; "Secure apartment" (label+button = 600px, didn't fit) wrapped the button below, so the label got the full 350px and read cleanly. Confirmed in both light and dark mode.
+
+Fixed with a `min-width: 10rem` guard on `.action-row .grow` — guaranteeing the label at least that much room forces the control to wrap below whenever there truly isn't space for both, instead of leaving it to an unpredictable per-row threshold. Verified live via the same DOM-measurement approach used to diagnose it: both apartment rows now render identically (label gets the full 350px, button wraps below); short-button rows (City University's Train buttons) are unaffected, still inline since there's genuinely enough room. Affects all ~13 `ActionRow` usages, not just Rent Office, though only that location was screenshot-verified before/after.
+
+<a id="wave-21-mobile-layout-density-job-board-grouping"></a>
+
+### Job Board grouping
+
+**✅ 2026-09-11** · Size M
+
+`JobBoard` (`LocationPanel.tsx`) rendered every job at every tier for every workplace as one flat list — a Regional Manager row a player was nowhere near qualifying for got the same visual weight as the job they could take right now, and the wall of near-identical requirement chips made the whole panel hard to scan.
+
+Grouped by workplace using `ActionGroup`, the same section-header pattern already shipped at City University's Classes/Skill training — reused, not reinvented. `JOBS` is already ordered consecutively by workplace in `data.ts`, so grouping is a single linear pass, not a sort. Dropped the now-redundant "· Workplace" suffix from each job's own title since the group header already says it; updated `LocationPanel.test.tsx`'s `jobListing()` helper for the new title format (exact match instead of a "· Workplace" regex). Verified live: applying still works, all 5 workplace section headers render correctly, zero console errors.
+
+**Scope note:** the row's other half (default-collapsing tiers more than one step above the player's current job) is deferred — grouping alone was the clear, low-risk win; the collapse-threshold logic needs its own design pass on what "current tier" means per job ladder, and isn't blocked on anything shipped here.
+
+<a id="wave-21-mobile-layout-density-compact-hint-presentation-on-arrival"></a>
+
+### Compact hint presentation on arrival
+
+**✅ 2026-09-11** · Size S/M
+
+A live audit found a fresh game's food hint wrapping to 3 lines, and combined with the qualify-nudge banner stacking below it, pushed the board far enough down that its bottom row sat partially under the fixed mobile dock (see the sticky-footer row's note above for the related, reverted board-padding attempt).
+
+**First attempt reverted after breaking two existing tests.** Suppressing `JobSwitchNudge` whenever `HintBar` had anything to show cut the stack to one banner — but an existing test explicitly asserted "the nudge should surface alongside the unrelated food hint, not replace it," encoding a deliberate Wave 12 decision. Reversing that under the banner of "compaction" would have been a real product-behavior change smuggled in as a UI fix, so it was backed out rather than pushed through or silently updating the tests to match.
+
+Shipped instead, after checking with the user given the conflicting prior decision: both banners still show when relevant, each capped to 2 lines via `-webkit-line-clamp` on `.hint-bar .text` (`min-width: 0` added alongside it, required for a flex item's line-clamp to actually engage instead of just growing the row). 2 lines, not 1 — checked actual hint copy lengths (`hintCopy()` in `HintBar.tsx`): most run 60-90+ characters, long enough that a 1-line clamp would routinely cut off the actionable half of the sentence (e.g. "Running low on food —" with the actual "go to MegaMart or Burger Barn" guidance clipped). Verified live: both banners now render at 62px each, down from a 3-line ~110px+ food hint; zero console errors; all 244 tests still pass unchanged since CSS-only truncation doesn't touch the DOM text content the tests' text-matching assertions read.
+
+<a id="wave-21-mobile-layout-density-compact-customize-match"></a>
+
+### Compact "Customize match"
+
+**✅ 2026-09-11** · Size M
+
+"Customize match" was ~3 phone-screens of scrolling — 7 near-identical button-row+blurb blocks stacked vertically before reaching Import save/Legacy Perks below it.
+
+Compared two approaches before building, per the row's own instruction not to default to the first idea: a segmented tab bar (a new UI pattern this app doesn't use anywhere else, more implementation risk) vs. nesting the picker sections in `CollapsibleActionGroup`, the disclosure component already shipped and proven at Bank's Loans panel. Went with the latter — reuse over invention, the same call Job Board's grouping fix made earlier the same session.
+
+Wrapped "Your background", "Rules", "Riley's playstyle", and "Riley's difficulty" each in their own `CollapsibleActionGroup`, collapsed by default. Each summary shows the current selection (e.g. "Rules: Classic") so collapsing doesn't hide what's actually chosen. Left "Your name" and the goal presets/sliders always visible — they're not "pick one of N" pickers like the other four, and goals are core enough to keep in view. Verified live: collapsed height is 360px, down from the ~2400px full expansion measured in the original audit — roughly an 85% reduction in the common case. Expanding a nested group, changing a selection, and starting a game all still work end to end (confirmed picking Veteran correctly applies its +$40 cash delta); nested `<details>` work correctly in jsdom without any test changes needed. One minor, expected cosmetic side effect: origin buttons wrap one-per-row instead of two when a nested group is expanded, from the extra nesting padding — not a functional issue, and irrelevant to the default collapsed state.
+
+<a id="wave-21-mobile-layout-density-location-dialog-header-truncation"></a>
+
+### Location dialog header truncation
+
+**✅ 2026-09-11** · Size S
+
+`.location-heading .desc` was always single-line (`white-space: nowrap` + ellipsis) everywhere it rendered, silently truncating real flavor text with no way to read the rest — confirmed live on at least the Casino ("The wheel always favors the house – you kn...") and Clinic ("See a doctor – overwork and cheap food ca...") dialogs, neither of which restates the cut-off sentence anywhere else in the panel.
+
+Scoped the fix to `.location-modal-header` specifically (`display: -webkit-box; -webkit-line-clamp: 2; white-space: normal`) rather than the shared base rule — the mobile dock trigger's own copy of the same heading component needs to stay single-line, since the dock is a fixed `--dock-height` row and a taller description would grow it past that, reintroducing the same fixed-element-with-no-reserved-space bug class already fixed once for the sticky footer. Verified live: both dialogs now show their full sentence on two lines; the dock trigger's computed `white-space` is still `nowrap`, confirming it's unaffected.
+
 ## Wave context notes (archived)
 
 > Audit and "current state" notes written while these waves were in flight. Kept for the reasoning, not as pending work.

@@ -98,54 +98,75 @@ export function WorkAction({ game }: { game: GameState }) {
   )
 }
 
-function JobBoard({ game }: { game: GameState }) {
+function JobListing({ game, job }: { game: GameState; job: (typeof JOBS)[number] }) {
   const { dispatchGame } = useGame()
   const p = game.player
+  const qual = qualifiesFor(p, job.id)
+  const reqs = jobRequirements(p, job.id)
+  const isCurrent = p.jobId === job.id
+  return (
+    <div className="job-listing">
+      <div className="grow">
+        <div className="title">{job.title}</div>
+        <div className="meta">
+          ${wagePerHour(game, job.id, isCurrent ? p.promotionLevel : 0).toFixed(2)}/h · prestige{' '}
+          {job.prestige + (isCurrent ? p.promotionLevel * PROMOTION_PRESTIGE_BONUS : 0)}
+        </div>
+        {reqs.length > 0 && (
+          <div className="job-requirements">
+            {reqs.map((r) => (
+              <span key={r.key} className={r.met ? 'req met' : 'req unmet'}>
+                {r.met ? <CheckIcon size={11} /> : <LockIcon size={11} />}{' '}
+                {/* Both icons above already set aria-hidden internally (Icon.tsx),
+                    and the Computer row has no numeric progress at all, so
+                    without this a screen reader announces nothing but
+                    "Computer" — met/unmet would be conveyed by color alone. */}
+                <span className="sr-only">{r.met ? 'Met: ' : 'Not met: '}</span>
+                {r.key === 'computer'
+                  ? r.label
+                  : `${r.label} ${Math.floor(r.current)}/${r.required}`}
+                {r.waived && ' (waived)'}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+      <button
+        disabled={!qual.ok || isCurrent}
+        onClick={() => dispatchGame({ type: 'applyJob', jobId: job.id })}
+      >
+        {isCurrent ? 'Current job' : 'Apply (2h)'}
+      </button>
+    </div>
+  )
+}
+
+/** Grouped by workplace (`ActionGroup`, the same section-header pattern
+ * already shipped at City University's Classes/Skill training) instead of
+ * one flat list of every job at every tier for every workplace — a live
+ * mobile audit found that wall-of-text layout gave a Regional Manager row
+ * a player was nowhere near qualifying for the same visual weight as the
+ * job they could take right now. `JOBS` is already ordered consecutively
+ * by workplace in data.ts, so grouping is a single linear pass, not a sort. */
+function JobBoard({ game }: { game: GameState }) {
+  const groups: Array<{ workplace: (typeof JOBS)[number]['workplace']; jobs: typeof JOBS }> = []
+  for (const job of JOBS) {
+    const currentGroup = groups.at(-1)
+    if (currentGroup?.workplace === job.workplace) {
+      currentGroup.jobs.push(job)
+    } else {
+      groups.push({ workplace: job.workplace, jobs: [job] })
+    }
+  }
   return (
     <>
-      {JOBS.map((job) => {
-        const qual = qualifiesFor(p, job.id)
-        const reqs = jobRequirements(p, job.id)
-        const isCurrent = p.jobId === job.id
-        return (
-          <div className="job-listing" key={job.id}>
-            <div className="grow">
-              <div className="title">
-                {job.title} · {LOCATIONS[job.workplace].name}
-              </div>
-              <div className="meta">
-                ${wagePerHour(game, job.id, isCurrent ? p.promotionLevel : 0).toFixed(2)}/h ·
-                prestige{' '}
-                {job.prestige + (isCurrent ? p.promotionLevel * PROMOTION_PRESTIGE_BONUS : 0)}
-              </div>
-              {reqs.length > 0 && (
-                <div className="job-requirements">
-                  {reqs.map((r) => (
-                    <span key={r.key} className={r.met ? 'req met' : 'req unmet'}>
-                      {r.met ? <CheckIcon size={11} /> : <LockIcon size={11} />}{' '}
-                      {/* Both icons above already set aria-hidden internally (Icon.tsx),
-                          and the Computer row has no numeric progress at all, so
-                          without this a screen reader announces nothing but
-                          "Computer" — met/unmet would be conveyed by color alone. */}
-                      <span className="sr-only">{r.met ? 'Met: ' : 'Not met: '}</span>
-                      {r.key === 'computer'
-                        ? r.label
-                        : `${r.label} ${Math.floor(r.current)}/${r.required}`}
-                      {r.waived && ' (waived)'}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button
-              disabled={!qual.ok || isCurrent}
-              onClick={() => dispatchGame({ type: 'applyJob', jobId: job.id })}
-            >
-              {isCurrent ? 'Current job' : 'Apply (2h)'}
-            </button>
-          </div>
-        )
-      })}
+      {groups.map((group) => (
+        <ActionGroup key={group.workplace} label={LOCATIONS[group.workplace].name}>
+          {group.jobs.map((job) => (
+            <JobListing key={job.id} game={game} job={job} />
+          ))}
+        </ActionGroup>
+      ))}
     </>
   )
 }
