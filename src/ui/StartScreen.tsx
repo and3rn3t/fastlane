@@ -234,7 +234,9 @@ export function StartScreen() {
           />
         </label>
 
-        <CollapsibleActionGroup label={`Your background: ${ORIGINS.find((origin) => origin.id === originId)!.name}`}>
+        <CollapsibleActionGroup
+          label={`Your background: ${ORIGINS.find((origin) => origin.id === originId)!.name}`}
+        >
           <div className="presets">
             {ORIGINS.map((origin) => (
               <button
