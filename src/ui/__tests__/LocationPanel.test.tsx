@@ -14,7 +14,10 @@ function employmentGame(playerOverrides: Partial<PlayerState> = {}): GameState {
 }
 
 function jobListing(title: string) {
-  const heading = screen.getByText(new RegExp(`^${title} ·`))
+  // Wave 21 grouped JobBoard by workplace (ActionGroup headers), so the
+  // per-job title no longer repeats "· Workplace" — exact match now that
+  // it's unambiguous within its own group.
+  const heading = screen.getByText(title, { selector: '.title' })
   // .job-listing is the shared ancestor row — the requirement chips and the
   // Apply button both live inside it, not inside the title itself.
   return within(heading.closest('.job-listing') as HTMLElement)
