@@ -36,8 +36,19 @@ describe('useModalDialog', () => {
 
   it('focuses the dialog container itself, not the trailing button, when it is the only focusable element', () => {
     render(<SingleButtonDialog onClose={() => {}} />)
-    expect(document.activeElement).toBe(screen.getByRole('dialog', { name: 'single-button dialog' }))
+    expect(document.activeElement).toBe(
+      screen.getByRole('dialog', { name: 'single-button dialog' })
+    )
     expect(document.activeElement).not.toBe(screen.getByTestId('only'))
+  })
+
+  it('traps Shift+Tab from the dialog container itself, instead of tabbing out of the dialog', () => {
+    render(<SingleButtonDialog onClose={() => {}} />)
+    expect(document.activeElement).toBe(
+      screen.getByRole('dialog', { name: 'single-button dialog' })
+    )
+    fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
+    expect(document.activeElement).toBe(screen.getByTestId('only'))
   })
 
   it('calls onClose when Escape is pressed', () => {
