@@ -15,10 +15,13 @@
 
 import { AI_PROFILES } from '../src/engine/index.ts'
 import {
+  combineLocationActions,
   DRIFT_THRESHOLD_POINTS,
   flagOutlier,
+  flagStallOutlier,
   fmtWeeks,
   GOAL_KEYS,
+  LONG_STALL_WEEKS,
   MAX_WEEKS,
   NO_WINNER_GUARD_PCT,
   ORIGIN_NAMES,
@@ -26,8 +29,11 @@ import {
   PROFILE_NAMES,
   RULE_PRESET_NAMES,
   runBatch,
+  STALL_RATE_ABSOLUTE_GUARD_PCT,
+  STALL_RATE_DRIFT_THRESHOLD_PCT,
   type BatchSummary,
   type GoalTally,
+  type StallBreakdown,
 } from './sim.ts'
 
 const REPORT_DEFAULT_GAME_COUNT = 100
@@ -35,6 +41,17 @@ const REPORT_DEFAULT_GAME_COUNT = 100
 function goalPctLine(tally: GoalTally, wins: number): string {
   if (wins === 0) return 'n/a (no wins)'
   return GOAL_KEYS.map((key) => `${key}: ${((tally[key] / wins) * 100).toFixed(0)}%`).join(', ')
+}
+
+// Sorted descending by longStallGamePct, same rationale as sim.ts's own
+// printStallBreakdown — the requirement most often a real wall leads, not
+// whichever has the most total weeks.
+function stallPctLine(breakdown: StallBreakdown): string {
+  const entries = Object.entries(breakdown).sort(
+    ([, a], [, b]) => b.longStallGamePct - a.longStallGamePct
+  )
+  if (entries.length === 0) return 'none'
+  return entries.map(([key, s]) => `${key}: ${s.longStallGamePct.toFixed(0)}%`).join(', ')
 }
 
 function reportCell(
@@ -60,6 +77,27 @@ function reportCell(
     `Goal breakdown — player wins: ${goalPctLine(batch.goalBreakdown.player, playerWins)}`
   )
   console.log(`                 riley wins:  ${goalPctLine(batch.goalBreakdown.riley, rileyWins)}`)
+  console.log(
+    `Requirement stalls (player, % of games with a ${LONG_STALL_WEEKS}+ week stall): ` +
+      stallPctLine(batch.stallBreakdown.player)
+  )
+}
+
+function addLocationActions(totals: Record<string, number>, batch: BatchSummary): void {
+  for (const [id, n] of Object.entries(combineLocationActions(batch))) {
+    totals[id] = (totals[id] ?? 0) + n
+  }
+}
+
+function printLocationRanking(totals: Record<string, number>): void {
+  const totalActions = Object.values(totals).reduce((a, b) => a + b, 0)
+  console.log(
+    `\nLocation engagement — player + riley, least-visited first (share of logged actions):`
+  )
+  const ranked = Object.entries(totals).sort(([, a], [, b]) => a - b)
+  for (const [id, n] of ranked) {
+    console.log(`  ${id.padEnd(12)} ${((n / totalActions) * 100).toFixed(1)}%`)
+  }
 }
 
 function main() {
@@ -70,12 +108,18 @@ function main() {
       `${PROFILE_NAMES.length}×${RULE_PRESET_NAMES.length} = ${PROFILE_NAMES.length * RULE_PRESET_NAMES.length} cells`
   )
   console.log(
-    `Drift thresholds: >${DRIFT_THRESHOLD_POINTS} points of player win-rate drift from the ` +
-      `balanced/classic baseline, or >${NO_WINNER_GUARD_PCT}% no-winner rate.`
+    `Drift vs. the balanced/classic baseline: >${DRIFT_THRESHOLD_POINTS} points of player win-rate drift, ` +
+      `or >${STALL_RATE_DRIFT_THRESHOLD_PCT} points of requirement long-stall-rate drift. ` +
+      `Absolute caps regardless of baseline: >${NO_WINNER_GUARD_PCT}% no-winner rate, ` +
+      `or >${STALL_RATE_ABSOLUTE_GUARD_PCT}% long-stall rate on any requirement.`
   )
 
   const baseline = runBatch(gameCount, 'balanced', 'classic')
   const flags: string[] = []
+  // Wave 24's cold-path engagement report: summed across every cell below so
+  // the final ranking reflects the whole matrix, not just one profile/rules
+  // combination.
+  const locationTotals: Record<string, number> = {}
 
   for (const rulesPreset of RULE_PRESET_NAMES) {
     for (const rileyProfile of PROFILE_NAMES) {
@@ -84,9 +128,16 @@ function main() {
           ? baseline
           : runBatch(gameCount, rileyProfile, rulesPreset)
       reportCell(batch, rileyProfile, rulesPreset)
-      flags.push(...flagOutlier(batch, baseline, `${rileyProfile}/${rulesPreset}`))
+      const label = `${rileyProfile}/${rulesPreset}`
+      flags.push(
+        ...flagOutlier(batch, baseline, label),
+        ...flagStallOutlier(batch, baseline, label)
+      )
+      addLocationActions(locationTotals, batch)
     }
   }
+
+  printLocationRanking(locationTotals)
 
   console.log(`\n${ORIGIN_NAMES.length} origins (Balanced/Classic, Riley's origin forced):`)
   for (const originId of ORIGIN_NAMES) {
