@@ -583,6 +583,20 @@ Retuned per-mode, same "re-pick, don't flip" approach as Wave 11's `--gold` fix:
 
 Pure move, no behavior change: `HintBar`, `JobSwitchNudge`, `recentFailureHint`, `hintCopy`, and their `DISASTER_KEYWORDS`/`RECENT_FAILURE_COPY` tables moved into a new `src/ui/HintBar.tsx`; `GameScreen.tsx` now imports and renders them as before. `TopBar`/`EventLog`/`GameScreen` itself and the three hooks (`useAutoHelp`, `useDisasterSound`, `useTurnReplay`) stayed put — tightly coupled to `GameScreen`'s own render tree in a way the extracted pieces weren't. Verified live: both hint-bar instances (the food nudge and a qualify-for-Fry-Cook nudge, which can legitimately coexist) still render and dismiss independently, zero console errors; all 241 pre-existing tests passed unchanged, confirming the move introduced no behavior drift.
 
+## Wave 21 — Mobile Layout & Density
+
+<a id="wave-21-mobile-layout-density-fix-location-modal-sticky-footer-overlap"></a>
+
+### Fix location-modal sticky-footer overlap
+
+**✅ 2026-09-11** · Size S
+
+Found by actually driving the mobile UI live (iPhone-13-sized viewport, real screenshots) rather than re-reading the code: `.location-modal-footer` (`index.css`) was `position: sticky` inside the same scrolling flex column as the location panel's own content (`.modal { display:flex; flex-direction:column; overflow-y:auto }`), with no compensating bottom padding on the scrollable content — so a long panel's last item (a job listing far down the Job Board, the Investing section's controls in the Bank panel) could scroll to a position directly under the sticky footer, genuinely obscured, not just visually tight. Screenshotted live in both panels before fixing.
+
+Fixed by splitting `.location-modal` into the standard three-part non-overlapping layout: a non-scrolling header (`flex-shrink: 0`, unchanged), a new `.location-modal-body` (`flex: 1; min-height: 0; overflow-y: auto`) wrapping `LocationPanelBody` in `LocationSheet.tsx`, and a non-scrolling footer (`flex-shrink: 0`, `position: sticky` removed since it's no longer needed). `min-height: 0` is required for the body to actually shrink and scroll internally instead of growing the whole modal past its `max-height`. Verified live: scrolling a Job Board to its last listing now shows a real 59.5px gap above the "End week" footer (previously overlapping), confirmed with the last listing's Apply button genuinely interactive at that scroll position, zero console errors.
+
+**A related fix was attempted and reverted in the same session — recorded so it isn't re-tried.** The board's own bottom row also appeared to sit directly under the fixed mobile location dock in screenshots, and the obvious theory — give `.board` the same `--dock-height` bottom padding `.side` already has — was implemented first. Live testing disproved it: scrolling to the bottom of the page already reveals the board's last row with a clean 187px gap (`.side`'s existing padding does its job for the page as a whole; `.board`'s own padding-bottom only adds trailing space that doesn't affect the _initial_ scroll position). The real issue is narrower — hint-bar content stacking above the board on a fresh game pushes its bottom row partially under the dock before any scrolling happens — and belongs to the "Compact hint presentation on arrival" row, not a CSS padding fix here. See `docs/ROADMAP.md`'s Wave 21 preamble for the corrected framing.
+
 ## Wave context notes (archived)
 
 > Audit and "current state" notes written while these waves were in flight. Kept for the reasoning, not as pending work.

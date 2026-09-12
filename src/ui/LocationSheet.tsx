@@ -100,7 +100,9 @@ function LocationActionsSheet({ game, onClose }: { game: GameState; onClose: () 
             <CloseIcon size={16} />
           </button>
         </div>
-        <LocationPanelBody game={game} />
+        <div className="location-modal-body">
+          <LocationPanelBody game={game} />
+        </div>
         <div className="location-modal-footer">
           <button
             type="button"
