@@ -6,9 +6,22 @@ import { useModalDialog } from '../useModalDialog'
 function TestDialog({ onClose }: { onClose: () => void }) {
   const ref = useModalDialog(onClose)
   return (
-    <div ref={ref} role="dialog" aria-label="test dialog">
+    <div ref={ref} role="dialog" aria-label="test dialog" tabIndex={-1}>
       <button data-testid="first">First</button>
       <button data-testid="second">Second</button>
+    </div>
+  )
+}
+
+// Mirrors Help/WeekReportModal's real shape: several screens of non-focusable
+// prose/log content, then a single trailing primary button — the case that
+// used to auto-focus (and browser-scroll straight to) that trailing button.
+function SingleButtonDialog({ onClose }: { onClose: () => void }) {
+  const ref = useModalDialog(onClose)
+  return (
+    <div ref={ref} role="dialog" aria-label="single-button dialog" tabIndex={-1}>
+      <p>Lots of unfocusable content above the only button.</p>
+      <button data-testid="only">Got it</button>
     </div>
   )
 }
@@ -19,6 +32,12 @@ describe('useModalDialog', () => {
   it('moves focus to the first focusable element on mount', () => {
     render(<TestDialog onClose={() => {}} />)
     expect(document.activeElement).toBe(screen.getByTestId('first'))
+  })
+
+  it('focuses the dialog container itself, not the trailing button, when it is the only focusable element', () => {
+    render(<SingleButtonDialog onClose={() => {}} />)
+    expect(document.activeElement).toBe(screen.getByRole('dialog', { name: 'single-button dialog' }))
+    expect(document.activeElement).not.toBe(screen.getByTestId('only'))
   })
 
   it('calls onClose when Escape is pressed', () => {

@@ -14,7 +14,24 @@ export function useModalDialog(onClose: () => void) {
   useEffect(() => {
     const dialog = ref.current
     const previouslyFocused = document.activeElement as HTMLElement | null
-    dialog?.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus()
+    const focusables = dialog
+      ? Array.from(dialog.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+      : []
+    // Help/WeekReportModal have exactly one focusable element — a trailing
+    // primary button below several screens of prose/log. Focusing it
+    // directly triggers the browser's native scroll-into-view, which lands
+    // a freshly-opened dialog scrolled straight to the bottom, skipping the
+    // title and most of the content (caught live at 375×667: the first-run
+    // auto-opened Help tour opened already scrolled past its own "Your
+    // goals" intro). LocationSheet doesn't hit this — its close button is
+    // always the first focusable element, so focus (and the resulting
+    // scroll) lands at the top. Requires the dialog itself to carry
+    // `tabIndex={-1}` (every consumer's root div does).
+    if (focusables.length > 1) {
+      focusables[0].focus()
+    } else {
+      dialog?.focus()
+    }
 
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') {

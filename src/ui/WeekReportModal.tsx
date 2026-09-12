@@ -38,6 +38,7 @@ export function WeekReportModal({ game }: { game: GameState }) {
         aria-modal="true"
         aria-label={`Week ${report.week} report`}
         ref={dialogRef}
+        tabIndex={-1}
       >
         <h2>Week {report.week} wraps up</h2>
         <p className="blurb">📰 {report.headline}</p>

@@ -88,6 +88,7 @@ function LocationActionsSheet({ game, onClose }: { game: GameState; onClose: () 
         aria-modal="true"
         aria-label={loc.name}
         ref={dialogRef}
+        tabIndex={-1}
       >
         <div className="location-modal-header">
           <LocationHeading game={game} />

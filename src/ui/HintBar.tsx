@@ -170,14 +170,21 @@ export function JobSwitchNudge({ game }: { game: GameState }) {
   const canAffordSwitch = game.player.timeLeft >= timeNeeded
 
   return (
-    <div className="hint-bar">
+    <div className="hint-bar hint-bar-switch">
       <BriefcaseIcon size={15} className="icon" />
       <span className="text">
         You now qualify for {better.title} at {LOCATIONS[better.workplace].name}
         {game.player.jobId ? ' — a step up from your current job.' : '.'}
       </span>
       <button
-        className="primary"
+        className="hint-dismiss"
+        onClick={() => setDismissedJobIds((prev) => new Set(prev).add(better.id))}
+        aria-label="Dismiss job suggestion"
+      >
+        <CloseIcon size={13} />
+      </button>
+      <button
+        className="primary switch-now"
         disabled={!canAffordSwitch}
         onClick={() =>
           dispatchGame(
@@ -188,13 +195,6 @@ export function JobSwitchNudge({ game }: { game: GameState }) {
         }
       >
         Switch now
-      </button>
-      <button
-        className="hint-dismiss"
-        onClick={() => setDismissedJobIds((prev) => new Set(prev).add(better.id))}
-        aria-label="Dismiss job suggestion"
-      >
-        <CloseIcon size={13} />
       </button>
     </div>
   )
