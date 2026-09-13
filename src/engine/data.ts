@@ -93,8 +93,8 @@ export const FITNESS_GAIN_PER_HOUR = 1
  * ~20 points). Capping it forces the investment to actually spread across
  * many weeks, as intended. */
 export const FITNESS_WORKOUT_CAP_PER_WEEK = 8
-/** At fitness 100, healthUpkeep()'s overwork/cheap-food decay is halved —
- * never reversed, never eliminated, so upkeep still matters at any fitness
+/** At fitness 100, healthUpkeep()'s cheap-food decay is halved — never
+ * reversed, never eliminated, so upkeep still matters at any fitness
  * level. */
 export const FITNESS_DECAY_REDUCTION_MAX = 0.5
 export const DOCTOR_HEAL = 35

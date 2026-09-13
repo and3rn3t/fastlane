@@ -70,6 +70,18 @@ export function price(state: GameState, base: number): number {
   return Math.round(base * state.economy.priceIndex)
 }
 
+/** The Clinic's actual price for this specific player — `full` insurance
+ * discounts it by INSURANCE_MEDICAL_DISCOUNT. Shared by seeDoctor() (the
+ * real charge), ai.ts's ensureHealth() (the affordability check — without
+ * this, Riley could reject a visit she can actually afford, a Standing
+ * Constraints violation), and the Clinic panel's own price display, so all
+ * three agree on the same number. */
+export function doctorPrice(state: GameState, p: PlayerState): number {
+  return Math.round(
+    price(state, DOCTOR_PRICE) * (p.insurance === 'full' ? INSURANCE_MEDICAL_DISCOUNT : 1)
+  )
+}
+
 /** Same as price(), plus the current season's grocery/rent swing — kept
  * separate from price() since most categories (meals, tuition, items, …)
  * have no seasonal component. `priceMultiplier` is the acting player's trait
@@ -578,9 +590,7 @@ export function seeDoctor(state: GameState, key: PlayerKey) {
   require_(p.location === 'clinic', 'The doctor is at the Clinic')
   require_(p.health < 100, 'Already at full health')
   spendTime(p, DOCTOR_TIME)
-  const cost =
-    price(state, DOCTOR_PRICE) * (p.insurance === 'full' ? INSURANCE_MEDICAL_DISCOUNT : 1)
-  spendCash(p, Math.round(cost))
+  spendCash(p, doctorPrice(state, p))
   p.health = Math.min(100, p.health + DOCTOR_HEAL)
   log(state, key, `Saw the doctor (+${DOCTOR_HEAL} health)`)
 }

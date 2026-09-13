@@ -217,11 +217,19 @@ export function tallyLocationActions(
   return tally
 }
 
-// Reuses the same two thresholds the engine itself already gates real
-// consequences on (a sickness event can cost time below HEALTH_SICK_
-// THRESHOLD; happiness suffers past BURNOUT_HIGH_THRESHOLD) rather than
-// inventing a new sim-only bar — "unwell" here means the same thing it
-// means to the engine.
+// Reuses the exact same condition week.ts's own `unwell` local (happinessUpkeep)
+// gates its happiness penalty on, and the same HEALTH_SICK_THRESHOLD a
+// sickness event risks time on — not a new sim-only bar, "unwell" here means
+// the same thing it means to the engine.
+//
+// Deliberately does NOT also fire once burnout > 0, even though
+// burnoutEfficiency() starts shaving work() pay from the very first point of
+// burnout — that efficiency cut is a continuous economic tax (a little
+// burnout, a little less pay), while "unwell" tracks the same discrete bad
+// states the engine itself treats as a threshold to cross, not a dial to
+// nudge. Counting any nonzero efficiency loss as "unwell" would fire on
+// nearly every week either side works overtime, drowning this breakdown's
+// signal for the two conditions it actually names.
 export function isUnwell(p: Pick<PlayerState, 'health' | 'burnout'>): boolean {
   return p.health < HEALTH_SICK_THRESHOLD || p.burnout > BURNOUT_HIGH_THRESHOLD
 }

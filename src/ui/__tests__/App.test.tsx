@@ -821,7 +821,165 @@ describe('save migration', () => {
     expect(upgraded.version).toBe(16)
     expect(upgraded.player.fitness).toBe(0)
     expect(upgraded.riley.fitness).toBe(0)
+    expect(upgraded.player.workedOutThisWeek).toBe(0)
     expect(upgraded.player.insurance).toBe('basic') // untouched by this migration
+  })
+
+  it('upgrades a v14 (pre-Burnout) save, backfilling burnout to 0', () => {
+    // A genuine v14 save already has fitness/workedOutThisWeek (added by the
+    // migration this one doesn't exercise) but no per-player `burnout` field
+    // yet — a save from before Wave 16's Burnout row had never accumulated
+    // any, so 0 is a real fact, not a guess.
+    const v14Fields = {
+      health: 100,
+      hoursWorkedThisWeek: 0,
+      jobTenureWeeks: 0,
+      promotionLevel: 0,
+      loanBalance: 0,
+      loanWeeksBehind: 0,
+      creditScore: 50,
+      garnished: false,
+      loanPaidThisWeek: false,
+      skills: { sales: 0, trades: 0, tech: 0 },
+      investments: 0,
+      activeEvents: [],
+      originId: 'career-changer',
+      items: ['bike'],
+      insurance: 'basic',
+      fitness: 20,
+      workedOutThisWeek: 4,
+    }
+    const v14 = {
+      version: 14,
+      week: 16,
+      rngSeed: 1,
+      phase: 'playing',
+      winner: null,
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      economy: {
+        priceIndex: 1,
+        wageIndex: 1,
+        interestRate: 0.005,
+        lotteryJackpot: 500,
+        marketIndex: 1,
+      },
+      layout: {
+        home: 0,
+        employment: 1,
+        burgers: 2,
+        megamart: 3,
+        university: 4,
+        factory: 5,
+        bank: 6,
+        clothing: 7,
+        gadgets: 8,
+        market: 9,
+        pawn: 10,
+        rentoffice: 11,
+        clinic: 12,
+        casino: 13,
+      },
+      player: { ...legacyPlayer('V14Player', 88), ...v14Fields },
+      riley: { ...legacyPlayer('Riley', 250), ...v14Fields, items: [], insurance: 'none' },
+      rileyProfile: 'hustler',
+      rileyDifficulty: 'easy',
+      rileyMomentum: 'cold',
+      rules: { eventFrequency: 1, economyVolatility: 1, startingCash: 200 },
+      isDailyChallenge: false,
+      headline: 'A new life in the fast lane begins.',
+      log: [],
+      lastReport: null,
+      history: [],
+    }
+    localStorage.setItem('fastlane-save-v1', JSON.stringify(v14))
+
+    renderApp()
+
+    expect(screen.getByText(/Week 16/)).toBeTruthy()
+    const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
+    expect(upgraded.version).toBe(16)
+    expect(upgraded.player.burnout).toBe(0)
+    expect(upgraded.riley.burnout).toBe(0)
+    expect(upgraded.player.fitness).toBe(20) // untouched by this migration
+  })
+
+  it('upgrades a v15 (pre-Chronic-conditions) save, backfilling neglectWeeks to 0', () => {
+    // A genuine v15 save already has burnout (added by the migration this
+    // one doesn't exercise) but no per-player `neglectWeeks` field yet — a
+    // save from before Wave 16's Chronic conditions row had never been
+    // tracked for neglect, so 0 is a real fact, not a guess.
+    const v15Fields = {
+      health: 100,
+      hoursWorkedThisWeek: 0,
+      jobTenureWeeks: 0,
+      promotionLevel: 0,
+      loanBalance: 0,
+      loanWeeksBehind: 0,
+      creditScore: 50,
+      garnished: false,
+      loanPaidThisWeek: false,
+      skills: { sales: 0, trades: 0, tech: 0 },
+      investments: 0,
+      activeEvents: [],
+      originId: 'career-changer',
+      items: ['bike'],
+      insurance: 'basic',
+      fitness: 20,
+      workedOutThisWeek: 4,
+      burnout: 15,
+    }
+    const v15 = {
+      version: 15,
+      week: 17,
+      rngSeed: 1,
+      phase: 'playing',
+      winner: null,
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      economy: {
+        priceIndex: 1,
+        wageIndex: 1,
+        interestRate: 0.005,
+        lotteryJackpot: 500,
+        marketIndex: 1,
+      },
+      layout: {
+        home: 0,
+        employment: 1,
+        burgers: 2,
+        megamart: 3,
+        university: 4,
+        factory: 5,
+        bank: 6,
+        clothing: 7,
+        gadgets: 8,
+        market: 9,
+        pawn: 10,
+        rentoffice: 11,
+        clinic: 12,
+        casino: 13,
+      },
+      player: { ...legacyPlayer('V15Player', 88), ...v15Fields },
+      riley: { ...legacyPlayer('Riley', 250), ...v15Fields, items: [], insurance: 'none' },
+      rileyProfile: 'hustler',
+      rileyDifficulty: 'easy',
+      rileyMomentum: 'cold',
+      rules: { eventFrequency: 1, economyVolatility: 1, startingCash: 200 },
+      isDailyChallenge: false,
+      headline: 'A new life in the fast lane begins.',
+      log: [],
+      lastReport: null,
+      history: [],
+    }
+    localStorage.setItem('fastlane-save-v1', JSON.stringify(v15))
+
+    renderApp()
+
+    expect(screen.getByText(/Week 17/)).toBeTruthy()
+    const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
+    expect(upgraded.version).toBe(16)
+    expect(upgraded.player.neglectWeeks).toBe(0)
+    expect(upgraded.riley.neglectWeeks).toBe(0)
+    expect(upgraded.player.burnout).toBe(15) // untouched by this migration
   })
 
   it('falls back to a fresh game and surfaces an error toast on corrupted JSON', () => {

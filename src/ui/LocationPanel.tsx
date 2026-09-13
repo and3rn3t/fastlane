@@ -5,7 +5,6 @@ import {
   CASINO_MIN_BET,
   CASINO_PAYOUT_MULTIPLIER,
   CASINO_WIN_CHANCE,
-  DOCTOR_PRICE,
   FITNESS_WORKOUT_CAP_PER_WEEK,
   FOOD_NEEDED,
   GROCERY_PRICE_MARKET,
@@ -26,6 +25,7 @@ import {
   SKILL_TRAIN_PRICE,
   TUITION,
   burnoutEfficiency,
+  doctorPrice,
   groceryCap,
   hasItem,
   itemById,
@@ -34,6 +34,8 @@ import {
   maxLoan,
   price,
   qualifiesFor,
+  seasonalPrice,
+  traitPriceMultiplier,
   traitWageMultiplier,
   wagePerHour,
   type GameState,
@@ -191,7 +193,7 @@ export function GroceryAction({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
   const p = game.player
   const unitBase = p.location === 'megamart' ? GROCERY_PRICE_MEGAMART : GROCERY_PRICE_MARKET
-  const unitPrice = price(game, unitBase)
+  const unitPrice = seasonalPrice(game, unitBase, 'grocery', traitPriceMultiplier(p))
   const cap = groceryCap(p)
   const room = cap - p.groceries
   const [units, setUnits] = useState(FOOD_NEEDED)
@@ -420,7 +422,7 @@ function RentActions({ game }: { game: GameState }) {
               <strong>{tier === 'basic' ? 'Basic apartment' : 'Secure apartment'}</strong>
               <br />
               <span className="desc">
-                ${price(game, RENT[tier])}/week
+                ${seasonalPrice(game, RENT[tier], 'rent', traitPriceMultiplier(p))}/week
                 {tier === 'secure'
                   ? ' · +2 happiness/week, no street robbery'
                   : ' · a roof over your head'}
@@ -562,7 +564,9 @@ export function FitnessAction({ game }: { game: GameState }) {
   const workoutLeft = FITNESS_WORKOUT_CAP_PER_WEEK - p.workedOutThisWeek
   const [hours, setHours] = useState(4)
   const clamped = Math.max(1, Math.min(hours, workoutLeft, p.timeLeft))
-  if (p.apartment === 'none') return null
+  if (p.apartment === 'none') {
+    return <p className="blurb">You need a place to live before you can work out at home.</p>
+  }
   if (p.fitness >= 100) {
     return (
       <p className="blurb">Peak fitness — health decay is already slowed as much as it gets.</p>
@@ -764,7 +768,7 @@ export function DoctorAction({ game }: { game: GameState }) {
         <>
           Health: <strong className={p.health < 40 ? 'low' : ''}>{p.health}/100</strong>
           <br />
-          <span className="desc">Overwork and living on cheap groceries wear it down.</span>
+          <span className="desc">Living on cheap groceries wears it down.</span>
         </>
       }
     >
@@ -776,7 +780,7 @@ export function DoctorAction({ game }: { game: GameState }) {
           dispatchGame({ type: 'seeDoctor' })
         }}
       >
-        {p.health >= 100 ? 'Feeling great' : `See doctor ($${price(game, DOCTOR_PRICE)}, 3h)`}
+        {p.health >= 100 ? 'Feeling great' : `See doctor ($${doctorPrice(game, p)}, 3h)`}
       </button>
     </ActionRow>
   )

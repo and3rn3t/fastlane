@@ -30,7 +30,6 @@ import { bestQualifiedJob, nextTargetJob } from './career'
 import {
   CASINO_MAX_BET,
   CASINO_MIN_BET,
-  DOCTOR_PRICE,
   GROCERY_PRICE_MEGAMART,
   HEALTH_SICK_THRESHOLD,
   INSURANCE_PREMIUM,
@@ -40,6 +39,7 @@ import {
   TUITION,
   itemById,
   jobById,
+  traitPriceMultiplier,
   travelCost,
 } from './data'
 import { roll } from './rng'
@@ -199,7 +199,12 @@ function ensureFood(state: GameState, key: PlayerKey): boolean {
   const p = get(state, key)
   const needed = act.foodShortfall(p)
   if (needed === 0) return false
-  const unitCost = act.seasonalPrice(state, GROCERY_PRICE_MEGAMART, 'grocery')
+  const unitCost = act.seasonalPrice(
+    state,
+    GROCERY_PRICE_MEGAMART,
+    'grocery',
+    traitPriceMultiplier(p)
+  )
   if (p.cash < unitCost * needed + 10) return false
   if (!goTo(state, key, 'megamart')) return false
   const stockUp = act.hasItem(p, 'fridge') ? needed + 6 : needed
@@ -213,7 +218,8 @@ function ensureFood(state: GameState, key: PlayerKey): boolean {
 function ensureHousing(state: GameState, key: PlayerKey): boolean {
   const p = get(state, key)
   if (p.apartment === 'none') {
-    if (p.cash < act.seasonalPrice(state, RENT.basic, 'rent') * 1.5) return false
+    const firstWeek = act.seasonalPrice(state, RENT.basic, 'rent', traitPriceMultiplier(p))
+    if (p.cash < firstWeek * 1.5) return false
     if (!goTo(state, key, 'rentoffice')) return false
     return attempt(() => act.rentApartment(state, key, 'basic'))
   }
@@ -227,7 +233,7 @@ function ensureHousing(state: GameState, key: PlayerKey): boolean {
 function ensureHealth(state: GameState, key: PlayerKey, profile: AiProfile): boolean {
   const p = get(state, key)
   if (p.health >= HEALTH_SICK_THRESHOLD) return false
-  if (p.cash < act.price(state, DOCTOR_PRICE) + reserve(state, profile)) return false
+  if (p.cash < act.doctorPrice(state, p) + reserve(state, profile)) return false
   if (!goTo(state, key, 'clinic')) return false
   return attempt(() => act.seeDoctor(state, key))
 }

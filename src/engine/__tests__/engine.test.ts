@@ -36,6 +36,7 @@ import {
   INSURANCE_MEDICAL_DISCOUNT,
   INSURANCE_PREMIUM,
   JOBS,
+  LOOP_SIZE,
   LOST_WALLET_HAPPINESS_PENALTY,
   LUCKY_FIND_HAPPINESS_BONUS,
   MARKET_INDEX_MAX,
@@ -54,6 +55,7 @@ import {
   jobById,
   maxLoan,
   seasonForWeek,
+  shuffledLayout,
   traitDressWearDelta,
   traitPriceMultiplier,
   traitWageMultiplier,
@@ -98,6 +100,22 @@ describe('travel', () => {
 
   it('rejects travel to the current location', () => {
     expect(() => applyAction(game(), { type: 'travel', to: 'home' })).toThrow(EngineError)
+  })
+})
+
+describe('shuffledLayout', () => {
+  it('produces a complete permutation of loop indices', () => {
+    const layout = shuffledLayout({ rngSeed: 7 })
+    const indices = Object.values(layout).sort((a, b) => a - b)
+    expect(indices).toEqual(Array.from({ length: LOOP_SIZE }, (_, i) => i))
+  })
+
+  it('is deterministic for a given seed', () => {
+    expect(shuffledLayout({ rngSeed: 123 })).toEqual(shuffledLayout({ rngSeed: 123 }))
+  })
+
+  it('differs across different seeds', () => {
+    expect(shuffledLayout({ rngSeed: 1 })).not.toEqual(shuffledLayout({ rngSeed: 2 }))
   })
 })
 
@@ -683,9 +701,10 @@ describe('durable goods', () => {
   it('an uninsured item can be stolen from an unsecured home', () => {
     // Seed/week found by brute force: the player's own bike goes missing by
     // the 2nd endWeek (was 3 weeks before Wave 15's shuffled city layout
-    // added a second seeded RNG draw at newGame() construction time — every
-    // game's roll() stream now starts one step later than before, per
-    // Standing Constraints' RNG-draw-count fragility note).
+    // added 13 more seeded RNG draws — a Fisher-Yates shuffle over 14
+    // locations — at newGame() construction time — every game's roll()
+    // stream now starts 13 steps later than before, per Standing
+    // Constraints' RNG-draw-count fragility note).
     // burglaryUpkeep's roll() is only spent when a player actually owns a
     // stealable item that week, so any change to *when* either side buys or
     // loses things shifts how many rolls get consumed, which shifts the
@@ -758,6 +777,26 @@ describe('insurance', () => {
     ).toBe(true)
   })
 
+  it('caps the premium at whatever cash the player actually has', () => {
+    let s = applyAction(
+      newGame({ playerName: 'T', goals: easyGoals, seed: 1, rules: noEventRules }),
+      { type: 'travel', to: 'bank' }
+    )
+    s = applyAction(s, { type: 'buyInsurance', tier: 'full' })
+    s.week = 5
+    const expectedPremium = price(s, INSURANCE_PREMIUM.full)
+    const shortOfPremium = Math.floor(expectedPremium / 2)
+    expect(shortOfPremium).toBeLessThan(expectedPremium) // sanity: the scenario is actually cash-short
+    s.player.cash = shortOfPremium
+    s = applyAction(s, { type: 'endWeek' })
+    expect(s.player.cash).toBe(0) // paid everything it had, not the full premium
+    expect(
+      s.lastReport?.entries.some(
+        (e) => e.actor === 'player' && e.text === `T paid $${shortOfPremium} in insurance premiums`
+      )
+    ).toBe(true)
+  })
+
   it('canceling (tier "none") stops the weekly premium', () => {
     let s = applyAction(
       newGame({ playerName: 'T', goals: easyGoals, seed: 1, rules: noEventRules }),
@@ -790,6 +829,50 @@ describe('insurance', () => {
     expect(insuredCost).toBe(Math.round(price(insured, DOCTOR_PRICE) * INSURANCE_MEDICAL_DISCOUNT))
     expect(insuredCost).toBeLessThan(plainCost)
     expect(insured.player.health).toBe(Math.min(100, 50 + DOCTOR_HEAL))
+  })
+
+  it("halves personalEvent()'s doctor's-bill outcome under full coverage, same as the Clinic", () => {
+    // Seed/week found by brute force: this player draws personalEvent()'s
+    // doctor's-bill outcome (week.ts case 1) on week 5, with eventFrequency
+    // cranked up so the search doesn't need many weeks (same idea as the
+    // "expanded personal events" describe block above). Cash held high and
+    // every other upkeep confound neutralized each week (fed, secure
+    // apartment, no rent due, no active event chain) so the RNG stream this
+    // player's turn consumes stays identical between the two runs below —
+    // isolating insurance's own effect on the bill, not a side effect of
+    // some other week.ts branch reacting differently to the tier change.
+    // Compared via the bill's own log text (not a cash delta, which would
+    // also include that week's insurance premium) — same isolation idea as
+    // the "charges a weekly premium" test above.
+    const highFrequencyRules = { ...RULE_PRESETS.classic, eventFrequency: 3 }
+    const noWinGoals: Goals = { wealth: 1_000_000, happiness: 1000, education: 1000, career: 1000 }
+    function billTextFor(insurance: 'none' | 'full'): string | undefined {
+      let s = newGame({ playerName: 'T', goals: noWinGoals, seed: 1, rules: highFrequencyRules })
+      for (let w = 0; w < 5; w++) {
+        s.player.fed = FOOD_NEEDED
+        s.player.apartment = 'secure'
+        s.player.rentDue = 0
+        s.player.weeksBehindOnRent = 0
+        s.player.activeEvents = []
+        s.player.cash = 100000
+        s.player.insurance = insurance
+        const before = s.log.length
+        const s2 = applyAction(s, { type: 'endWeek' })
+        if (w === 4) {
+          return s2.log
+            .slice(before)
+            .find((e) => e.actor === 'player' && e.text.includes("doctor's bill"))?.text
+        }
+        s = s2.phase === 'weekReport' ? applyAction(s2, { type: 'dismissReport' }) : s2
+      }
+      return undefined
+    }
+    const uninsured = billTextFor('none')
+    const fullyInsured = billTextFor('full')
+    expect(uninsured).toBe("T got hit with a $35 doctor's bill")
+    expect(fullyInsured).toBe(
+      `T got hit with a $${Math.round(35 * INSURANCE_MEDICAL_DISCOUNT)} doctor's bill`
+    )
   })
 })
 
