@@ -578,9 +578,7 @@ export function FitnessAction({ game }: { game: GameState }) {
         <>
           Fitness: <strong>{p.fitness}/100</strong> ({workoutLeft}h left this week)
           <br />
-          <span className="desc">
-            Slows health decay from overwork and cheap food — never reverses it
-          </span>
+          <span className="desc">Slows health decay from cheap food — never reverses it</span>
         </>
       }
     >
