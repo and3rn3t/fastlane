@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useReducer, type ReactNode } from 'react'
 import {
   CREDIT_SCORE_START,
+  DEFAULT_LAYOUT,
   EngineError,
   HEALTH_START,
   RULE_PRESETS,
@@ -126,6 +127,36 @@ function isPlausibleSave(data: unknown): data is Record<string, unknown> {
  * stats — 'career-changer' is that exact origin (every field a no-op delta),
  * so backfilling it changes nothing about the save's actual numbers, only
  * the label.
+ *
+ * 11 → 12: Wave 15's shuffled city layout added `GameState.layout`. A save
+ * from before it existed keeps the original, unshuffled travel map (see
+ * DEFAULT_LAYOUT) rather than getting a new random one it never agreed to.
+ *
+ * 12 → 13: Wave 16's Insurance tiers replaced the old binary `insurance`
+ * ItemId with `PlayerState.insurance: InsuranceTier` (a weekly premium, not
+ * a one-time purchase). A save that had bought the old item keeps exactly
+ * the coverage it already paid for — backfilled to `'basic'` (the tier the
+ * old item's single behavior, burglary protection, maps to) rather than
+ * `'none'`, which would silently take away something the player owned; a
+ * save that never bought it defaults to `'none'`. Either way `'insurance'`
+ * is stripped from `items` — it's no longer a valid ItemId.
+ *
+ * 13 → 14: Wave 16's Fitness habit added `PlayerState.fitness` and
+ * `workedOutThisWeek` (this week's workOut hours, same shape as
+ * relaxedThisWeek). A save from before it existed had never built any
+ * fitness and hadn't worked out this week either, so both default to 0 —
+ * the same starting values a fresh player gets, not a guess.
+ *
+ * 14 → 15: Wave 16's Burnout row added `PlayerState.burnout`, split out of
+ * what used to be pure health drain from overwork. A save from before it
+ * existed was never tracking a separate burnout number, so it defaults to
+ * 0 — not a guess, since burnout only ever rises from tracked overwork this
+ * migration has no record of.
+ *
+ * 15 → 16: Wave 16's Chronic conditions added `PlayerState.neglectWeeks`. A
+ * save from before it existed was never tracking a neglect streak, so it
+ * defaults to 0 — the same fresh-start value a save with no chronic
+ * condition already carries in its (untouched) `activeEvents`.
  */
 function upgradePlayerToV2(player: unknown): unknown {
   if (typeof player !== 'object' || player === null) return player
@@ -194,6 +225,46 @@ function upgradePlayerToV11(player: unknown): unknown {
   }
 }
 
+function upgradePlayerToV13(player: unknown): unknown {
+  if (typeof player !== 'object' || player === null) return player
+  const p = player as Record<string, unknown>
+  const items = Array.isArray(p.items) ? (p.items as unknown[]) : []
+  const hadInsuranceItem = items.includes('insurance')
+  return {
+    ...p,
+    items: items.filter((id) => id !== 'insurance'),
+    insurance: hadInsuranceItem ? 'basic' : 'none',
+  }
+}
+
+function upgradePlayerToV14(player: unknown): unknown {
+  if (typeof player !== 'object' || player === null) return player
+  const p = player as Record<string, unknown>
+  return {
+    ...p,
+    fitness: typeof p.fitness === 'number' ? p.fitness : 0,
+    workedOutThisWeek: typeof p.workedOutThisWeek === 'number' ? p.workedOutThisWeek : 0,
+  }
+}
+
+function upgradePlayerToV15(player: unknown): unknown {
+  if (typeof player !== 'object' || player === null) return player
+  const p = player as Record<string, unknown>
+  return {
+    ...p,
+    burnout: typeof p.burnout === 'number' ? p.burnout : 0,
+  }
+}
+
+function upgradePlayerToV16(player: unknown): unknown {
+  if (typeof player !== 'object' || player === null) return player
+  const p = player as Record<string, unknown>
+  return {
+    ...p,
+    neglectWeeks: typeof p.neglectWeeks === 'number' ? p.neglectWeeks : 0,
+  }
+}
+
 const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<string, unknown>> = {
   0: (save) => ({
     ...save,
@@ -245,6 +316,33 @@ const MIGRATIONS: Record<number, (save: Record<string, unknown>) => Record<strin
     ...save,
     player: upgradePlayerToV11(save.player),
     riley: upgradePlayerToV11(save.riley),
+  }),
+  // Wave 15's shuffled city layout: a save from before this field existed
+  // keeps the original, unshuffled travel map rather than getting a new
+  // random one it never agreed to.
+  11: (save) => ({
+    ...save,
+    layout: DEFAULT_LAYOUT,
+  }),
+  12: (save) => ({
+    ...save,
+    player: upgradePlayerToV13(save.player),
+    riley: upgradePlayerToV13(save.riley),
+  }),
+  13: (save) => ({
+    ...save,
+    player: upgradePlayerToV14(save.player),
+    riley: upgradePlayerToV14(save.riley),
+  }),
+  14: (save) => ({
+    ...save,
+    player: upgradePlayerToV15(save.player),
+    riley: upgradePlayerToV15(save.riley),
+  }),
+  15: (save) => ({
+    ...save,
+    player: upgradePlayerToV16(save.player),
+    riley: upgradePlayerToV16(save.riley),
   }),
 }
 

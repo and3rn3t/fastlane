@@ -94,6 +94,8 @@ function hintCopy(tag: CandidateTag, p: PlayerState): string {
       return "You've got surplus cash sitting idle — bank it at First Bank."
     case 'gamble':
       return 'Feeling lucky? The Casino is open.'
+    case 'fitness':
+      return 'A workout at home builds fitness — it slows health decay for good.'
   }
 }
 
@@ -166,7 +168,7 @@ export function JobSwitchNudge({ game }: { game: GameState }) {
   // (applyJob/travel both call the engine's spendTime, which asserts this).
   const timeNeeded = canApplyNow
     ? APPLY_JOB_TIME
-    : travelCost(game.player.location, 'employment', hasItem(game.player, 'bike'))
+    : travelCost(game.player.location, 'employment', hasItem(game.player, 'bike'), game.layout)
   const canAffordSwitch = game.player.timeLeft >= timeNeeded
 
   return (

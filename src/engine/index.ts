@@ -10,6 +10,8 @@ export {
   hasItem,
   groceryCap,
   price,
+  seasonalPrice,
+  doctorPrice,
   wagePerHour,
 } from './actions'
 export { careerScore, goalProgress, meetsGoals } from './week'

@@ -9,6 +9,7 @@ import {
   originById,
   ORIGINS,
   RULE_PRESETS,
+  shuffledLayout,
   WEEK_TIME,
 } from './data'
 import { rollInt } from './rng'
@@ -59,6 +60,7 @@ function newPlayer(
     dress,
     items,
     apartment: origin.apartment ?? 'none',
+    insurance: 'none',
     rentDue: 0,
     weeksBehindOnRent: 0,
     fed: 0,
@@ -66,6 +68,10 @@ function newPlayer(
     lotteryTickets: 0,
     relaxedThisWeek: 0,
     health: HEALTH_START,
+    fitness: 0,
+    workedOutThisWeek: 0,
+    burnout: 0,
+    neglectWeeks: 0,
     hoursWorkedThisWeek: 0,
     jobTenureWeeks: 0,
     promotionLevel: 0,
@@ -116,37 +122,41 @@ export interface NewGameOptions {
 }
 
 /** Draws Riley's origin against a mutable rng state (advancing its seed by
- * one step) — the one and only RNG draw newGame() makes at construction
- * time. Factored out so initialRngSeed() below can reproduce exactly this
- * transformation without duplicating it. */
+ * one step) — the first of newGame()'s construction-time RNG draws (see
+ * shuffledLayout() for the other). Factored out so initialRngSeed() below
+ * can reproduce exactly this transformation without duplicating it. */
 function drawRileyOrigin(rngState: { rngSeed: number }): OriginId {
   return ORIGINS[rollInt(rngState, ORIGINS.length)].id
 }
 
 /** The `rngSeed` a freshly-constructed `newGame({ seed })` would have,
  * before any week is played — i.e. `seed` advanced by newGame()'s own
- * construction-time draws (currently just Riley's origin). Lets a caller
- * check "does this save's current rngSeed match having just been started
- * fresh from this exact seed" without replaying full game construction —
- * e.g. the Daily Challenge deep-link's "is this already today's challenge"
- * check in App.tsx. Update this alongside newGame() if it ever adds another
- * construction-time draw. */
+ * construction-time draws: Riley's origin (1 draw), then the shuffled board
+ * layout (13 draws, one per Fisher-Yates swap over 14 locations). Lets a
+ * caller check "does this save's current rngSeed match having just been
+ * started fresh from this exact seed" without replaying full game
+ * construction — e.g. the Daily Challenge deep-link's "is this already
+ * today's challenge" check in App.tsx. Update this alongside newGame() if it
+ * ever adds another construction-time draw. */
 export function initialRngSeed(seed: number): number {
   const rngState = { rngSeed: seed }
   drawRileyOrigin(rngState)
+  shuffledLayout(rngState)
   return rngState.rngSeed
 }
 
 export function newGame(opts: NewGameOptions): GameState {
   const rules = opts.rules ?? RULE_PRESETS.classic
-  // Riley's origin is the game's very first RNG draw, ahead of anything
-  // week.ts does — deliberately, so it stays reproducible from the seed like
-  // everything else in a replay. It also means every seed-dependent test in
-  // this repo shifts by one draw from here on; see Standing Constraints in
+  // Riley's origin and the shuffled board layout are the game's very first
+  // RNG draws (1 + 13, in that order), ahead of anything week.ts does —
+  // deliberately, so both stay reproducible from the seed like everything
+  // else in a replay. It also means every seed-dependent test in this repo
+  // shifts by 14 draws from here on; see Standing Constraints in
   // docs/ROADMAP.md for why that's expected, not a bug.
   const rngState = { rngSeed: opts.seed ?? Math.floor(Math.random() * 2 ** 31) }
   const drawnRileyOriginId = drawRileyOrigin(rngState)
   const rileyOriginId = opts.rileyOriginId ?? drawnRileyOriginId
+  const layout = shuffledLayout(rngState)
   return {
     version: SAVE_VERSION,
     week: 1,
@@ -154,6 +164,7 @@ export function newGame(opts: NewGameOptions): GameState {
     phase: 'playing',
     winner: null,
     goals: opts.goals,
+    layout,
     economy: {
       priceIndex: 1,
       wageIndex: 1,
@@ -259,11 +270,17 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'rentApartment':
       act.rentApartment(draft, 'player', action.tier)
       break
+    case 'buyInsurance':
+      act.buyInsurance(draft, 'player', action.tier)
+      break
     case 'sellItem':
       act.sellItem(draft, 'player', action.itemId)
       break
     case 'relax':
       act.relax(draft, 'player', action.hours)
+      break
+    case 'workOut':
+      act.workOut(draft, 'player', action.hours)
       break
     case 'seeDoctor':
       act.seeDoctor(draft, 'player')

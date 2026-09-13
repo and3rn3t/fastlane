@@ -5,10 +5,12 @@ import {
   CASINO_MIN_BET,
   CASINO_PAYOUT_MULTIPLIER,
   CASINO_WIN_CHANCE,
-  DOCTOR_PRICE,
+  FITNESS_WORKOUT_CAP_PER_WEEK,
   FOOD_NEEDED,
   GROCERY_PRICE_MARKET,
   GROCERY_PRICE_MEGAMART,
+  INSURANCE_MEDICAL_DISCOUNT,
+  INSURANCE_PREMIUM,
   JOBS,
   LOCATIONS,
   LOTTERY_TICKET_PRICE,
@@ -22,6 +24,8 @@ import {
   SKILL_TRAIN_TIME,
   SKILL_TRAIN_PRICE,
   TUITION,
+  burnoutEfficiency,
+  doctorPrice,
   groceryCap,
   hasItem,
   itemById,
@@ -30,6 +34,9 @@ import {
   maxLoan,
   price,
   qualifiesFor,
+  seasonalPrice,
+  traitPriceMultiplier,
+  traitWageMultiplier,
   wagePerHour,
   type GameState,
   type ItemId,
@@ -41,6 +48,7 @@ import {
   CheckIcon,
   DollarIcon,
   GradCapIcon,
+  HeartIcon,
   HomeIcon,
   LockIcon,
   ShieldIcon,
@@ -56,7 +64,8 @@ export function WorkAction({ game }: { game: GameState }) {
   if (job.workplace !== p.location) return null
   const max = p.timeLeft
   const clamped = Math.min(hours, max)
-  const rate = wagePerHour(game, job.id, p.promotionLevel)
+  const rate =
+    wagePerHour(game, job.id, p.promotionLevel, traitWageMultiplier(p)) * burnoutEfficiency(p)
   const weeksToPromotion =
     p.promotionLevel < MAX_PROMOTIONS
       ? PROMOTION_TENURE_WEEKS * (p.promotionLevel + 1) - p.jobTenureWeeks
@@ -72,6 +81,8 @@ export function WorkAction({ game }: { game: GameState }) {
             {p.promotionLevel >= MAX_PROMOTIONS
               ? 'Fully promoted here'
               : `Next promotion in ${Math.max(1, weeksToPromotion)} week${weeksToPromotion === 1 ? '' : 's'} of showing up`}
+            {p.burnout > 0 &&
+              ` · burned out: pay cut ${Math.round((1 - burnoutEfficiency(p)) * 100)}%`}
           </span>
         </>
       }
@@ -109,7 +120,14 @@ function JobListing({ game, job }: { game: GameState; job: (typeof JOBS)[number]
       <div className="grow">
         <div className="title">{job.title}</div>
         <div className="meta">
-          ${wagePerHour(game, job.id, isCurrent ? p.promotionLevel : 0).toFixed(2)}/h · prestige{' '}
+          $
+          {wagePerHour(
+            game,
+            job.id,
+            isCurrent ? p.promotionLevel : 0,
+            traitWageMultiplier(p)
+          ).toFixed(2)}
+          /h · prestige{' '}
           {job.prestige + (isCurrent ? p.promotionLevel * PROMOTION_PRESTIGE_BONUS : 0)}
         </div>
         {reqs.length > 0 && (
@@ -175,7 +193,7 @@ export function GroceryAction({ game }: { game: GameState }) {
   const { dispatchGame } = useGame()
   const p = game.player
   const unitBase = p.location === 'megamart' ? GROCERY_PRICE_MEGAMART : GROCERY_PRICE_MARKET
-  const unitPrice = price(game, unitBase)
+  const unitPrice = seasonalPrice(game, unitBase, 'grocery', traitPriceMultiplier(p))
   const cap = groceryCap(p)
   const room = cap - p.groceries
   const [units, setUnits] = useState(FOOD_NEEDED)
@@ -404,7 +422,7 @@ function RentActions({ game }: { game: GameState }) {
               <strong>{tier === 'basic' ? 'Basic apartment' : 'Secure apartment'}</strong>
               <br />
               <span className="desc">
-                ${price(game, RENT[tier])}/week
+                ${seasonalPrice(game, RENT[tier], 'rent', traitPriceMultiplier(p))}/week
                 {tier === 'secure'
                   ? ' · +2 happiness/week, no street robbery'
                   : ' · a roof over your head'}
@@ -423,6 +441,52 @@ function RentActions({ game }: { game: GameState }) {
           </button>
         </ActionRow>
       ))}
+    </>
+  )
+}
+
+function InsuranceActions({ game }: { game: GameState }) {
+  const { dispatchGame } = useGame()
+  const p = game.player
+  const medicalOffPct = Math.round((1 - INSURANCE_MEDICAL_DISCOUNT) * 100)
+  return (
+    <>
+      {(['basic', 'full'] as const).map((tier) => (
+        <ActionRow
+          key={tier}
+          label={
+            <>
+              <strong>{tier === 'basic' ? 'Basic coverage' : 'Full coverage'}</strong>
+              <br />
+              <span className="desc">
+                ${price(game, INSURANCE_PREMIUM[tier])}/week · covers a burglar taking your
+                belongings
+                {tier === 'full' &&
+                  ` · plus ${medicalOffPct}% off Clinic visits and doctor's-bill mishaps`}
+              </span>
+            </>
+          }
+        >
+          <button
+            disabled={p.insurance === tier}
+            onClick={() => {
+              playPurchase()
+              dispatchGame({ type: 'buyInsurance', tier })
+            }}
+          >
+            {p.insurance === tier ? 'Current coverage' : 'Buy (1h)'}
+          </button>
+        </ActionRow>
+      ))}
+      {p.insurance !== 'none' && (
+        <ActionRow
+          label={<span className="desc">Drop coverage and stop paying the weekly premium.</span>}
+        >
+          <button onClick={() => dispatchGame({ type: 'buyInsurance', tier: 'none' })}>
+            Cancel (1h)
+          </button>
+        </ActionRow>
+      )}
     </>
   )
 }
@@ -469,7 +533,10 @@ export function HomeActions({ game }: { game: GameState }) {
         <>
           Relax (+1 happiness per hour, {relaxLeft}h left this week)
           <br />
-          <span className="desc">Pantry: {p.groceries} food units stored</span>
+          <span className="desc">
+            Pantry: {p.groceries} food units stored
+            {p.burnout > 0 && ` · Burnout: ${p.burnout}/100 (relax relieves it)`}
+          </span>
         </>
       }
     >
@@ -486,6 +553,48 @@ export function HomeActions({ game }: { game: GameState }) {
         onClick={() => dispatchGame({ type: 'relax', hours: clamped })}
       >
         Relax {clamped}h
+      </button>
+    </ActionRow>
+  )
+}
+
+export function FitnessAction({ game }: { game: GameState }) {
+  const { dispatchGame } = useGame()
+  const p = game.player
+  const workoutLeft = FITNESS_WORKOUT_CAP_PER_WEEK - p.workedOutThisWeek
+  const [hours, setHours] = useState(4)
+  const clamped = Math.max(1, Math.min(hours, workoutLeft, p.timeLeft))
+  if (p.apartment === 'none') {
+    return <p className="blurb">You need a place to live before you can work out at home.</p>
+  }
+  if (p.fitness >= 100) {
+    return (
+      <p className="blurb">Peak fitness — health decay is already slowed as much as it gets.</p>
+    )
+  }
+  return (
+    <ActionRow
+      label={
+        <>
+          Fitness: <strong>{p.fitness}/100</strong> ({workoutLeft}h left this week)
+          <br />
+          <span className="desc">Slows health decay from cheap food — never reverses it</span>
+        </>
+      }
+    >
+      <Stepper
+        value={clamped}
+        min={1}
+        max={Math.max(1, Math.min(workoutLeft, p.timeLeft))}
+        onChange={setHours}
+        label="hours to work out"
+        suffix="h"
+      />
+      <button
+        disabled={workoutLeft < 1 || p.timeLeft < 1}
+        onClick={() => dispatchGame({ type: 'workOut', hours: clamped })}
+      >
+        Work out {clamped}h
       </button>
     </ActionRow>
   )
@@ -657,7 +766,7 @@ export function DoctorAction({ game }: { game: GameState }) {
         <>
           Health: <strong className={p.health < 40 ? 'low' : ''}>{p.health}/100</strong>
           <br />
-          <span className="desc">Overwork and living on cheap groceries wear it down.</span>
+          <span className="desc">Living on cheap groceries wears it down.</span>
         </>
       }
     >
@@ -669,7 +778,7 @@ export function DoctorAction({ game }: { game: GameState }) {
           dispatchGame({ type: 'seeDoctor' })
         }}
       >
-        {p.health >= 100 ? 'Feeling great' : `See doctor ($${price(game, DOCTOR_PRICE)}, 3h)`}
+        {p.health >= 100 ? 'Feeling great' : `See doctor ($${doctorPrice(game, p)}, 3h)`}
       </button>
     </ActionRow>
   )
@@ -683,6 +792,11 @@ export function LocationPanelBody({ game }: { game: GameState }) {
       {loc.id === 'home' && (
         <ActionGroup label="Home" icon={<HomeIcon size={15} />}>
           <HomeActions game={game} />
+        </ActionGroup>
+      )}
+      {loc.id === 'home' && (
+        <ActionGroup label="Fitness" icon={<HeartIcon size={15} />}>
+          <FitnessAction game={game} />
         </ActionGroup>
       )}
       {loc.id === 'home' && hasItem(game.player, 'phone') && (
@@ -725,7 +839,7 @@ export function LocationPanelBody({ game }: { game: GameState }) {
             <LoanActions game={game} />
           </CollapsibleActionGroup>
           <ActionGroup label="Protection" icon={<ShieldIcon size={15} />}>
-            <ShopItems game={game} ids={['insurance']} />
+            <InsuranceActions game={game} />
           </ActionGroup>
         </>
       )}

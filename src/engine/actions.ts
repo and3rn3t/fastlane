@@ -4,6 +4,7 @@
 
 import {
   APPLY_JOB_TIME,
+  BURNOUT_RELIEF_PER_HOUR,
   CASINO_MAX_BET,
   CASINO_MIN_BET,
   CASINO_PAYOUT_MULTIPLIER,
@@ -12,12 +13,15 @@ import {
   DOCTOR_HEAL,
   DOCTOR_PRICE,
   DOCTOR_TIME,
+  FITNESS_GAIN_PER_HOUR,
+  FITNESS_WORKOUT_CAP_PER_WEEK,
   FOOD_NEEDED,
   GARNISHMENT_RATE,
   GROCERY_CAP_BASE,
   GROCERY_CAP_FRIDGE,
   GROCERY_PRICE_MARKET,
   GROCERY_PRICE_MEGAMART,
+  INSURANCE_MEDICAL_DISCOUNT,
   LOCATIONS,
   LOTTERY_TICKET_PRICE,
   MEAL_PRICE,
@@ -34,16 +38,20 @@ import {
   SKILL_TRAIN_TIME,
   SKILLS,
   TUITION,
+  burnoutEfficiency,
   itemById,
   jobById,
   maxLoan,
   seasonForWeek,
+  traitPriceMultiplier,
+  traitWageMultiplier,
   travelCost,
 } from './data'
 import { roll } from './rng'
 import type {
   ApartmentTier,
   GameState,
+  InsuranceTier,
   ItemId,
   JobRequirement,
   LocationId,
@@ -62,20 +70,42 @@ export function price(state: GameState, base: number): number {
   return Math.round(base * state.economy.priceIndex)
 }
 
+/** The Clinic's actual price for this specific player — `full` insurance
+ * discounts it by INSURANCE_MEDICAL_DISCOUNT. Shared by seeDoctor() (the
+ * real charge), ai.ts's ensureHealth() (the affordability check — without
+ * this, Riley could reject a visit she can actually afford, a Standing
+ * Constraints violation), and the Clinic panel's own price display, so all
+ * three agree on the same number. */
+export function doctorPrice(state: GameState, p: PlayerState): number {
+  return Math.round(
+    price(state, DOCTOR_PRICE) * (p.insurance === 'full' ? INSURANCE_MEDICAL_DISCOUNT : 1)
+  )
+}
+
 /** Same as price(), plus the current season's grocery/rent swing — kept
  * separate from price() since most categories (meals, tuition, items, …)
- * have no seasonal component. */
+ * have no seasonal component. `priceMultiplier` is the acting player's trait
+ * effect (see traitPriceMultiplier in data.ts) — defaults to 1 so callers
+ * with no player in scope (none today) keep working unchanged. */
 export function seasonalPrice(
   state: GameState,
   base: number,
-  category: 'grocery' | 'rent'
+  category: 'grocery' | 'rent',
+  priceMultiplier = 1
 ): number {
   const seasonal = SEASON_MULTIPLIERS[seasonForWeek(state.week)][category]
-  return Math.round(base * state.economy.priceIndex * seasonal)
+  return Math.round(base * state.economy.priceIndex * seasonal * priceMultiplier)
 }
 
-export function wagePerHour(state: GameState, jobId: string, promotionLevel = 0): number {
-  const base = jobById(jobId).wage * state.economy.wageIndex
+/** `wageMultiplier` is the acting player's trait effect (see
+ * traitWageMultiplier in data.ts) — defaults to 1. */
+export function wagePerHour(
+  state: GameState,
+  jobId: string,
+  promotionLevel = 0,
+  wageMultiplier = 1
+): number {
+  const base = jobById(jobId).wage * state.economy.wageIndex * wageMultiplier
   return base * (1 + promotionLevel * PROMOTION_WAGE_BONUS)
 }
 
@@ -122,7 +152,7 @@ export function groceryCap(p: PlayerState): number {
 export function travel(state: GameState, key: PlayerKey, to: LocationId) {
   const p = state[key]
   require_(to !== p.location, 'Already there')
-  const cost = travelCost(p.location, to, hasItem(p, 'bike'))
+  const cost = travelCost(p.location, to, hasItem(p, 'bike'), state.layout)
   spendTime(p, cost)
   p.location = to
   log(state, key, `Walked to ${LOCATIONS[to].name}`)
@@ -135,7 +165,11 @@ export function work(state: GameState, key: PlayerKey, hours: number) {
   require_(p.location === job.workplace, `You must be at your workplace to work`)
   require_(hours >= 1, 'Work at least one hour')
   spendTime(p, hours)
-  const pay = Math.round(hours * wagePerHour(state, job.id, p.promotionLevel))
+  const pay = Math.round(
+    hours *
+      wagePerHour(state, job.id, p.promotionLevel, traitWageMultiplier(p)) *
+      burnoutEfficiency(p)
+  )
   p.experience += hours
   p.hoursWorkedThisWeek += hours
   if (job.trainsSkill) {
@@ -268,7 +302,11 @@ export function applyJob(state: GameState, key: PlayerKey, jobId: string) {
   p.jobId = job.id
   p.jobTenureWeeks = 0
   p.promotionLevel = 0
-  log(state, key, `Hired as ${job.title} at $${wagePerHour(state, job.id).toFixed(2)}/h`)
+  log(
+    state,
+    key,
+    `Hired as ${job.title} at $${wagePerHour(state, job.id, 0, traitWageMultiplier(p)).toFixed(2)}/h`
+  )
 }
 
 export function quitJob(state: GameState, key: PlayerKey) {
@@ -326,7 +364,7 @@ export function buyGroceries(state: GameState, key: PlayerKey, units: number) {
   )
   const unitPrice = p.location === 'megamart' ? GROCERY_PRICE_MEGAMART : GROCERY_PRICE_MARKET
   spendTime(p, 1)
-  spendCash(p, seasonalPrice(state, unitPrice, 'grocery') * units)
+  spendCash(p, seasonalPrice(state, unitPrice, 'grocery', traitPriceMultiplier(p)) * units)
   p.groceries += units
   log(state, key, `Bought ${units} unit${units === 1 ? '' : 's'} of groceries`)
 }
@@ -460,13 +498,34 @@ export function rentApartment(
   require_(p.location === 'rentoffice', 'Rent at the Rent Office')
   require_(p.apartment !== tier, 'Already renting that apartment')
   // First week's rent due up front.
-  const firstWeek = seasonalPrice(state, RENT[tier], 'rent')
+  const firstWeek = seasonalPrice(state, RENT[tier], 'rent', traitPriceMultiplier(p))
   spendTime(p, 2)
   spendCash(p, firstWeek)
   p.apartment = tier
   p.rentDue = 0
   p.weeksBehindOnRent = 0
   log(state, key, `Moved into a ${tier === 'basic' ? 'basic' : 'secure'} apartment`)
+}
+
+/** Sets the weekly-premium insurance tier directly — see InsuranceTier's own
+ * doc comment for coverage. No first-week-upfront charge like
+ * rentApartment(): the premium simply starts accruing in upkeep() from the
+ * very next week, same as loan interest starting from the next upkeep with
+ * no special first-week case either. */
+export function buyInsurance(state: GameState, key: PlayerKey, tier: InsuranceTier) {
+  const p = state[key]
+  require_(p.location === 'bank', 'Insurance is at First Bank')
+  require_(
+    p.insurance !== tier,
+    tier === 'none' ? 'Already uninsured' : 'Already have that coverage'
+  )
+  spendTime(p, 1)
+  p.insurance = tier
+  log(
+    state,
+    key,
+    tier === 'none' ? `${p.name} dropped insurance coverage` : `${p.name} bought ${tier} insurance`
+  )
 }
 
 export function takeLoan(state: GameState, key: PlayerKey, amount: number) {
@@ -504,7 +563,26 @@ export function relax(state: GameState, key: PlayerKey, hours: number) {
   spendTime(p, used)
   p.relaxedThisWeek += used
   p.happiness = Math.min(100, p.happiness + used)
-  log(state, key, `Relaxed ${used}h`)
+  const burnoutBefore = p.burnout
+  p.burnout = Math.max(0, p.burnout - used * BURNOUT_RELIEF_PER_HOUR)
+  const relieved = burnoutBefore - p.burnout
+  log(state, key, relieved > 0 ? `Relaxed ${used}h (-${relieved} burnout)` : `Relaxed ${used}h`)
+}
+
+export function workOut(state: GameState, key: PlayerKey, hours: number) {
+  const p = state[key]
+  require_(p.location === 'home', 'Work out at home')
+  require_(p.apartment !== 'none', 'You need an apartment to work out at home')
+  require_(hours >= 1, 'Work out at least one hour')
+  require_(p.fitness < 100, 'Already at peak fitness')
+  const available = FITNESS_WORKOUT_CAP_PER_WEEK - p.workedOutThisWeek
+  require_(available > 0, 'Already worked out enough for one week')
+  const used = Math.min(hours, available)
+  spendTime(p, used)
+  p.workedOutThisWeek += used
+  const gained = Math.min(100 - p.fitness, used * FITNESS_GAIN_PER_HOUR)
+  p.fitness += gained
+  log(state, key, `Worked out ${used}h (+${gained} fitness)`)
 }
 
 export function seeDoctor(state: GameState, key: PlayerKey) {
@@ -512,7 +590,7 @@ export function seeDoctor(state: GameState, key: PlayerKey) {
   require_(p.location === 'clinic', 'The doctor is at the Clinic')
   require_(p.health < 100, 'Already at full health')
   spendTime(p, DOCTOR_TIME)
-  spendCash(p, price(state, DOCTOR_PRICE))
+  spendCash(p, doctorPrice(state, p))
   p.health = Math.min(100, p.health + DOCTOR_HEAL)
   log(state, key, `Saw the doctor (+${DOCTOR_HEAL} health)`)
 }

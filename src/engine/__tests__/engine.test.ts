@@ -4,21 +4,44 @@ import {
   EngineError,
   jobRequirements,
   netWorth,
+  price,
   qualifiesFor,
   seasonalPrice,
   wagePerHour,
 } from '../actions'
 import { bestQualifiedJob, nextTargetJob } from '../career'
 import {
+  BURNOUT_EFFICIENCY_PENALTY_MAX,
+  BURNOUT_GAIN_RATE,
+  BURNOUT_HIGH_HAPPINESS_PENALTY,
+  BURNOUT_HIGH_THRESHOLD,
+  BURNOUT_RELIEF_PER_HOUR,
+  CHRONIC_FITNESS_SAFE_THRESHOLD,
+  CHRONIC_ONSET_WEEKS,
+  CHRONIC_RECOVERY_WEEKS,
+  CHRONIC_WEEKLY_COST,
+  CHRONIC_WEEKLY_TIME_COST,
   COSTLY_MISTAKE_HAPPINESS_PENALTY,
+  DOCTOR_HEAL,
+  DOCTOR_PRICE,
+  DRESS_WEAR_PER_WEEK,
+  FITNESS_DECAY_REDUCTION_MAX,
+  FITNESS_GAIN_PER_HOUR,
+  FITNESS_WORKOUT_CAP_PER_WEEK,
   FOOD_NEEDED,
   GROCERY_PRICE_MEGAMART,
+  HEALTH_CHEAP_FOOD_DRAIN,
+  HEALTH_SICK_THRESHOLD,
   HOLIDAY_BEATS,
+  INSURANCE_MEDICAL_DISCOUNT,
+  INSURANCE_PREMIUM,
   JOBS,
+  LOOP_SIZE,
   LOST_WALLET_HAPPINESS_PENALTY,
   LUCKY_FIND_HAPPINESS_BONUS,
   MARKET_INDEX_MAX,
   MARKET_INDEX_MIN,
+  OVERWORK_THRESHOLD,
   RENT,
   RULE_PRESETS,
   SEASON_LENGTH_WEEKS,
@@ -28,9 +51,14 @@ import {
   SKILL_TRAIN_PRICE,
   VIRAL_WINDFALL_HAPPINESS_BONUS,
   WEEK_TIME,
+  burnoutEfficiency,
   jobById,
   maxLoan,
   seasonForWeek,
+  shuffledLayout,
+  traitDressWearDelta,
+  traitPriceMultiplier,
+  traitWageMultiplier,
   travelCost,
   weekInCycle,
 } from '../data'
@@ -61,13 +89,33 @@ describe('travel', () => {
   })
 
   it('spends time on travel', () => {
-    const s1 = applyAction(game(), { type: 'travel', to: 'university' })
+    const g = game()
+    // Cost is computed from the game's own shuffled layout (Wave 15), not a
+    // hardcoded number — the layout differs per seed by design.
+    const cost = travelCost(g.player.location, 'university', false, g.layout)
+    const s1 = applyAction(g, { type: 'travel', to: 'university' })
     expect(s1.player.location).toBe('university')
-    expect(s1.player.timeLeft).toBe(WEEK_TIME - 4)
+    expect(s1.player.timeLeft).toBe(WEEK_TIME - cost)
   })
 
   it('rejects travel to the current location', () => {
     expect(() => applyAction(game(), { type: 'travel', to: 'home' })).toThrow(EngineError)
+  })
+})
+
+describe('shuffledLayout', () => {
+  it('produces a complete permutation of loop indices', () => {
+    const layout = shuffledLayout({ rngSeed: 7 })
+    const indices = Object.values(layout).sort((a, b) => a - b)
+    expect(indices).toEqual(Array.from({ length: LOOP_SIZE }, (_, i) => i))
+  })
+
+  it('is deterministic for a given seed', () => {
+    expect(shuffledLayout({ rngSeed: 123 })).toEqual(shuffledLayout({ rngSeed: 123 }))
+  })
+
+  it('differs across different seeds', () => {
+    expect(shuffledLayout({ rngSeed: 1 })).not.toEqual(shuffledLayout({ rngSeed: 2 }))
   })
 })
 
@@ -177,6 +225,63 @@ describe('university', () => {
     s = applyAction(s, { type: 'takeClass' })
     expect(s.player.education).toBe(1)
     expect(s.player.cash).toBe(cash - 75)
+  })
+})
+
+describe('traits', () => {
+  it('adaptable (career-changer, the default origin) is a true no-op', () => {
+    const p = game().player
+    expect(traitWageMultiplier(p)).toBe(1)
+    expect(traitPriceMultiplier(p)).toBe(1)
+    expect(traitDressWearDelta(p)).toBe(0)
+  })
+
+  it("connected (trust-fund-kid) raises work()'s pay via wagePerHour's multiplier", () => {
+    let s = applyAction(
+      newGame({ playerName: 'T', goals: easyGoals, seed: 1, playerOriginId: 'trust-fund-kid' }),
+      { type: 'travel', to: 'employment' }
+    )
+    s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
+    s = applyAction(s, { type: 'travel', to: 'burgers' })
+    expect(traitWageMultiplier(s.player)).toBeGreaterThan(1)
+    const before = s.player.cash
+    s = applyAction(s, { type: 'work', hours: 10 })
+    const plainPay = Math.round(10 * wagePerHour(s, 'fry-cook', 0))
+    const actualPay = s.player.cash - before
+    expect(actualPay).toBeGreaterThan(plainPay)
+    expect(actualPay).toBe(
+      Math.round(10 * wagePerHour(s, 'fry-cook', 0, traitWageMultiplier(s.player)))
+    )
+  })
+
+  it("scrappy (first-gen-student) discounts rent via seasonalPrice's multiplier", () => {
+    // Rent (base $110), not a $4 grocery unit — the discount is real
+    // percentage math inside seasonalPrice() either way, but a small enough
+    // base rounds it away entirely, which would make this test meaningless.
+    let s = applyAction(
+      newGame({ playerName: 'T', goals: easyGoals, seed: 1, playerOriginId: 'first-gen-student' }),
+      { type: 'travel', to: 'rentoffice' }
+    )
+    expect(traitPriceMultiplier(s.player)).toBeLessThan(1)
+    const before = s.player.cash
+    s = applyAction(s, { type: 'rentApartment', tier: 'basic' })
+    const plainCost = seasonalPrice(s, RENT.basic, 'rent')
+    const paid = before - s.player.cash
+    expect(paid).toBeLessThan(plainCost)
+    expect(paid).toBe(seasonalPrice(s, RENT.basic, 'rent', traitPriceMultiplier(s.player)))
+  })
+
+  it('disciplined (veteran) wears dress out slower than the neutral origin, same seed/week', () => {
+    const neutral = applyAction(
+      newGame({ playerName: 'T', goals: easyGoals, seed: 2, playerOriginId: 'career-changer' }),
+      { type: 'endWeek' }
+    )
+    const disciplined = applyAction(
+      newGame({ playerName: 'T', goals: easyGoals, seed: 2, playerOriginId: 'veteran' }),
+      { type: 'endWeek' }
+    )
+    expect(neutral.player.dress).toBe(20 - DRESS_WEAR_PER_WEEK)
+    expect(disciplined.player.dress).toBe(20 - (DRESS_WEAR_PER_WEEK - 1))
   })
 })
 
@@ -595,9 +700,10 @@ describe('durable goods', () => {
 
   it('an uninsured item can be stolen from an unsecured home', () => {
     // Seed/week found by brute force: the player's own bike goes missing by
-    // the 3rd endWeek (was seed 8/3 weeks before Wave 14's Origin backgrounds
-    // added a seeded RNG draw at newGame() construction time — every game's
-    // roll() stream now starts one step later than before, per Standing
+    // the 2nd endWeek (was 3 weeks before Wave 15's shuffled city layout
+    // added 13 more seeded RNG draws — a Fisher-Yates shuffle over 14
+    // locations — at newGame() construction time — every game's roll()
+    // stream now starts 13 steps later than before, per Standing
     // Constraints' RNG-draw-count fragility note).
     // burglaryUpkeep's roll() is only spent when a player actually owns a
     // stealable item that week, so any change to *when* either side buys or
@@ -607,7 +713,7 @@ describe('durable goods', () => {
     // brute-force search rather than guessing.
     let s = applyAction(game(easyGoals, 14), { type: 'travel', to: 'gadgets' })
     s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < 2; i++) {
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
@@ -627,12 +733,391 @@ describe('durable goods', () => {
     s = applyAction(s, { type: 'travel', to: 'gadgets' })
     s = applyAction(s, { type: 'buyItem', itemId: 'bike' })
     s = applyAction(s, { type: 'travel', to: 'bank' })
-    s = applyAction(s, { type: 'buyItem', itemId: 'insurance' })
+    s = applyAction(s, { type: 'buyInsurance', tier: 'basic' })
     for (let i = 0; i < 3; i++) {
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
     expect(s.player.items).toContain('bike')
+  })
+})
+
+describe('insurance', () => {
+  it('buyInsurance requires being at First Bank and an actual tier change', () => {
+    const s = game()
+    expect(() => applyAction(s, { type: 'buyInsurance', tier: 'basic' })).toThrow(/First Bank/)
+    const atBank = applyAction(s, { type: 'travel', to: 'bank' })
+    expect(() => applyAction(atBank, { type: 'buyInsurance', tier: 'none' })).toThrow(/uninsured/)
+  })
+
+  // personalEvent() also runs inside endWeek() and can move the player's
+  // cash at random — noEventRules zeroes its trigger chance. Separately,
+  // Holiday one-offs/season transitions are unconditional on eventFrequency
+  // and fire by cycle position regardless — forcing week 5 (an "ordinary"
+  // position, same idea as isFreeWeek in the personal-events tests below)
+  // avoids that confound too, so these two tests isolate insuranceUpkeep()'s
+  // own effect.
+  const noEventRules = { ...RULE_PRESETS.classic, eventFrequency: 0 }
+
+  it('charges a weekly premium in upkeep(), capped at cash', () => {
+    let s = applyAction(
+      newGame({ playerName: 'T', goals: easyGoals, seed: 1, rules: noEventRules }),
+      { type: 'travel', to: 'bank' }
+    )
+    s = applyAction(s, { type: 'buyInsurance', tier: 'basic' })
+    s.week = 5
+    const expectedPremium = price(s, INSURANCE_PREMIUM.basic)
+    const before = s.player.cash
+    s = applyAction(s, { type: 'endWeek' })
+    expect(s.player.cash).toBe(before - expectedPremium)
+    expect(
+      s.lastReport?.entries.some(
+        (e) => e.actor === 'player' && e.text.includes('insurance premiums')
+      )
+    ).toBe(true)
+  })
+
+  it('caps the premium at whatever cash the player actually has', () => {
+    let s = applyAction(
+      newGame({ playerName: 'T', goals: easyGoals, seed: 1, rules: noEventRules }),
+      { type: 'travel', to: 'bank' }
+    )
+    s = applyAction(s, { type: 'buyInsurance', tier: 'full' })
+    s.week = 5
+    const expectedPremium = price(s, INSURANCE_PREMIUM.full)
+    const shortOfPremium = Math.floor(expectedPremium / 2)
+    expect(shortOfPremium).toBeLessThan(expectedPremium) // sanity: the scenario is actually cash-short
+    s.player.cash = shortOfPremium
+    s = applyAction(s, { type: 'endWeek' })
+    expect(s.player.cash).toBe(0) // paid everything it had, not the full premium
+    expect(
+      s.lastReport?.entries.some(
+        (e) => e.actor === 'player' && e.text === `T paid $${shortOfPremium} in insurance premiums`
+      )
+    ).toBe(true)
+  })
+
+  it('canceling (tier "none") stops the weekly premium', () => {
+    let s = applyAction(
+      newGame({ playerName: 'T', goals: easyGoals, seed: 1, rules: noEventRules }),
+      { type: 'travel', to: 'bank' }
+    )
+    s = applyAction(s, { type: 'buyInsurance', tier: 'basic' })
+    s = applyAction(s, { type: 'buyInsurance', tier: 'none' })
+    expect(s.player.insurance).toBe('none')
+    s.week = 5
+    const before = s.player.cash
+    s = applyAction(s, { type: 'endWeek' })
+    expect(s.player.cash).toBe(before) // no premium, no other cash-affecting confound below $400
+  })
+
+  it("full coverage halves seeDoctor()'s Clinic price, basic doesn't", () => {
+    let plain = applyAction(game(easyGoals, 1), { type: 'travel', to: 'clinic' })
+    plain.player.health = 50
+    const plainBefore = plain.player.cash
+    plain = applyAction(plain, { type: 'seeDoctor' })
+    const plainCost = plainBefore - plain.player.cash
+    expect(plainCost).toBe(price(plain, DOCTOR_PRICE))
+
+    let insured = applyAction(game(easyGoals, 1), { type: 'travel', to: 'bank' })
+    insured = applyAction(insured, { type: 'buyInsurance', tier: 'full' })
+    insured = applyAction(insured, { type: 'travel', to: 'clinic' })
+    insured.player.health = 50
+    const insuredBefore = insured.player.cash
+    insured = applyAction(insured, { type: 'seeDoctor' })
+    const insuredCost = insuredBefore - insured.player.cash
+    expect(insuredCost).toBe(Math.round(price(insured, DOCTOR_PRICE) * INSURANCE_MEDICAL_DISCOUNT))
+    expect(insuredCost).toBeLessThan(plainCost)
+    expect(insured.player.health).toBe(Math.min(100, 50 + DOCTOR_HEAL))
+  })
+
+  it("halves personalEvent()'s doctor's-bill outcome under full coverage, same as the Clinic", () => {
+    // Seed/week found by brute force: this player draws personalEvent()'s
+    // doctor's-bill outcome (week.ts case 1) on week 5, with eventFrequency
+    // cranked up so the search doesn't need many weeks (same idea as the
+    // "expanded personal events" describe block above). Cash held high and
+    // every other upkeep confound neutralized each week (fed, secure
+    // apartment, no rent due, no active event chain) so the RNG stream this
+    // player's turn consumes stays identical between the two runs below —
+    // isolating insurance's own effect on the bill, not a side effect of
+    // some other week.ts branch reacting differently to the tier change.
+    // Compared via the bill's own log text (not a cash delta, which would
+    // also include that week's insurance premium) — same isolation idea as
+    // the "charges a weekly premium" test above.
+    const highFrequencyRules = { ...RULE_PRESETS.classic, eventFrequency: 3 }
+    const noWinGoals: Goals = { wealth: 1_000_000, happiness: 1000, education: 1000, career: 1000 }
+    function billTextFor(insurance: 'none' | 'full'): string | undefined {
+      let s = newGame({ playerName: 'T', goals: noWinGoals, seed: 1, rules: highFrequencyRules })
+      for (let w = 0; w < 5; w++) {
+        s.player.fed = FOOD_NEEDED
+        s.player.apartment = 'secure'
+        s.player.rentDue = 0
+        s.player.weeksBehindOnRent = 0
+        s.player.activeEvents = []
+        s.player.cash = 100000
+        s.player.insurance = insurance
+        const before = s.log.length
+        const s2 = applyAction(s, { type: 'endWeek' })
+        if (w === 4) {
+          return s2.log
+            .slice(before)
+            .find((e) => e.actor === 'player' && e.text.includes("doctor's bill"))?.text
+        }
+        s = s2.phase === 'weekReport' ? applyAction(s2, { type: 'dismissReport' }) : s2
+      }
+      return undefined
+    }
+    const uninsured = billTextFor('none')
+    const fullyInsured = billTextFor('full')
+    expect(uninsured).toBe("T got hit with a $35 doctor's bill")
+    expect(fullyInsured).toBe(
+      `T got hit with a $${Math.round(35 * INSURANCE_MEDICAL_DISCOUNT)} doctor's bill`
+    )
+  })
+})
+
+describe('fitness', () => {
+  it('workOut requires being at home with an apartment, and room left to improve', () => {
+    const elsewhere = applyAction(game(), { type: 'travel', to: 'employment' })
+    expect(() => applyAction(elsewhere, { type: 'workOut', hours: 1 })).toThrow(/home/i)
+    // game()'s player already starts at 'home' with career-changer's default
+    // (no apartment).
+    expect(() => applyAction(game(), { type: 'workOut', hours: 1 })).toThrow(/apartment/i)
+  })
+
+  it('raises fitness by hours * FITNESS_GAIN_PER_HOUR, capped per week and at 100 total', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'rentoffice' })
+    s = applyAction(s, { type: 'rentApartment', tier: 'basic' })
+    s = applyAction(s, { type: 'travel', to: 'home' })
+    s = applyAction(s, { type: 'workOut', hours: 20 })
+    // Clamped to the weekly cap (like RELAX_CAP), not the full 20h requested —
+    // otherwise a single idle week could dump the whole 100-point stat at
+    // once, which pnpm sim showed displaces Riley's fallback work entirely.
+    expect(s.player.fitness).toBe(FITNESS_WORKOUT_CAP_PER_WEEK * FITNESS_GAIN_PER_HOUR)
+    expect(() => applyAction(s, { type: 'workOut', hours: 1 })).toThrow(/enough for one week/i)
+
+    // Bypasses the weekly cap directly to isolate the separate 100-point
+    // ceiling on total fitness.
+    s.player.fitness = 95
+    s.player.workedOutThisWeek = 0
+    s = applyAction(s, { type: 'workOut', hours: 10 })
+    expect(s.player.fitness).toBe(100) // capped, not 105
+
+    expect(() => applyAction(s, { type: 'workOut', hours: 1 })).toThrow(/peak fitness/i)
+  })
+
+  it('resets the weekly workout cap at the start of each week (same shape as relaxedThisWeek)', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'rentoffice' })
+    s = applyAction(s, { type: 'rentApartment', tier: 'basic' })
+    s = applyAction(s, { type: 'travel', to: 'home' })
+    s = applyAction(s, { type: 'workOut', hours: FITNESS_WORKOUT_CAP_PER_WEEK })
+    expect(() => applyAction(s, { type: 'workOut', hours: 1 })).toThrow(/enough for one week/i)
+    s = applyAction(s, { type: 'endWeek' })
+    if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    expect(s.player.workedOutThisWeek).toBe(0)
+    expect(() => applyAction(s, { type: 'workOut', hours: 1 })).not.toThrow()
+  })
+
+  it("slows healthUpkeep()'s cheap-food drain, proportional to fitness, never reversing it", () => {
+    // Overwork no longer drains health at all (Wave 16's Burnout row moved
+    // that consequence to a separate stat) — the cheap-groceries drain is
+    // the one health-decay source fitness still slows.
+    function cheapFoodPlayer(fitness: number) {
+      const s = game(easyGoals, 1)
+      s.player.apartment = 'secure' // no rent/robbery confound
+      s.player.fed = 0
+      s.player.groceries = FOOD_NEEDED // fed entirely from cheap groceries
+      s.player.fitness = fitness
+      return s
+    }
+    const noFitness = cheapFoodPlayer(0)
+    const healthBefore1 = noFitness.player.health
+    const afterNoFitness = applyAction(noFitness, { type: 'endWeek' })
+    const drainNoFitness = healthBefore1 - afterNoFitness.player.health
+
+    const maxFitness = cheapFoodPlayer(100)
+    const healthBefore2 = maxFitness.player.health
+    const afterMaxFitness = applyAction(maxFitness, { type: 'endWeek' })
+    const drainMaxFitness = healthBefore2 - afterMaxFitness.player.health
+
+    expect(drainNoFitness).toBe(HEALTH_CHEAP_FOOD_DRAIN)
+    expect(drainMaxFitness).toBe(
+      Math.round(HEALTH_CHEAP_FOOD_DRAIN * (1 - FITNESS_DECAY_REDUCTION_MAX))
+    )
+    expect(drainMaxFitness).toBeLessThan(drainNoFitness)
+    expect(drainMaxFitness).toBeGreaterThan(0) // slowed, not eliminated
+  })
+})
+
+describe('burnout', () => {
+  it('overwork builds burnout instead of draining health directly', () => {
+    let s = game(easyGoals, 1)
+    s.player.hoursWorkedThisWeek = OVERWORK_THRESHOLD + 20
+    s.player.apartment = 'secure' // no rent/robbery confound
+    s.player.fed = FOOD_NEEDED // no hunger or cheap-food confound
+    const healthBefore = s.player.health
+    s = applyAction(s, { type: 'endWeek' })
+    expect(s.player.burnout).toBe(Math.round(20 * BURNOUT_GAIN_RATE))
+    expect(s.player.health).toBe(healthBefore) // health is untouched by overwork now
+    expect(
+      s.lastReport?.entries.some(
+        (e) => e.actor === 'player' && e.text.includes('overworked') && e.text.includes('burnout')
+      )
+    ).toBe(true)
+  })
+
+  it('drags happiness down once burnout crosses BURNOUT_HIGH_THRESHOLD, same shape as health', () => {
+    function burntPlayer(burnout: number) {
+      const s = game(easyGoals, 1)
+      s.player.apartment = 'secure'
+      s.player.fed = FOOD_NEEDED
+      s.player.burnout = burnout
+      return s
+    }
+    const atThreshold = applyAction(burntPlayer(BURNOUT_HIGH_THRESHOLD), { type: 'endWeek' })
+    const overThreshold = applyAction(burntPlayer(BURNOUT_HIGH_THRESHOLD + 1), { type: 'endWeek' })
+    // Identical seed/setup otherwise, so the only difference is the extra
+    // happiness penalty for crossing the threshold.
+    expect(atThreshold.player.happiness - overThreshold.player.happiness).toBe(
+      BURNOUT_HIGH_HAPPINESS_PENALTY
+    )
+  })
+
+  it('relax() relieves burnout at BURNOUT_RELIEF_PER_HOUR/hour, capped at 0', () => {
+    let s = applyAction(game(), { type: 'travel', to: 'rentoffice' })
+    s = applyAction(s, { type: 'rentApartment', tier: 'basic' })
+    s = applyAction(s, { type: 'travel', to: 'home' })
+    s.player.burnout = 10
+    s = applyAction(s, { type: 'relax', hours: 2 })
+    expect(s.player.burnout).toBe(Math.max(0, 10 - 2 * BURNOUT_RELIEF_PER_HOUR))
+
+    s.player.burnout = 1
+    s = applyAction(s, { type: 'relax', hours: 1 })
+    expect(s.player.burnout).toBe(0) // capped, not negative
+  })
+
+  it("gates work()'s pay via burnoutEfficiency — its real differentiator from health", () => {
+    let s = applyAction(game(easyGoals, 1), { type: 'travel', to: 'employment' })
+    s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
+    s = applyAction(s, { type: 'travel', to: 'burgers' })
+    s.player.burnout = 100
+    const before = s.player.cash
+    s = applyAction(s, { type: 'work', hours: 10 })
+    const actualPay = s.player.cash - before
+    const nominalRate = wagePerHour(s, 'fry-cook', 0, traitWageMultiplier(s.player))
+    expect(burnoutEfficiency(s.player)).toBe(1 - BURNOUT_EFFICIENCY_PENALTY_MAX)
+    expect(actualPay).toBe(Math.round(10 * nominalRate * (1 - BURNOUT_EFFICIENCY_PENALTY_MAX)))
+    expect(actualPay).toBeLessThan(Math.round(10 * nominalRate))
+  })
+})
+
+describe('chronic conditions', () => {
+  // personalEvent() runs every week regardless of what's under test here and
+  // can move cash at random (a real confound over the many weeks these tests
+  // play out) — zeroed the same way the insurance tests above isolate their
+  // own weekly-cost assertions.
+  const noEventRules = { ...RULE_PRESETS.classic, eventFrequency: 0 }
+
+  // Unwell (health below HEALTH_SICK_THRESHOLD) with `fitness` as the given
+  // parameter — everything else neutral (secure apartment, no rent/robbery/
+  // hunger confound needed since nothing here touches cash via those paths).
+  function neglectedPlayer(fitness: number) {
+    const s = newGame({ playerName: 'T', goals: easyGoals, seed: 1, rules: noEventRules })
+    s.player.apartment = 'secure'
+    s.player.health = HEALTH_SICK_THRESHOLD - 1
+    s.player.fitness = fitness
+    return s
+  }
+
+  function playNWeeks(s: GameState, weeks: number): GameState {
+    for (let w = 0; w < weeks; w++) {
+      s = applyAction(s, { type: 'endWeek' })
+      if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
+    }
+    return s
+  }
+
+  function hasChronic(s: GameState): boolean {
+    return s.player.activeEvents.some((e) => e.chainId === 'chronic')
+  }
+
+  it('starts a chronic condition only after CHRONIC_ONSET_WEEKS of sustained neglect', () => {
+    let s = neglectedPlayer(0)
+    s = playNWeeks(s, CHRONIC_ONSET_WEEKS - 1)
+    expect(hasChronic(s)).toBe(false)
+    s = applyAction(s, { type: 'endWeek' })
+    expect(hasChronic(s)).toBe(true)
+    expect(s.player.neglectWeeks).toBe(0) // reset once the chain actually starts
+    expect(
+      s.lastReport?.entries.some(
+        (e) =>
+          e.actor === 'player' && e.text.includes('chronic condition') && e.text.includes('neglect')
+      )
+    ).toBe(true)
+  })
+
+  it('never accumulates neglect while fitness stays at/above CHRONIC_FITNESS_SAFE_THRESHOLD', () => {
+    // The whole point of "depends on Fitness habit for the neglect signal":
+    // even a modest fitness investment is real self-care, so it isn't neglect
+    // no matter how unwell the player is otherwise.
+    let s = neglectedPlayer(CHRONIC_FITNESS_SAFE_THRESHOLD)
+    s = playNWeeks(s, CHRONIC_ONSET_WEEKS + 5)
+    expect(s.player.neglectWeeks).toBe(0)
+    expect(hasChronic(s)).toBe(false)
+  })
+
+  it('charges CHRONIC_WEEKLY_COST and CHRONIC_WEEKLY_TIME_COST each week it stays active', () => {
+    let s = neglectedPlayer(0)
+    s = playNWeeks(s, CHRONIC_ONSET_WEEKS)
+    expect(hasChronic(s)).toBe(true)
+    const cashBefore = s.player.cash
+    s = applyAction(s, { type: 'endWeek' })
+    expect(cashBefore - s.player.cash).toBe(CHRONIC_WEEKLY_COST)
+    expect(s.player.timeLeft).toBe(WEEK_TIME - CHRONIC_WEEKLY_TIME_COST)
+  })
+
+  it('clears after CHRONIC_RECOVERY_WEEKS of sustained recovery, not a moment sooner', () => {
+    let s = neglectedPlayer(0)
+    s = playNWeeks(s, CHRONIC_ONSET_WEEKS)
+    expect(hasChronic(s)).toBe(true)
+
+    // Recover: health fixed, and nothing else in this scenario touches it
+    // again (no overwork, no cheap-food week), so it holds steady on its own.
+    s.player.health = 100
+    s = playNWeeks(s, CHRONIC_RECOVERY_WEEKS - 1)
+    expect(hasChronic(s)).toBe(true) // not yet — one week short
+    s = applyAction(s, { type: 'endWeek' })
+    expect(hasChronic(s)).toBe(false) // cleared
+  })
+
+  it('a relapse week resets recovery progress instead of merely pausing it', () => {
+    let s = neglectedPlayer(0)
+    s = playNWeeks(s, CHRONIC_ONSET_WEEKS)
+    s.player.health = 100
+    s = playNWeeks(s, CHRONIC_RECOVERY_WEEKS - 1) // one week from clearing
+    expect(hasChronic(s)).toBe(true)
+
+    s.player.health = HEALTH_SICK_THRESHOLD - 1 // relapse
+    s = applyAction(s, { type: 'endWeek' })
+    expect(hasChronic(s)).toBe(true) // still active — the relapse cost it the progress
+
+    // Recovering again needs the *full* CHRONIC_RECOVERY_WEEKS from here, not
+    // just the one week that would have cleared it before the relapse.
+    s.player.health = 100
+    s = playNWeeks(s, CHRONIC_RECOVERY_WEEKS - 1)
+    expect(hasChronic(s)).toBe(true)
+    s = applyAction(s, { type: 'endWeek' })
+    expect(hasChronic(s)).toBe(false)
+  })
+
+  it("doesn't stack a second chain while one is already active", () => {
+    let s = neglectedPlayer(0)
+    // Neglect continues well past onset — hasActiveChain must keep this from
+    // starting a second, redundant chain every time neglectWeeks re-crosses
+    // the threshold.
+    s = playNWeeks(s, CHRONIC_ONSET_WEEKS + 3)
+    const chronicChains = s.player.activeEvents.filter((e) => e.chainId === 'chronic')
+    expect(chronicChains).toHaveLength(1)
   })
 })
 
@@ -645,17 +1130,17 @@ describe('casino', () => {
   })
 
   it('a win pays out double the bet; a loss costs the bet — seeds found by brute force', () => {
-    // Lose seed re-found (1 → 5) after Wave 14's Origin backgrounds added a
-    // seeded RNG draw at newGame() construction — see Standing Constraints'
-    // RNG-draw-count fragility note. Win seed 0 happened to still work.
-    let win = applyAction(game(easyGoals, 0), { type: 'travel', to: 'casino' })
+    // Both seeds re-found (win 0 → 1, lose 5 → 0) after Wave 15's shuffled
+    // city layout added a second seeded RNG draw at newGame() construction —
+    // see Standing Constraints' RNG-draw-count fragility note.
+    let win = applyAction(game(easyGoals, 1), { type: 'travel', to: 'casino' })
     const winCashBefore = win.player.cash
     win = applyAction(win, { type: 'playCasino', bet: 50 })
     expect(win.player.cash).toBe(winCashBefore + 50) // net +50: staked 50, paid back 100
     expect(win.lastReport).toBeNull() // resolves immediately, not at week's end
     expect(win.log.some((e) => e.text.includes('won'))).toBe(true)
 
-    let lose = applyAction(game(easyGoals, 5), { type: 'travel', to: 'casino' })
+    let lose = applyAction(game(easyGoals, 0), { type: 'travel', to: 'casino' })
     const loseCashBefore = lose.player.cash
     lose = applyAction(lose, { type: 'playCasino', bet: 50 })
     expect(lose.player.cash).toBe(loseCashBefore - 50)
@@ -835,23 +1320,25 @@ describe('event chains', () => {
 })
 
 describe('health', () => {
-  it('overworking past 40h/week drains health', () => {
+  it('overworking past 40h/week no longer drains health — see describe(burnout) for its own consequence', () => {
     let s = applyAction(game(), { type: 'travel', to: 'employment' })
     s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
     s = applyAction(s, { type: 'travel', to: 'burgers' })
     s = applyAction(s, { type: 'work', hours: 45 })
     s = applyAction(s, { type: 'endWeek' })
-    expect(s.player.health).toBe(100 - Math.round(5 * 0.5)) // 5h over the 40h threshold
+    expect(s.player.health).toBe(100)
+    expect(s.player.burnout).toBeGreaterThan(0) // the consequence moved here, not gone
     expect(s.lastReport?.entries.some((e) => e.text.includes('overworked'))).toBe(true)
   })
 
-  it('working exactly 40h/week costs no health', () => {
+  it('working exactly 40h/week costs no health or burnout', () => {
     let s = applyAction(game(), { type: 'travel', to: 'employment' })
     s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
     s = applyAction(s, { type: 'travel', to: 'burgers' })
     s = applyAction(s, { type: 'work', hours: 40 })
     s = applyAction(s, { type: 'endWeek' })
     expect(s.player.health).toBe(100)
+    expect(s.player.burnout).toBe(0)
   })
 
   it('a week fed entirely from cheap groceries costs health even without hunger', () => {
@@ -863,10 +1350,10 @@ describe('health', () => {
   })
 
   it('the Clinic heals health for cash and time', () => {
-    let s = applyAction(game(), { type: 'travel', to: 'employment' })
-    s = applyAction(s, { type: 'applyJob', jobId: 'fry-cook' })
-    s = applyAction(s, { type: 'travel', to: 'burgers' })
-    s = applyAction(s, { type: 'work', hours: 50 })
+    // A cheap-groceries week hurts health (overwork no longer does — see the
+    // burnout tests above and describe('burnout') below).
+    let s = applyAction(game(), { type: 'travel', to: 'megamart' })
+    s = applyAction(s, { type: 'buyGroceries', units: FOOD_NEEDED })
     s = applyAction(s, { type: 'endWeek' })
     const hurtHealth = s.player.health
     expect(hurtHealth).toBeLessThan(100)
@@ -1228,11 +1715,11 @@ describe('wilder global headlines', () => {
 
   it("applies a wilder headline's wage/market swing to the shared economy indices", () => {
     // Deterministic seed/week found by brute force where the very next
-    // driftEconomy() call lands on the Boom year headline. Re-found (156 →
-    // 194) after Wave 14's Origin backgrounds added a seeded RNG draw at
-    // newGame() construction — see Standing Constraints' RNG-draw-count
-    // fragility note.
-    let s = newGame({ playerName: 'T', goals: easyGoals, seed: 194 })
+    // driftEconomy() call lands on the Boom year headline. Re-found (194 →
+    // 24) after Wave 15's shuffled city layout added a second seeded RNG
+    // draw at newGame() construction — see Standing Constraints'
+    // RNG-draw-count fragility note.
+    let s = newGame({ playerName: 'T', goals: easyGoals, seed: 24 })
     s.week = 4 // an ordinary week — not a season-transition or holiday week
     const priceIndexBefore = s.economy.priceIndex
     const wageIndexBefore = s.economy.wageIndex
@@ -1289,40 +1776,47 @@ describe('expanded personal events (Wave 7)', () => {
   }
 
   it('fires viral windfall, car trouble, surprise refund, costly mistake, lucky find, jury duty, and lost wallet with exact cash/happiness/time effects — seed found by brute force', () => {
-    // Re-found (weeks, cash deltas, jury-duty hours) twice: once after Wave
-    // 14's Origin backgrounds added a seeded RNG draw at newGame()
-    // construction, and again after rebalancing the ORIGINS deltas
-    // themselves — Riley's origin changes what her AI does with its turn
-    // (runAIWeek), which changes how many rolls her turn consumes, which
-    // shifts the shared stream for every week after. Same seed (0) still
-    // hits all seven outcomes both times, just at different weeks/amounts;
-    // see Standing Constraints' RNG-draw-count fragility note.
+    // Re-found (weeks, cash deltas, jury-duty hours) four times now: after
+    // Wave 14's Origin backgrounds added a seeded RNG draw at newGame()
+    // construction, after rebalancing the ORIGINS deltas themselves, after
+    // Wave 15's shuffled city layout added a second construction-time draw,
+    // and again after Wave 14's Traits row gave Riley's (randomly drawn)
+    // origin a wage/price/dress-wear modifier — changing Riley's own cash
+    // trajectory shifts when Riley buys/loses things, which shifts how many
+    // rolls her turn consumes, same fragility class as an RNG-draw-count
+    // change. Same seed (0) still hits all seven outcomes every time, just
+    // at different weeks/amounts; see Standing Constraints' RNG-draw-count
+    // fragility note. Re-found once more after Wave 16's Burnout row moved
+    // overwork's health drain onto a separate stat and changed ensureHealth's
+    // own trigger condition — this time 'costly mistake' (week 151 → 89) and
+    // "'s post went viral" (week 100 → 125) both moved; the other five
+    // happened not to shift this time.
     const expected: Record<
       string,
       { week: number; cashDelta: number; happinessDelta: number; hours?: number }
     > = {
       "'s post went viral": {
-        week: 4,
-        cashDelta: 38,
+        week: 125,
+        cashDelta: 34,
         happinessDelta: VIRAL_WINDFALL_HAPPINESS_BONUS,
       },
-      'car broke down': { week: 8, cashDelta: -100, happinessDelta: 0 },
-      'surprise $': { week: 101, cashDelta: 74, happinessDelta: 0 },
-      'jury duty': { week: 17, cashDelta: 0, happinessDelta: 0, hours: 12 },
-      'incredibly lucky': { week: 29, cashDelta: 174, happinessDelta: LUCKY_FIND_HAPPINESS_BONUS },
+      'car broke down': { week: 17, cashDelta: -113, happinessDelta: 0 },
+      'surprise $': { week: 23, cashDelta: 67, happinessDelta: 0 },
+      'jury duty': { week: 16, cashDelta: 0, happinessDelta: 0, hours: 12 },
+      'incredibly lucky': { week: 47, cashDelta: 185, happinessDelta: LUCKY_FIND_HAPPINESS_BONUS },
       'costly mistake': {
-        week: 11,
-        cashDelta: -155,
+        week: 89,
+        cashDelta: -258,
         happinessDelta: -COSTLY_MISTAKE_HAPPINESS_PENALTY,
       },
       'lost their wallet': {
-        week: 56,
-        cashDelta: -58,
+        week: 31,
+        cashDelta: -22,
         happinessDelta: -LOST_WALLET_HAPPINESS_PENALTY,
       },
     }
     let s = newGame({ playerName: 'T', goals: noWinGoals, seed: 0, rules: highFrequencyRules })
-    for (let w = 1; w <= 101; w++) {
+    for (let w = 1; w <= 200; w++) {
       neutralizeConfounds(s)
       const cashBefore = s.player.cash
       const happinessBefore = s.player.happiness
@@ -1347,22 +1841,23 @@ describe('expanded personal events (Wave 7)', () => {
   })
 
   it('fires home repair only for a player with a place to fix, with an exact cash effect — seed found by brute force', () => {
-    // Seed/week/cash-delta re-found twice (was seed 5/week 5/-$68, then seed
-    // 0/week 23/-$122) — once after Wave 14's Origin backgrounds added a
-    // seeded RNG draw at newGame() construction, and again after rebalancing
-    // the ORIGINS deltas themselves shifted how many rolls Riley's AI turn
-    // consumes. See Standing Constraints' RNG-draw-count fragility note.
+    // Seed/week/cash-delta re-found three times now (was seed 5/week 5/-$68,
+    // then seed 0/week 23/-$122, then seed 0/week 5/-$45) — after Wave 14's
+    // Origin backgrounds added a seeded RNG draw at newGame() construction,
+    // after rebalancing the ORIGINS deltas themselves, and again after Wave
+    // 15's shuffled city layout added a second construction-time draw. See
+    // Standing Constraints' RNG-draw-count fragility note.
     let s = applyAction(
       newGame({ playerName: 'T', goals: noWinGoals, seed: 0, rules: highFrequencyRules }),
       { type: 'travel', to: 'rentoffice' }
     )
     s = applyAction(s, { type: 'rentApartment', tier: 'basic' })
-    // Weeks 1-23 pass uneventfully (this outcome needs an actual apartment,
+    // Weeks 1-4 pass uneventfully (this outcome needs an actual apartment,
     // so it can't reuse neutralizeConfounds()'s secure-apartment default);
-    // week 24 is the target, isolated the same way — no rent due, no
+    // week 5 is the target, isolated the same way — no rent due, no
     // maturing chain, no hunger — so the cash delta is provably this
     // outcome's own effect.
-    for (let w = 1; w <= 23; w++) {
+    for (let w = 1; w <= 4; w++) {
       s.player.fed = FOOD_NEEDED
       s.player.rentDue = 0
       s.player.weeksBehindOnRent = 0
@@ -1380,19 +1875,19 @@ describe('expanded personal events (Wave 7)', () => {
       (e) => e.actor === 'player' && e.text.includes('fix something around the apartment')
     )
     expect(repair).toBeDefined()
-    expect(s.player.cash - cashBefore).toBe(-66)
+    expect(s.player.cash - cashBefore).toBe(-45)
   })
 
   it("caps a cash-cost outcome at the player's available cash, never going negative", () => {
     // Same cap pattern as the doctor's bill (case 1) and Holiday one-offs'
     // tax week — targets the known costly-mistake week from the first test
-    // above (week 11, $155 cost — re-found alongside it after Wave 14's
-    // Origin backgrounds shifted the RNG stream) with far less cash than
-    // that on hand.
+    // above (week 89, $258 cost — re-found alongside it after Wave 16's
+    // Burnout row shifted the RNG stream) with far less cash than that on
+    // hand.
     let s = newGame({ playerName: 'T', goals: noWinGoals, seed: 0, rules: highFrequencyRules })
-    for (let w = 1; w <= 11; w++) {
+    for (let w = 1; w <= 89; w++) {
       neutralizeConfounds(s)
-      if (w === 11) s.player.cash = 10 // below the $155 this week is about to cost
+      if (w === 89) s.player.cash = 10 // below the $258 this week is about to cost
       s = applyAction(s, { type: 'endWeek' })
       if (s.phase === 'weekReport') s = applyAction(s, { type: 'dismissReport' })
     }
@@ -1400,6 +1895,6 @@ describe('expanded personal events (Wave 7)', () => {
       (e) => e.actor === 'player' && e.text.includes('costly mistake')
     )
     expect(mistake).toBeDefined()
-    expect(s.player.cash).toBe(0) // capped, not -277
+    expect(s.player.cash).toBe(0) // capped, not -248
   })
 })

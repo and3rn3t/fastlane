@@ -25,7 +25,9 @@
 import {
   AI_PROFILES,
   applyAction,
+  BURNOUT_HIGH_THRESHOLD,
   goalProgress,
+  HEALTH_SICK_THRESHOLD,
   jobRequirements,
   LOCATIONS,
   newGame,
@@ -39,6 +41,7 @@ import {
   type LocationId,
   type OriginId,
   type PlayerKey,
+  type PlayerState,
   type RulePresetName,
 } from '../src/engine/index.ts'
 
@@ -85,6 +88,15 @@ export interface SimResult {
   // this reflects real usage, not just passing through.
   playerLocationActions: Record<LocationId, number>
   rileyLocationActions: Record<LocationId, number>
+  // Wave 16 — "Sim: health as a reported bottleneck": weeks (same "entering
+  // the week" snapshot timing as the stall tracker above) this side was
+  // unwell — see isUnwell() below. The four-goal framing above can only ever
+  // say *which goal* fell short; this is what lets a losing run also say
+  // *why* — "too sick/burned out to keep up" is invisible to winningGoal
+  // entirely, since a side that never got close to any goal crossing never
+  // registers there at all.
+  playerUnwellWeeks: number
+  rileyUnwellWeeks: number
 }
 
 // A requirement (e.g. 'dress', 'skill:sales') counts as "stalled" for a week
@@ -205,6 +217,23 @@ export function tallyLocationActions(
   return tally
 }
 
+// Reuses the exact same condition week.ts's own `unwell` local (happinessUpkeep)
+// gates its happiness penalty on, and the same HEALTH_SICK_THRESHOLD a
+// sickness event risks time on — not a new sim-only bar, "unwell" here means
+// the same thing it means to the engine.
+//
+// Deliberately does NOT also fire once burnout > 0, even though
+// burnoutEfficiency() starts shaving work() pay from the very first point of
+// burnout — that efficiency cut is a continuous economic tax (a little
+// burnout, a little less pay), while "unwell" tracks the same discrete bad
+// states the engine itself treats as a threshold to cross, not a dial to
+// nudge. Counting any nonzero efficiency loss as "unwell" would fire on
+// nearly every week either side works overtime, drowning this breakdown's
+// signal for the two conditions it actually names.
+export function isUnwell(p: Pick<PlayerState, 'health' | 'burnout'>): boolean {
+  return p.health < HEALTH_SICK_THRESHOLD || p.burnout > BURNOUT_HIGH_THRESHOLD
+}
+
 // Only a goal that was actually below threshold going into the winning week
 // AND cleared it by the end of that same week counts as "completed this
 // week" — picking the global lowest-progress goal instead (an earlier draft
@@ -248,6 +277,8 @@ function runOneGame(
 
   const playerStallTracker = newStallTracker()
   const rileyStallTracker = newStallTracker()
+  let playerUnwellWeeks = 0
+  let rileyUnwellWeeks = 0
 
   const finish = (): Pick<
     SimResult,
@@ -277,6 +308,9 @@ function runOneGame(
     // priorProgress above.
     updateStallTracker(playerStallTracker, ...observeStall(state, 'player'))
     updateStallTracker(rileyStallTracker, ...observeStall(state, 'riley'))
+    // Wave 16: same "entering the week" timing as the stall tracker above.
+    if (isUnwell(state.player)) playerUnwellWeeks++
+    if (isUnwell(state.riley)) rileyUnwellWeeks++
     // Player side always runs Balanced — a fixed opponent is what makes the
     // win rate a meaningful signal for whatever Riley profile is under test.
     runAIWeek(state, 'player', AI_PROFILES.balanced)
@@ -294,6 +328,8 @@ function runOneGame(
         winner,
         weeks: state.week - 1,
         winningGoal,
+        playerUnwellWeeks,
+        rileyUnwellWeeks,
         ...rileySystemUsage(state),
         ...finish(),
       }
@@ -304,6 +340,8 @@ function runOneGame(
     winner: 'none',
     weeks: MAX_WEEKS,
     winningGoal: null,
+    playerUnwellWeeks,
+    rileyUnwellWeeks,
     ...rileySystemUsage(state),
     ...finish(),
   }
@@ -409,6 +447,27 @@ function tallyStalls(results: SimResult[], side: 'player' | 'riley'): StallBreak
   return out
 }
 
+// Wave 16 — "Sim: health as a reported bottleneck": among the games this
+// side *lost* (the other side won, or nobody did), what share had this side
+// unwell (see isUnwell()) for LONG_STALL_WEEKS+ weeks — the same "sustained,
+// not a blip" bar the requirement-stall report already uses, so the two
+// numbers read on the same scale. "Lost" here is deliberately "didn't win"
+// rather than "the other side won": a no-winner game is exactly the kind of
+// grind where being chronically unwell is most plausibly part of the story.
+export interface UnwellLossStats {
+  losses: number
+  longUnwellLossPct: number
+}
+
+function tallyUnwellLosses(results: SimResult[], side: 'player' | 'riley'): UnwellLossStats {
+  const losses = results.filter((r) => r.winner !== side)
+  if (losses.length === 0) return { losses: 0, longUnwellLossPct: 0 }
+  const longUnwell = losses.filter(
+    (r) => (side === 'player' ? r.playerUnwellWeeks : r.rileyUnwellWeeks) >= LONG_STALL_WEEKS
+  ).length
+  return { losses: losses.length, longUnwellLossPct: (longUnwell / losses.length) * 100 }
+}
+
 function tallyLocationActionsAcrossBatch(
   results: SimResult[],
   side: 'player' | 'riley'
@@ -444,6 +503,8 @@ export interface BatchSummary {
   // tallyLocationActions()), aggregated across every game in the batch.
   stallBreakdown: { player: StallBreakdown; riley: StallBreakdown }
   locationActions: { player: Record<LocationId, number>; riley: Record<LocationId, number> }
+  // Wave 16 — "Sim: health as a reported bottleneck": see tallyUnwellLosses().
+  unwellLossBreakdown: { player: UnwellLossStats; riley: UnwellLossStats }
 }
 
 export function runBatch(
@@ -481,6 +542,10 @@ export function runBatch(
     locationActions: {
       player: tallyLocationActionsAcrossBatch(results, 'player'),
       riley: tallyLocationActionsAcrossBatch(results, 'riley'),
+    },
+    unwellLossBreakdown: {
+      player: tallyUnwellLosses(results, 'player'),
+      riley: tallyUnwellLosses(results, 'riley'),
     },
   }
 }
@@ -554,7 +619,25 @@ function reportSingleCell(
   )
 
   printStallBreakdown(batch)
+  printUnwellBreakdown(batch)
   printLocationBreakdown(batch)
+}
+
+// Companion to the winning-goal breakdown above: that one can only speak for
+// the side that actually won something. This one speaks for the side that
+// didn't — how often being chronically unwell (see isUnwell()) looks like
+// part of why, not just a coincidence. "10+ weeks" here is a total across
+// the whole game, not a consecutive streak (unlike the requirement-stall
+// tracker above) — a simpler, cheaper signal that still distinguishes "sick
+// once in passing" from "chronically run down," which is the actual
+// question this row asks.
+function printUnwellBreakdown(batch: BatchSummary) {
+  const { player, riley } = batch.unwellLossBreakdown
+  console.log(
+    `Health/burnout as a loss factor (losses where the losing side spent ${LONG_STALL_WEEKS}+ weeks unwell):`
+  )
+  console.log(`  Player losses — ${player.longUnwellLossPct.toFixed(1)}% (${player.losses} losses)`)
+  console.log(`  Riley losses  — ${riley.longUnwellLossPct.toFixed(1)}% (${riley.losses} losses)\n`)
 }
 
 // Sorted descending by longStallGamePct — the requirement most often a real

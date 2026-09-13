@@ -263,9 +263,9 @@ export function Board({
   return (
     <div className="board" ref={boardRef}>
       {Object.values(LOCATIONS).map((loc) => {
-        const [row, col] = PERIMETER[loc.loopIndex]
+        const [row, col] = PERIMETER[game.layout[loc.id]]
         const here = p.location === loc.id
-        const cost = travelCost(p.location, loc.id, bike)
+        const cost = travelCost(p.location, loc.id, bike, game.layout)
         const TileIcon = LOCATION_ICONS[loc.id]
         const category = LOCATION_CATEGORY[loc.id]
         return (

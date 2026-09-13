@@ -260,7 +260,7 @@ describe('save migration', () => {
     expect(screen.getAllByText('$777').length).toBeGreaterThan(0)
 
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(11)
+    expect(upgraded.version).toBe(16)
     expect(upgraded.history).toEqual([])
     // 0 → 1 → 2 → 3 → 4 ran in sequence — every field along the way backfilled.
     expect(upgraded.player.health).toBe(100)
@@ -297,7 +297,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 3/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(11)
+    expect(upgraded.version).toBe(16)
     expect(upgraded.player.health).toBe(100)
     expect(upgraded.riley.health).toBe(100)
     expect(upgraded.player.hoursWorkedThisWeek).toBe(0)
@@ -327,7 +327,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 4/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(11)
+    expect(upgraded.version).toBe(16)
     expect(upgraded.player.health).toBe(88) // untouched by this migration
     expect(upgraded.player.jobTenureWeeks).toBe(0)
     expect(upgraded.player.promotionLevel).toBe(0)
@@ -369,7 +369,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 6/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(11)
+    expect(upgraded.version).toBe(16)
     expect(upgraded.player.promotionLevel).toBe(1) // untouched by this migration
     expect(upgraded.player.loanBalance).toBe(0)
     expect(upgraded.player.loanWeeksBehind).toBe(0)
@@ -414,7 +414,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 7/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(11)
+    expect(upgraded.version).toBe(16)
     expect(upgraded.player.loanBalance).toBe(500) // untouched by this migration
     expect(upgraded.rileyProfile).toBe('balanced')
     expect(upgraded.rules).toEqual({ eventFrequency: 1, economyVolatility: 1, startingCash: 200 })
@@ -443,7 +443,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 8/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(11)
+    expect(upgraded.version).toBe(16)
     expect(upgraded.rileyProfile).toBe('hustler') // untouched by this migration
     expect(upgraded.rules).toEqual({ eventFrequency: 1, economyVolatility: 1, startingCash: 200 })
     expect(upgraded.isDailyChallenge).toBe(false)
@@ -473,7 +473,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 9/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(11)
+    expect(upgraded.version).toBe(16)
     expect(upgraded.rules.startingCash).toBe(100) // untouched by this migration
     expect(upgraded.isDailyChallenge).toBe(false)
   })
@@ -503,7 +503,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 10/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(11)
+    expect(upgraded.version).toBe(16)
     expect(upgraded.rileyProfile).toBe('scholar') // untouched by this migration
     expect(upgraded.rileyDifficulty).toBe('normal')
   })
@@ -545,7 +545,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 11/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(11)
+    expect(upgraded.version).toBe(16)
     expect(upgraded.rileyDifficulty).toBe('easy') // untouched by this migration
     expect(upgraded.economy.marketIndex).toBe(1)
     expect(upgraded.player.skills).toEqual({ sales: 0, trades: 100, tech: 0 })
@@ -608,7 +608,7 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 12/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(11)
+    expect(upgraded.version).toBe(16)
     expect(upgraded.rileyProfile).toBe('gambler') // untouched by this migration
     expect(upgraded.rileyMomentum).toBe('even')
   })
@@ -664,10 +664,322 @@ describe('save migration', () => {
 
     expect(screen.getByText(/Week 13/)).toBeTruthy()
     const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
-    expect(upgraded.version).toBe(11)
+    expect(upgraded.version).toBe(16)
     expect(upgraded.rileyMomentum).toBe('cold') // untouched by this migration
     expect(upgraded.player.originId).toBe('career-changer')
     expect(upgraded.riley.originId).toBe('career-changer')
+  })
+
+  it('upgrades a v12 (pre-Insurance-tiers) save: the old item backfills to basic, no item backfills to none', () => {
+    // A genuine v12 save already has originId/layout (added by earlier
+    // migrations this one doesn't exercise) but no per-player `insurance`
+    // field yet — the old binary `insurance` ItemId is what Wave 16's
+    // Insurance tiers row replaced, so a player who owned it keeps the exact
+    // coverage they already paid for (backfilled to 'basic', not 'none',
+    // which would silently take away something they owned) and it's
+    // stripped out of `items` since it's no longer a valid ItemId.
+    const v12Fields = {
+      health: 100,
+      hoursWorkedThisWeek: 0,
+      jobTenureWeeks: 0,
+      promotionLevel: 0,
+      loanBalance: 0,
+      loanWeeksBehind: 0,
+      creditScore: 50,
+      garnished: false,
+      loanPaidThisWeek: false,
+      skills: { sales: 0, trades: 0, tech: 0 },
+      investments: 0,
+      activeEvents: [],
+      originId: 'career-changer',
+    }
+    const v12 = {
+      version: 12,
+      week: 14,
+      rngSeed: 1,
+      phase: 'playing',
+      winner: null,
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      economy: {
+        priceIndex: 1,
+        wageIndex: 1,
+        interestRate: 0.005,
+        lotteryJackpot: 500,
+        marketIndex: 1,
+      },
+      layout: {
+        home: 0,
+        employment: 1,
+        burgers: 2,
+        megamart: 3,
+        university: 4,
+        factory: 5,
+        bank: 6,
+        clothing: 7,
+        gadgets: 8,
+        market: 9,
+        pawn: 10,
+        rentoffice: 11,
+        clinic: 12,
+        casino: 13,
+      },
+      player: { ...legacyPlayer('V12Player', 88), ...v12Fields, items: ['insurance', 'bike'] },
+      riley: { ...legacyPlayer('Riley', 250), ...v12Fields, items: [] },
+      rileyProfile: 'hustler',
+      rileyDifficulty: 'easy',
+      rileyMomentum: 'cold',
+      rules: { eventFrequency: 1, economyVolatility: 1, startingCash: 200 },
+      isDailyChallenge: false,
+      headline: 'A new life in the fast lane begins.',
+      log: [],
+      lastReport: null,
+      history: [],
+    }
+    localStorage.setItem('fastlane-save-v1', JSON.stringify(v12))
+
+    renderApp()
+
+    expect(screen.getByText(/Week 14/)).toBeTruthy()
+    const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
+    expect(upgraded.version).toBe(16)
+    expect(upgraded.player.insurance).toBe('basic')
+    expect(upgraded.player.items).toEqual(['bike']) // 'insurance' stripped, 'bike' untouched
+    expect(upgraded.riley.insurance).toBe('none')
+    expect(upgraded.riley.items).toEqual([])
+  })
+
+  it('upgrades a v13 (pre-Fitness-habit) save, backfilling fitness to 0', () => {
+    // A genuine v13 save already has insurance (added by the migration this
+    // one doesn't exercise) but no per-player `fitness` field yet — a save
+    // from before Wave 16's Fitness habit had never built any, so 0 is a
+    // real fact (the same starting value a fresh player gets), not a guess.
+    const v13Fields = {
+      health: 100,
+      hoursWorkedThisWeek: 0,
+      jobTenureWeeks: 0,
+      promotionLevel: 0,
+      loanBalance: 0,
+      loanWeeksBehind: 0,
+      creditScore: 50,
+      garnished: false,
+      loanPaidThisWeek: false,
+      skills: { sales: 0, trades: 0, tech: 0 },
+      investments: 0,
+      activeEvents: [],
+      originId: 'career-changer',
+      items: ['bike'],
+      insurance: 'basic',
+    }
+    const v13 = {
+      version: 13,
+      week: 15,
+      rngSeed: 1,
+      phase: 'playing',
+      winner: null,
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      economy: {
+        priceIndex: 1,
+        wageIndex: 1,
+        interestRate: 0.005,
+        lotteryJackpot: 500,
+        marketIndex: 1,
+      },
+      layout: {
+        home: 0,
+        employment: 1,
+        burgers: 2,
+        megamart: 3,
+        university: 4,
+        factory: 5,
+        bank: 6,
+        clothing: 7,
+        gadgets: 8,
+        market: 9,
+        pawn: 10,
+        rentoffice: 11,
+        clinic: 12,
+        casino: 13,
+      },
+      player: { ...legacyPlayer('V13Player', 88), ...v13Fields },
+      riley: { ...legacyPlayer('Riley', 250), ...v13Fields, items: [], insurance: 'none' },
+      rileyProfile: 'hustler',
+      rileyDifficulty: 'easy',
+      rileyMomentum: 'cold',
+      rules: { eventFrequency: 1, economyVolatility: 1, startingCash: 200 },
+      isDailyChallenge: false,
+      headline: 'A new life in the fast lane begins.',
+      log: [],
+      lastReport: null,
+      history: [],
+    }
+    localStorage.setItem('fastlane-save-v1', JSON.stringify(v13))
+
+    renderApp()
+
+    expect(screen.getByText(/Week 15/)).toBeTruthy()
+    const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
+    expect(upgraded.version).toBe(16)
+    expect(upgraded.player.fitness).toBe(0)
+    expect(upgraded.riley.fitness).toBe(0)
+    expect(upgraded.player.workedOutThisWeek).toBe(0)
+    expect(upgraded.player.insurance).toBe('basic') // untouched by this migration
+  })
+
+  it('upgrades a v14 (pre-Burnout) save, backfilling burnout to 0', () => {
+    // A genuine v14 save already has fitness/workedOutThisWeek (added by the
+    // migration this one doesn't exercise) but no per-player `burnout` field
+    // yet — a save from before Wave 16's Burnout row had never accumulated
+    // any, so 0 is a real fact, not a guess.
+    const v14Fields = {
+      health: 100,
+      hoursWorkedThisWeek: 0,
+      jobTenureWeeks: 0,
+      promotionLevel: 0,
+      loanBalance: 0,
+      loanWeeksBehind: 0,
+      creditScore: 50,
+      garnished: false,
+      loanPaidThisWeek: false,
+      skills: { sales: 0, trades: 0, tech: 0 },
+      investments: 0,
+      activeEvents: [],
+      originId: 'career-changer',
+      items: ['bike'],
+      insurance: 'basic',
+      fitness: 20,
+      workedOutThisWeek: 4,
+    }
+    const v14 = {
+      version: 14,
+      week: 16,
+      rngSeed: 1,
+      phase: 'playing',
+      winner: null,
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      economy: {
+        priceIndex: 1,
+        wageIndex: 1,
+        interestRate: 0.005,
+        lotteryJackpot: 500,
+        marketIndex: 1,
+      },
+      layout: {
+        home: 0,
+        employment: 1,
+        burgers: 2,
+        megamart: 3,
+        university: 4,
+        factory: 5,
+        bank: 6,
+        clothing: 7,
+        gadgets: 8,
+        market: 9,
+        pawn: 10,
+        rentoffice: 11,
+        clinic: 12,
+        casino: 13,
+      },
+      player: { ...legacyPlayer('V14Player', 88), ...v14Fields },
+      riley: { ...legacyPlayer('Riley', 250), ...v14Fields, items: [], insurance: 'none' },
+      rileyProfile: 'hustler',
+      rileyDifficulty: 'easy',
+      rileyMomentum: 'cold',
+      rules: { eventFrequency: 1, economyVolatility: 1, startingCash: 200 },
+      isDailyChallenge: false,
+      headline: 'A new life in the fast lane begins.',
+      log: [],
+      lastReport: null,
+      history: [],
+    }
+    localStorage.setItem('fastlane-save-v1', JSON.stringify(v14))
+
+    renderApp()
+
+    expect(screen.getByText(/Week 16/)).toBeTruthy()
+    const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
+    expect(upgraded.version).toBe(16)
+    expect(upgraded.player.burnout).toBe(0)
+    expect(upgraded.riley.burnout).toBe(0)
+    expect(upgraded.player.fitness).toBe(20) // untouched by this migration
+  })
+
+  it('upgrades a v15 (pre-Chronic-conditions) save, backfilling neglectWeeks to 0', () => {
+    // A genuine v15 save already has burnout (added by the migration this
+    // one doesn't exercise) but no per-player `neglectWeeks` field yet — a
+    // save from before Wave 16's Chronic conditions row had never been
+    // tracked for neglect, so 0 is a real fact, not a guess.
+    const v15Fields = {
+      health: 100,
+      hoursWorkedThisWeek: 0,
+      jobTenureWeeks: 0,
+      promotionLevel: 0,
+      loanBalance: 0,
+      loanWeeksBehind: 0,
+      creditScore: 50,
+      garnished: false,
+      loanPaidThisWeek: false,
+      skills: { sales: 0, trades: 0, tech: 0 },
+      investments: 0,
+      activeEvents: [],
+      originId: 'career-changer',
+      items: ['bike'],
+      insurance: 'basic',
+      fitness: 20,
+      workedOutThisWeek: 4,
+      burnout: 15,
+    }
+    const v15 = {
+      version: 15,
+      week: 17,
+      rngSeed: 1,
+      phase: 'playing',
+      winner: null,
+      goals: { wealth: 4000, happiness: 70, education: 12, career: 30 },
+      economy: {
+        priceIndex: 1,
+        wageIndex: 1,
+        interestRate: 0.005,
+        lotteryJackpot: 500,
+        marketIndex: 1,
+      },
+      layout: {
+        home: 0,
+        employment: 1,
+        burgers: 2,
+        megamart: 3,
+        university: 4,
+        factory: 5,
+        bank: 6,
+        clothing: 7,
+        gadgets: 8,
+        market: 9,
+        pawn: 10,
+        rentoffice: 11,
+        clinic: 12,
+        casino: 13,
+      },
+      player: { ...legacyPlayer('V15Player', 88), ...v15Fields },
+      riley: { ...legacyPlayer('Riley', 250), ...v15Fields, items: [], insurance: 'none' },
+      rileyProfile: 'hustler',
+      rileyDifficulty: 'easy',
+      rileyMomentum: 'cold',
+      rules: { eventFrequency: 1, economyVolatility: 1, startingCash: 200 },
+      isDailyChallenge: false,
+      headline: 'A new life in the fast lane begins.',
+      log: [],
+      lastReport: null,
+      history: [],
+    }
+    localStorage.setItem('fastlane-save-v1', JSON.stringify(v15))
+
+    renderApp()
+
+    expect(screen.getByText(/Week 17/)).toBeTruthy()
+    const upgraded = JSON.parse(localStorage.getItem('fastlane-save-v1')!)
+    expect(upgraded.version).toBe(16)
+    expect(upgraded.player.neglectWeeks).toBe(0)
+    expect(upgraded.riley.neglectWeeks).toBe(0)
+    expect(upgraded.player.burnout).toBe(15) // untouched by this migration
   })
 
   it('falls back to a fresh game and surfaces an error toast on corrupted JSON', () => {

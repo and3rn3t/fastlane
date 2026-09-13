@@ -30,15 +30,16 @@ import { bestQualifiedJob, nextTargetJob } from './career'
 import {
   CASINO_MAX_BET,
   CASINO_MIN_BET,
-  DOCTOR_PRICE,
   GROCERY_PRICE_MEGAMART,
   HEALTH_SICK_THRESHOLD,
+  INSURANCE_PREMIUM,
   ITEMS,
   RENT,
   SKILL_TRAIN_PRICE,
   TUITION,
   itemById,
   jobById,
+  traitPriceMultiplier,
   travelCost,
 } from './data'
 import { roll } from './rng'
@@ -190,7 +191,7 @@ function attempt(fn: () => void): boolean {
 function goTo(state: GameState, key: PlayerKey, to: LocationId): boolean {
   const p = get(state, key)
   if (p.location === to) return true
-  if (travelCost(p.location, to, act.hasItem(p, 'bike')) > p.timeLeft) return false
+  if (travelCost(p.location, to, act.hasItem(p, 'bike'), state.layout) > p.timeLeft) return false
   return attempt(() => act.travel(state, key, to))
 }
 
@@ -198,7 +199,12 @@ function ensureFood(state: GameState, key: PlayerKey): boolean {
   const p = get(state, key)
   const needed = act.foodShortfall(p)
   if (needed === 0) return false
-  const unitCost = act.seasonalPrice(state, GROCERY_PRICE_MEGAMART, 'grocery')
+  const unitCost = act.seasonalPrice(
+    state,
+    GROCERY_PRICE_MEGAMART,
+    'grocery',
+    traitPriceMultiplier(p)
+  )
   if (p.cash < unitCost * needed + 10) return false
   if (!goTo(state, key, 'megamart')) return false
   const stockUp = act.hasItem(p, 'fridge') ? needed + 6 : needed
@@ -212,7 +218,8 @@ function ensureFood(state: GameState, key: PlayerKey): boolean {
 function ensureHousing(state: GameState, key: PlayerKey): boolean {
   const p = get(state, key)
   if (p.apartment === 'none') {
-    if (p.cash < act.seasonalPrice(state, RENT.basic, 'rent') * 1.5) return false
+    const firstWeek = act.seasonalPrice(state, RENT.basic, 'rent', traitPriceMultiplier(p))
+    if (p.cash < firstWeek * 1.5) return false
     if (!goTo(state, key, 'rentoffice')) return false
     return attempt(() => act.rentApartment(state, key, 'basic'))
   }
@@ -226,7 +233,7 @@ function ensureHousing(state: GameState, key: PlayerKey): boolean {
 function ensureHealth(state: GameState, key: PlayerKey, profile: AiProfile): boolean {
   const p = get(state, key)
   if (p.health >= HEALTH_SICK_THRESHOLD) return false
-  if (p.cash < act.price(state, DOCTOR_PRICE) + reserve(state, profile)) return false
+  if (p.cash < act.doctorPrice(state, p) + reserve(state, profile)) return false
   if (!goTo(state, key, 'clinic')) return false
   return attempt(() => act.seeDoctor(state, key))
 }
@@ -299,14 +306,32 @@ function pursueCareer(
 }
 
 /** Once there's something worth protecting and cash to spare, insure it —
- * cheaper than risking a burglary replay every uninsured week. */
+ * a small weekly premium is cheaper than risking a burglary replay every
+ * uninsured week. Always picks `basic` (burglary coverage only) — Riley
+ * doesn't weigh `full`'s medical coverage into this decision, a deliberate
+ * simplification (like never gambling at the Casino) rather than a
+ * structural inability: she could take either action, this heuristic just
+ * doesn't reach for the pricier tier. */
 function protectValuables(state: GameState, key: PlayerKey, profile: AiProfile): boolean {
   const p = get(state, key)
-  if (p.items.length === 0 || act.hasItem(p, 'insurance')) return false
-  const insurance = itemById('insurance')
-  if (p.cash < act.price(state, insurance.price) + reserve(state, profile) * 2) return false
+  if (p.items.length === 0 || p.insurance !== 'none') return false
+  if (p.cash < act.price(state, INSURANCE_PREMIUM.basic) + reserve(state, profile)) return false
   if (!goTo(state, key, 'bank')) return false
-  return attempt(() => act.buyItem(state, key, 'insurance'))
+  return attempt(() => act.buyInsurance(state, key, 'basic'))
+}
+
+/** Invests spare hours in fitness (Wave 16) — a long-horizon return (slower
+ * health decay for every remaining week), so Riley must be able to make
+ * this trade too, or a player who trains it gets a structural edge no AI
+ * profile can match (Standing Constraints). Gated the same way
+ * pursueHappiness's relax branch is: needs a home, and only once nothing
+ * more urgent this turn (see FITNESS_UTILITY's placement) claimed the turn
+ * first. */
+function buildFitness(state: GameState, key: PlayerKey): boolean {
+  const p = get(state, key)
+  if (p.fitness >= 100 || p.apartment === 'none') return false
+  if (!goTo(state, key, 'home')) return false
+  return attempt(() => act.workOut(state, key, Math.min(4, p.timeLeft)))
 }
 
 function studyOnce(state: GameState, key: PlayerKey, profile: AiProfile): boolean {
@@ -409,6 +434,7 @@ export type CandidateTag =
   | 'invest'
   | 'bank'
   | 'gamble'
+  | 'fitness'
 
 interface Candidate {
   utility: number
@@ -462,6 +488,11 @@ const GAMBLE_UTILITY = 0.2
 // (see investSurplus's comment).
 const INVEST_UTILITY = 0.12
 const BANK_SURPLUS_UTILITY = 0.1
+// Below bank/invest — fitness is a real long-horizon return (see
+// buildFitness's comment), but it has no urgency signal of its own the way
+// goal-weighted candidates do, so it sits as a low fixed tier, engaged only
+// once nothing more pressing needs the turn.
+const FITNESS_UTILITY = 0.08
 // Absolute last resort: idle time has no value, so grinding out the clock
 // beats doing nothing once every goal-directed and housekeeping candidate
 // above has failed or is inapplicable.
@@ -509,6 +540,7 @@ function buildCandidates(state: GameState, key: PlayerKey, profile: AiProfile): 
     },
     { utility: INVEST_UTILITY, tag: 'invest', attempt: () => investSurplus(state, key, profile) },
     { utility: BANK_SURPLUS_UTILITY, tag: 'bank', attempt: () => bankSurplus(state, key, profile) },
+    { utility: FITNESS_UTILITY, tag: 'fitness', attempt: () => buildFitness(state, key) },
     {
       utility: LAST_RESORT_WORK_UTILITY,
       tag: 'wealth',

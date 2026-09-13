@@ -34,6 +34,7 @@ import {
   type BatchSummary,
   type GoalTally,
   type StallBreakdown,
+  type UnwellLossStats,
 } from './sim.ts'
 
 const REPORT_DEFAULT_GAME_COUNT = 100
@@ -52,6 +53,12 @@ function stallPctLine(breakdown: StallBreakdown): string {
   )
   if (entries.length === 0) return 'none'
   return entries.map(([key, s]) => `${key}: ${s.longStallGamePct.toFixed(0)}%`).join(', ')
+}
+
+// Wave 16 — "Sim: health as a reported bottleneck": same shape as
+// stallPctLine, one line per side rather than per requirement.
+function unwellLossLine(stats: UnwellLossStats): string {
+  return stats.losses === 0 ? 'n/a (no losses)' : `${stats.longUnwellLossPct.toFixed(0)}%`
 }
 
 function reportCell(
@@ -80,6 +87,11 @@ function reportCell(
   console.log(
     `Requirement stalls (player, % of games with a ${LONG_STALL_WEEKS}+ week stall): ` +
       stallPctLine(batch.stallBreakdown.player)
+  )
+  console.log(
+    `Health/burnout as a loss factor (losses with ${LONG_STALL_WEEKS}+ weeks unwell) — ` +
+      `player: ${unwellLossLine(batch.unwellLossBreakdown.player)}, ` +
+      `riley: ${unwellLossLine(batch.unwellLossBreakdown.riley)}`
   )
 }
 
