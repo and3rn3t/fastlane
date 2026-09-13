@@ -1,11 +1,16 @@
+import { rollInt, type RngState } from './rng'
 import type {
+  InsuranceTier,
   ItemDef,
   JobDef,
   LocationDef,
   LocationId,
   OriginDef,
+  PlayerState,
   RulesConfig,
   SkillId,
+  TraitDef,
+  TraitId,
 } from './types'
 
 export const WEEK_TIME = 60
@@ -35,9 +40,10 @@ export const RENT: Record<'basic' | 'secure', number> = {
 export const DRESS_WEAR_PER_WEEK = 3
 
 export const HEALTH_START = 100
-/** Hours worked in a week beyond this drain health, at HEALTH_OVERWORK_RATE per excess hour. */
+/** Hours worked in a week beyond this build burnout, at BURNOUT_GAIN_RATE
+ * per excess hour (see burnoutUpkeep in week.ts) — health itself no longer
+ * drains from overwork directly, only from a cheap-groceries diet. */
 export const OVERWORK_THRESHOLD = 40
-export const HEALTH_OVERWORK_RATE = 0.5
 /** Health cost of a week fed mostly from cheap groceries instead of hot meals. */
 export const HEALTH_CHEAP_FOOD_DRAIN = 2
 /** Below this, low health starts dragging happiness down too. */
@@ -47,7 +53,72 @@ export const HEALTH_LOW_HAPPINESS_PENALTY = 3
 export const HEALTH_SICK_THRESHOLD = 50
 export const DOCTOR_PRICE = 45
 export const DOCTOR_TIME = 3
+
+/** Burnout gained per hour worked beyond OVERWORK_THRESHOLD in a week. */
+export const BURNOUT_GAIN_RATE = 0.5
+/** Burnout relieved per hour of relax() — rides the same relaxedThisWeek
+ * cap as happiness rather than a separate one, so "how much rest fits in a
+ * week" stays one budget, not two. */
+export const BURNOUT_RELIEF_PER_HOUR = 3
+/** Above this, burnout starts dragging happiness down too — same shape as
+ * HEALTH_LOW_THRESHOLD/HEALTH_LOW_HAPPINESS_PENALTY. */
+export const BURNOUT_HIGH_THRESHOLD = 70
+export const BURNOUT_HIGH_HAPPINESS_PENALTY = 3
+/** At burnout 100, work()'s pay is cut by this fraction — burnout's real
+ * differentiator from health/happiness: it gates work's own output instead
+ * of just being another number that drains something else.
+ *
+ * Tuned up from an initial 0.3 after `pnpm sim` found a real, if smaller,
+ * side effect of this row (not a bug the way Fitness habit's uncapped sink
+ * was): removing overwork's old health-driven Clinic-time-tax freed real
+ * work capacity for both sides, which compounds with Riley's random,
+ * usually non-neutral origin trait more than it does with the player's
+ * fixed neutral one — a pay-efficiency cut doesn't claim hours back the way
+ * the old time-cost did, so it takes a stronger cut to land a comparable
+ * bite. 0.5 brought the 12-cell profile×rules matrix back clean; the
+ * 5-origin matrix needed the same escalation to `pnpm sim 300 origins`
+ * Wave 14's own rebalance used, settling to one cell (trust-fund-kid) right
+ * at the guard — see the archive entry for the full numbers. */
+export const BURNOUT_EFFICIENCY_PENALTY_MAX = 0.5
+
+/** Fitness gained per hour spent on the workOut action (Home) — 100 hours
+ * for a maxed-out stat, a genuinely multi-week commitment against the
+ * 60h/week budget, same "real cost, real payoff" shape as skill training. */
+export const FITNESS_GAIN_PER_HOUR = 1
+/** Weekly cap on workOut hours, same shape as RELAX_CAP — without this, a
+ * single idle week could dump dozens of spare hours into fitness at once
+ * (confirmed via pnpm sim: a first pass with no cap let Riley's fallback
+ * "last resort work" candidate get displaced by fitness for the rest of the
+ * game once other goals were met, tanking her income and swinging win rate
+ * ~20 points). Capping it forces the investment to actually spread across
+ * many weeks, as intended. */
+export const FITNESS_WORKOUT_CAP_PER_WEEK = 8
+/** At fitness 100, healthUpkeep()'s overwork/cheap-food decay is halved —
+ * never reversed, never eliminated, so upkeep still matters at any fitness
+ * level. */
+export const FITNESS_DECAY_REDUCTION_MAX = 0.5
 export const DOCTOR_HEAL = 35
+
+/** Below this, fitness doesn't count as active self-care for the neglect
+ * check (see isNeglecting() in week.ts) — low, deliberately: a couple of
+ * workOut sessions is enough protection, this isn't asking for a maxed
+ * stat, just *some* investment. */
+export const CHRONIC_FITNESS_SAFE_THRESHOLD = 20
+/** Consecutive weeks of neglect (unwell + no fitness safety net) before a
+ * `'chronic'` activeEvents chain starts — "sustained," not a blip, same
+ * order of magnitude as LONG_STALL_WEEKS in scripts/sim.ts. */
+export const CHRONIC_ONSET_WEEKS = 8
+/** Consecutive weeks NOT neglecting (a relapse week resets this to 0)
+ * needed to clear an active chronic condition — sustained care to match
+ * the sustained neglect that caused it, not a fixed cooldown timer the way
+ * layoff/inheritance resolve. */
+export const CHRONIC_RECOVERY_WEEKS = 8
+/** Weekly cost while a chronic condition is active — capped at cash, same
+ * pattern as every other recurring cost (insurance premiums, rent). Modest
+ * on purpose: a real, ongoing burden, not a run-ending one — "consequence,
+ * not punishment." */
+export const CHRONIC_WEEKLY_COST = 20
+export const CHRONIC_WEEKLY_TIME_COST = 4
 
 /** Chance per week (no secure apartment, uninsured, owns something stealable). */
 export const ITEM_THEFT_CHANCE = 0.08
@@ -341,6 +412,28 @@ export const LOCATIONS: Record<LocationId, LocationDef> = {
 }
 
 export const LOOP_SIZE = 14
+
+/** The original, unshuffled layout — every `LocationDef`'s own `loopIndex`,
+ * copied into the `GameState.layout` shape. Used as `travelCost()`'s default
+ * (so direct-call tests keep working unchanged) and as the layout any save
+ * from before Wave 15's shuffled city ships with, via GameContext.tsx's
+ * migration — an existing save's travel map must not change under it. */
+export const DEFAULT_LAYOUT: Record<LocationId, number> = Object.fromEntries(
+  Object.values(LOCATIONS).map((l) => [l.id, l.loopIndex])
+) as Record<LocationId, number>
+
+/** Fisher-Yates shuffle of the location→loopIndex assignment, consuming
+ * `LOOP_SIZE - 1` RNG draws. Called once at `newGame()` construction time,
+ * same shape as `newGame()`'s Riley-origin draw — see `initialRngSeed()` in
+ * engine.ts, which must replay this exact draw to stay in sync. */
+export function shuffledLayout(rngState: RngState): Record<LocationId, number> {
+  const order = (Object.keys(LOCATIONS) as LocationId[]).slice()
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = rollInt(rngState, i + 1)
+    ;[order[i], order[j]] = [order[j], order[i]]
+  }
+  return Object.fromEntries(order.map((id, index) => [id, index])) as Record<LocationId, number>
+}
 
 // Which skill each employer trains (JobDef.trainsSkill), and the skill floor
 // its top rung additionally demands (JobDef.minSkills) — retail/food service
@@ -676,6 +769,46 @@ export const ORIGINS: OriginDef[] = [
   },
 ]
 
+/** Each origin's one passive trait — see TraitId/TraitDef in types.ts for
+ * the closed hook set and why `adaptable` (Career Changer's) is empty.
+ * Deliberately small numbers: these are flavor on top of an origin's own
+ * starting-stat deltas, not a second layer of the same size. */
+export const TRAITS: Record<TraitId, TraitDef> = {
+  adaptable: {},
+  scrappy: { priceMultiplier: 0.95 },
+  connected: { wageMultiplier: 1.04 },
+  disciplined: { dressWearDelta: -1 },
+  resourceful: { priceMultiplier: 0.97 },
+}
+
+export function traitFor(p: PlayerState): TraitDef {
+  return TRAITS[originById(p.originId).traitId]
+}
+
+/** wagePerHour()'s trait input — defaults to 1 (no effect) so every call
+ * site can pass it unconditionally. */
+export function traitWageMultiplier(p: PlayerState): number {
+  return traitFor(p).wageMultiplier ?? 1
+}
+
+/** seasonalPrice()'s trait input — see traitWageMultiplier. */
+export function traitPriceMultiplier(p: PlayerState): number {
+  return traitFor(p).priceMultiplier ?? 1
+}
+
+/** upkeep()'s dress-wear trait input — see traitWageMultiplier. */
+export function traitDressWearDelta(p: PlayerState): number {
+  return traitFor(p).dressWearDelta ?? 0
+}
+
+/** work()'s burnout-gated pay multiplier — 1 at burnout 0, down to
+ * 1 - BURNOUT_EFFICIENCY_PENALTY_MAX at burnout 100. Composes with (not a
+ * substitute for) traitWageMultiplier: a trait changes the nominal rate, this
+ * reflects how much of it you're actually delivering right now. */
+export function burnoutEfficiency(p: PlayerState): number {
+  return 1 - (p.burnout / 100) * BURNOUT_EFFICIENCY_PENALTY_MAX
+}
+
 export const ITEMS: ItemDef[] = [
   {
     id: 'outfit-casual',
@@ -753,14 +886,21 @@ export const ITEMS: ItemDef[] = [
     price: 380,
     blurb: 'Required for senior office roles: Financial Analyst, Branch Manager, Professor.',
   },
-  {
-    id: 'insurance',
-    name: 'Home Insurance',
-    soldAt: 'bank',
-    price: 150,
-    blurb: "Covers your belongings — a burglar can't take what's insured.",
-  },
 ]
+
+/** Weekly premium for each paid insurance tier (see InsuranceTier in
+ * types.ts) — auto-deducted in upkeep(), capped at available cash like
+ * every other weekly cost. Replaces the old one-time $150 `insurance`
+ * item's price at roughly the same per-week rate over an average game. */
+export const INSURANCE_PREMIUM: Record<Exclude<InsuranceTier, 'none'>, number> = {
+  basic: 6,
+  full: 14,
+}
+
+/** `full` insurance multiplies both the Clinic's `seeDoctor()` price and the
+ * `personalEvent()` doctor's-bill outcome by this — a co-pay, not a full
+ * waiver, so seeing a doctor still costs something even with coverage. */
+export const INSURANCE_MEDICAL_DISCOUNT = 0.5
 
 export function jobById(id: string): JobDef {
   const job = JOBS.find((j) => j.id === id)
@@ -780,10 +920,18 @@ export function originById(id: string): OriginDef {
   return origin
 }
 
-/** Travel cost in time units between two locations (steps around the loop). */
-export function travelCost(from: LocationId, to: LocationId, hasBike: boolean): number {
-  const a = LOCATIONS[from].loopIndex
-  const b = LOCATIONS[to].loopIndex
+/** Travel cost in time units between two locations (steps around the loop).
+ * `layout` defaults to the original unshuffled ordering so direct callers
+ * (unit tests) keep working unchanged; real gameplay always passes the
+ * game's own `GameState.layout` (see Wave 15's shuffled city). */
+export function travelCost(
+  from: LocationId,
+  to: LocationId,
+  hasBike: boolean,
+  layout: Record<LocationId, number> = DEFAULT_LAYOUT
+): number {
+  const a = layout[from]
+  const b = layout[to]
   const diff = Math.abs(a - b)
   const steps = Math.min(diff, LOOP_SIZE - diff)
   return hasBike ? Math.ceil(steps / 2) : steps

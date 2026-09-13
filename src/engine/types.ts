@@ -25,9 +25,16 @@ export type ItemId =
   | 'bike'
   | 'phone'
   | 'computer'
-  | 'insurance'
 
 export type ApartmentTier = 'none' | 'basic' | 'secure'
+
+/** `none`/`basic`/`full` — a weekly premium (INSURANCE_PREMIUM in data.ts),
+ * not a one-time item purchase (Wave 16's Insurance tiers row replaced the
+ * old binary `insurance` ItemId with this). `basic` covers durable-goods
+ * burglary only (week.ts's burglaryUpkeep); `full` adds a discount on
+ * Clinic visits and the `personalEvent()` doctor's-bill outcome
+ * (INSURANCE_MEDICAL_DISCOUNT). */
+export type InsuranceTier = 'none' | 'basic' | 'full'
 
 /** A small, closed set of specializations — not a generic skill tree. Each
  * rises passively from working a job that trains it (JobDef.trainsSkill) or
@@ -39,10 +46,31 @@ export type SkillId = 'sales' | 'trades' | 'tech'
 /** A small, closed set of starting backgrounds — not a generator, same
  * discipline as SkillId. Each sets a player's starting cash/education/
  * skills/items/apartment (see ORIGINS in data.ts) and carries one `traitId`
- * (plain `string` placeholder — see OriginDef.traitId) whose passive effects
- * a future Wave 14 row implements. */
+ * (see OriginDef.traitId / TraitId) whose passive effects TRAITS in data.ts
+ * defines. */
 export type OriginId =
   'first-gen-student' | 'trust-fund-kid' | 'career-changer' | 'veteran' | 'small-town-transplant'
+
+/** A small, closed set of passive modifiers — not a scripting system, same
+ * discipline as SkillId/OriginId. Each origin carries exactly one (see
+ * OriginDef.traitId); TRAITS in data.ts maps each to at most a couple of the
+ * named hooks TraitDef exposes. `adaptable` (Career Changer's trait) is the
+ * neutral one — no modifiers — mirroring that origin's own no-op design. */
+export type TraitId = 'adaptable' | 'scrappy' | 'connected' | 'disciplined' | 'resourceful'
+
+/** A trait's passive effect, applied at exactly these named hook points —
+ * never anywhere else, and a trait touches at most two of them:
+ * `wagePerHour()` (work()'s pay rate), `seasonalPrice()` (grocery/rent
+ * cost), and `upkeep()`'s weekly dress wear. All optional; absent means no
+ * effect at that hook. */
+export interface TraitDef {
+  /** Multiplies wagePerHour()'s result. */
+  wageMultiplier?: number
+  /** Multiplies seasonalPrice()'s result. */
+  priceMultiplier?: number
+  /** Added to DRESS_WEAR_PER_WEEK in upkeep() — negative wears slower. */
+  dressWearDelta?: number
+}
 
 export interface LocationDef {
   id: LocationId
@@ -64,8 +92,8 @@ export interface OriginDef {
   skills?: Partial<Record<SkillId, number>>
   items?: ItemId[]
   apartment?: ApartmentTier
-  /** Not yet interpreted anywhere — see OriginId's own doc comment. */
-  traitId: string
+  /** Looked up in TRAITS (data.ts) for this origin's passive modifiers. */
+  traitId: TraitId
 }
 
 export interface JobDef {
@@ -153,6 +181,9 @@ export interface PlayerState {
   dress: number
   items: ItemId[]
   apartment: ApartmentTier
+  /** Weekly premium auto-deducted (capped at cash) in upkeep() — see
+   * InsuranceTier's own doc comment for what each tier covers. */
+  insurance: InsuranceTier
   /** Unpaid rent balance. */
   rentDue: number
   /** Consecutive weeks with unpaid rent (eviction at 3). */
@@ -164,9 +195,38 @@ export interface PlayerState {
   lotteryTickets: number
   /** Time units of relaxing already used this week (capped). */
   relaxedThisWeek: number
-  /** 0–100; drained by overworking or skipping hot meals for cheap groceries,
-   * restored at the Clinic. Feeds happiness rather than being its own goal. */
+  /** 0–100; drained by skipping hot meals for cheap groceries, restored at
+   * the Clinic. Feeds happiness rather than being its own goal. Overwork
+   * used to drain this too — split out into `burnout` below so the two
+   * consequences of a heavy week read as genuinely different things. */
   health: number
+  /** 0–100; built by the workOut action (Home), never decays on its own.
+   * Slows — never reverses — health's own weekly decay in healthUpkeep()
+   * (see FITNESS_DECAY_REDUCTION_MAX), a compounding return on hours spent
+   * now paid out over every remaining week. */
+  fitness: number
+  /** 0–100; rises from overwork (burnoutUpkeep, driven by
+   * hoursWorkedThisWeek over OVERWORK_THRESHOLD), never falls on its own —
+   * only relax() relieves it, riding the same relaxedThisWeek cap rather
+   * than a separate one. Distinct from health/happiness in what it actually
+   * does: high burnout gates work()'s pay efficiency directly (see
+   * burnoutEfficiency in data.ts), not just another number that drains
+   * something else. Also drags happiness down past BURNOUT_HIGH_THRESHOLD,
+   * same shape as health's own low-threshold happiness penalty. */
+  burnout: number
+  /** Time units of working out already used this week — capped at
+   * FITNESS_WORKOUT_CAP_PER_WEEK, same shape as relaxedThisWeek, so building
+   * fitness competes for hours across many weeks rather than being able to
+   * consume an entire week's idle time in one binge. */
+  workedOutThisWeek: number
+  /** Consecutive weeks (not reset weekly like the fields above — this
+   * persists across weeks on purpose) spent "neglecting" (see
+   * isNeglecting() in week.ts: unwell — low health or high burnout — with
+   * fitness still low, so there was no active self-care to offset it).
+   * Reaching CHRONIC_ONSET_WEEKS starts a `'chronic'` activeEvents chain and
+   * resets this to 0; any non-neglecting week also resets it, so recovery
+   * has to be sustained, not banked. */
+  neglectWeeks: number
   /** Time units worked this week — resets with the rest of the weekly state;
    * tracked separately from lifetime `experience` so upkeep can tell overwork
    * apart from a light week. */
@@ -212,9 +272,16 @@ export interface PlayerState {
  * indexes which point in the chain's story it's at; `weeksInStage` drives
  * how long it's been there, so resolveActiveEvents knows when to advance or
  * resolve it. Kept intentionally small — 2-3 chains, 2-3 stages each — not a
- * general narrative-scripting system. */
+ * general narrative-scripting system.
+ *
+ * `'chronic'` (Wave 16) repurposes `stage` as a *recovery* counter rather
+ * than a story position — consecutive weeks NOT neglecting (see
+ * isNeglecting() in week.ts) while the condition is active, reset to 0 on
+ * any relapse week. Unlike `layoff`/`inheritance`, which resolve on a fixed
+ * timer, `chronic` only resolves once `stage` reaches
+ * CHRONIC_RECOVERY_WEEKS — sustained care, not a cooldown. */
 export interface ActiveEvent {
-  chainId: 'layoff' | 'inheritance'
+  chainId: 'layoff' | 'inheritance' | 'chronic'
   stage: number
   weeksInStage: number
 }
@@ -266,7 +333,7 @@ export interface WeekSnapshot {
 /** Bump on any GameState/PlayerState shape change and add a migration step in
  * state/GameContext.tsx's MIGRATIONS map — see that file for the full scheme.
  * The engine owns this number since it owns what the shape actually is. */
-export const SAVE_VERSION = 11
+export const SAVE_VERSION = 16
 
 /** Riley's catch-up signal for the *current* game, derived once at game
  * start from the player's rivalry history (src/rivalry.ts) and stored on
@@ -308,6 +375,13 @@ export interface GameState {
   winner: 'player' | 'riley' | null
   goals: Goals
   economy: Economy
+  /** Per-game location → loopIndex assignment, shuffled at newGame() from the
+   * seed (see data.ts's `shuffledLayout`) instead of using `LocationDef`'s own
+   * fixed `loopIndex` directly, so the travel map differs every run while
+   * still replaying identically from a given seed. Persisted so a loaded save
+   * keeps its own city — see `DEFAULT_LAYOUT` and GameContext.tsx's migration
+   * for saves from before this field existed. */
+  layout: Record<LocationId, number>
   player: PlayerState
   riley: PlayerState
   rileyProfile: AiProfileName
@@ -343,8 +417,10 @@ export type GameAction =
   | { type: 'withdraw'; amount: number }
   | { type: 'payRent' }
   | { type: 'rentApartment'; tier: Exclude<ApartmentTier, 'none'> }
+  | { type: 'buyInsurance'; tier: InsuranceTier }
   | { type: 'sellItem'; itemId: ItemId }
   | { type: 'relax'; hours: number }
+  | { type: 'workOut'; hours: number }
   | { type: 'seeDoctor' }
   | { type: 'takeLoan'; amount: number }
   | { type: 'repayLoan'; amount: number }

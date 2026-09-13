@@ -1,10 +1,18 @@
 // End-of-week processing: upkeep for both players, economy drift, random
 // events, the rival's simulated week, and the victory check.
 
-import { foodShortfall, hasItem, netWorth, seasonalPrice } from './actions'
+import { foodShortfall, netWorth, price, seasonalPrice } from './actions'
 import {
+  BURNOUT_GAIN_RATE,
+  BURNOUT_HIGH_HAPPINESS_PENALTY,
+  BURNOUT_HIGH_THRESHOLD,
   CAR_TROUBLE_MIN,
   CAR_TROUBLE_RANGE,
+  CHRONIC_FITNESS_SAFE_THRESHOLD,
+  CHRONIC_ONSET_WEEKS,
+  CHRONIC_RECOVERY_WEEKS,
+  CHRONIC_WEEKLY_COST,
+  CHRONIC_WEEKLY_TIME_COST,
   COSTLY_MISTAKE_HAPPINESS_PENALTY,
   COSTLY_MISTAKE_MIN,
   COSTLY_MISTAKE_RANGE,
@@ -12,13 +20,13 @@ import {
   CREDIT_LOSS_ON_MISS,
   DRESS_WEAR_PER_WEEK,
   EVICTION_WEEKS,
+  FITNESS_DECAY_REDUCTION_MAX,
   FOOD_NEEDED,
   HEADLINE_DEFAULT_WEIGHT,
   HEADLINES,
   HEALTH_CHEAP_FOOD_DRAIN,
   HEALTH_LOW_HAPPINESS_PENALTY,
   HEALTH_LOW_THRESHOLD,
-  HEALTH_OVERWORK_RATE,
   HEALTH_SICK_THRESHOLD,
   HOLIDAY_BEATS,
   HOME_REPAIR_MIN,
@@ -26,6 +34,8 @@ import {
   INHERITANCE_DELAY_WEEKS,
   INHERITANCE_MIN,
   INHERITANCE_RANGE,
+  INSURANCE_MEDICAL_DISCOUNT,
+  INSURANCE_PREMIUM,
   ITEM_THEFT_CHANCE,
   JURY_DUTY_HOURS_RANGE,
   JURY_DUTY_MIN_HOURS,
@@ -57,6 +67,8 @@ import {
   itemById,
   jobById,
   seasonForWeek,
+  traitDressWearDelta,
+  traitPriceMultiplier,
   weekInCycle,
   type Headline,
   type HolidayBeat,
@@ -92,28 +104,69 @@ export function goalProgress(p: PlayerState, goals: Goals, marketIndex: number) 
   }
 }
 
-/** Overwork and a groceries-only diet both cost health; low health then
- * drags happiness down too. Split out of upkeep() to keep it readable. */
+/** A groceries-only diet costs health; low health then drags happiness down
+ * too. Fitness (built via the workOut action) slows — never reverses — this
+ * drain, up to FITNESS_DECAY_REDUCTION_MAX at max fitness. Overwork used to
+ * drain health here too — see burnoutUpkeep, which now owns that
+ * consequence entirely. Split out of upkeep() to keep it readable. */
 function healthUpkeep(state: GameState, key: PlayerKey, fedFromGroceries: number) {
   const p = state[key]
   const who = p.name
-
-  const overHours = p.hoursWorkedThisWeek - OVERWORK_THRESHOLD
-  if (overHours > 0) {
-    const drain = Math.round(overHours * HEALTH_OVERWORK_RATE)
-    p.health = Math.max(0, p.health - drain)
-    log(state, key, `${who} overworked (${p.hoursWorkedThisWeek}h): health -${drain}`)
-  }
+  const fitnessMultiplier = 1 - (p.fitness / 100) * FITNESS_DECAY_REDUCTION_MAX
 
   const ateWithoutGoingHungry = p.fed + fedFromGroceries >= FOOD_NEEDED
   if (ateWithoutGoingHungry && fedFromGroceries > p.fed) {
-    p.health = Math.max(0, p.health - HEALTH_CHEAP_FOOD_DRAIN)
-    log(state, key, `${who} lived on cheap groceries all week: health -${HEALTH_CHEAP_FOOD_DRAIN}`)
+    const drain = Math.round(HEALTH_CHEAP_FOOD_DRAIN * fitnessMultiplier)
+    p.health = Math.max(0, p.health - drain)
+    if (drain > 0) log(state, key, `${who} lived on cheap groceries all week: health -${drain}`)
   }
 
   if (p.health < HEALTH_LOW_THRESHOLD) {
     p.happiness = Math.max(0, p.happiness - HEALTH_LOW_HAPPINESS_PENALTY)
   }
+}
+
+/** Overwork builds burnout instead of draining health directly (see
+ * healthUpkeep's own comment) — a genuinely distinct consequence: past
+ * BURNOUT_HIGH_THRESHOLD it drags happiness down (same shape as health's low
+ * threshold), but its real differentiator is gating work()'s pay efficiency
+ * (burnoutEfficiency in data.ts), not just being another draining number.
+ * Never falls on its own — only relax() relieves it. Split out of upkeep()
+ * to keep it readable. */
+function burnoutUpkeep(state: GameState, key: PlayerKey) {
+  const p = state[key]
+  const who = p.name
+
+  const overHours = p.hoursWorkedThisWeek - OVERWORK_THRESHOLD
+  if (overHours > 0) {
+    const gain = Math.round(overHours * BURNOUT_GAIN_RATE)
+    p.burnout = Math.min(100, p.burnout + gain)
+    if (gain > 0) log(state, key, `${who} overworked (${p.hoursWorkedThisWeek}h): burnout +${gain}`)
+  }
+
+  if (p.burnout > BURNOUT_HIGH_THRESHOLD) {
+    p.happiness = Math.max(0, p.happiness - BURNOUT_HIGH_HAPPINESS_PENALTY)
+  }
+}
+
+/** Wave 16's Chronic conditions: unwell (low health or high burnout) with no
+ * active self-care to offset it (fitness still under
+ * CHRONIC_FITNESS_SAFE_THRESHOLD) — the "neglect" a sustained streak of
+ * eventually starts a `'chronic'` activeEvents chain over in
+ * resolveActiveEvents(). Also doubles as the *recovery* check once a chain
+ * is active: a week that isn't neglecting counts toward clearing it. */
+function isNeglecting(p: PlayerState): boolean {
+  const unwell = p.health < HEALTH_SICK_THRESHOLD || p.burnout > BURNOUT_HIGH_THRESHOLD
+  return unwell && p.fitness < CHRONIC_FITNESS_SAFE_THRESHOLD
+}
+
+/** Tracks consecutive neglect weeks — deliberately *not* reset with the rest
+ * of the weekly state, since the whole point is a streak that survives week
+ * boundaries. The actual chain-start check lives in resolveActiveEvents(),
+ * alongside the rest of that chain's lifecycle, not here. */
+function neglectUpkeep(state: GameState, key: PlayerKey) {
+  const p = state[key]
+  p.neglectWeeks = isNeglecting(p) ? p.neglectWeeks + 1 : 0
 }
 
 /** Tenure builds while employed and showing up (working ≥1h that week); a
@@ -144,15 +197,17 @@ function careerUpkeep(state: GameState, key: PlayerKey) {
 
 /** Durable goods at an unsecured, uninsured home can be stolen — a roll
  * independent of the cash robbery in upkeep(), so a broke player can still
- * lose a TV. Split out to keep upkeep() readable. */
+ * lose a TV. Both insurance tiers cover this (only `full` additionally
+ * covers medical costs — see INSURANCE_MEDICAL_DISCOUNT). Split out to keep
+ * upkeep() readable. */
 function burglaryUpkeep(state: GameState, key: PlayerKey) {
   const p = state[key]
   const who = p.name
-  const stealable = p.items.filter((id) => id !== 'insurance')
+  const stealable = p.items
   if (
     stealable.length === 0 ||
     p.apartment === 'secure' ||
-    hasItem(p, 'insurance') ||
+    p.insurance !== 'none' ||
     roll(state) >= ITEM_THEFT_CHANCE
   ) {
     return
@@ -194,6 +249,18 @@ function loanUpkeep(state: GameState, key: PlayerKey) {
   }
 }
 
+/** Weekly premium, auto-deducted and capped at cash — unlike rent/loans this
+ * never accrues as debt, since there's no eviction-style consequence for
+ * insurance to build toward. Split out to keep upkeep() readable. */
+function insuranceUpkeep(state: GameState, key: PlayerKey) {
+  const p = state[key]
+  if (p.insurance === 'none') return
+  const premium = price(state, INSURANCE_PREMIUM[p.insurance])
+  const paid = Math.min(premium, p.cash)
+  p.cash -= paid
+  if (paid > 0) log(state, key, `${p.name} paid $${paid} in insurance premiums`)
+}
+
 function upkeep(state: GameState, key: PlayerKey) {
   const p = state[key]
   const who = p.name
@@ -207,10 +274,12 @@ function upkeep(state: GameState, key: PlayerKey) {
     log(state, key, `${who} went hungry (${shortfall} meals short): happiness -${4 * shortfall}`)
   }
   healthUpkeep(state, key, fromGroceries)
+  burnoutUpkeep(state, key)
+  neglectUpkeep(state, key)
 
   // Rent accrues; miss enough weeks and you're out.
   if (p.apartment !== 'none') {
-    const rent = seasonalPrice(state, RENT[p.apartment], 'rent')
+    const rent = seasonalPrice(state, RENT[p.apartment], 'rent', traitPriceMultiplier(p))
     p.rentDue += rent
     if (p.rentDue > rent) {
       p.weeksBehindOnRent += 1
@@ -228,6 +297,8 @@ function upkeep(state: GameState, key: PlayerKey) {
     log(state, key, `${who} slept rough: happiness -6`)
   }
 
+  insuranceUpkeep(state, key)
+
   // Possessions and apartment comfort.
   let passive = 0
   for (const id of p.items) passive += itemById(id).weeklyHappiness ?? 0
@@ -237,8 +308,9 @@ function upkeep(state: GameState, key: PlayerKey) {
   // Happiness drifts toward a neutral 50 — comfort must be maintained.
   p.happiness = Math.round(p.happiness + (50 - p.happiness) * 0.05)
 
-  // Clothes wear out.
-  p.dress = Math.max(0, p.dress - DRESS_WEAR_PER_WEEK)
+  // Clothes wear out — a trait can slow (never reverse) this.
+  const wear = Math.max(0, DRESS_WEAR_PER_WEEK + traitDressWearDelta(p))
+  p.dress = Math.max(0, p.dress - wear)
 
   // Savings interest.
   if (p.savings > 0) {
@@ -275,6 +347,7 @@ function upkeep(state: GameState, key: PlayerKey) {
   // Fresh week.
   p.fed = 0
   p.relaxedThisWeek = 0
+  p.workedOutThisWeek = 0
   p.hoursWorkedThisWeek = 0
   p.loanPaidThisWeek = false
   p.timeLeft = WEEK_TIME
@@ -316,7 +389,9 @@ function personalEvent(state: GameState, key: PlayerKey) {
       break
     }
     case 1: {
-      const bill = 20 + rollInt(state, 60)
+      const bill = Math.round(
+        (20 + rollInt(state, 60)) * (p.insurance === 'full' ? INSURANCE_MEDICAL_DISCOUNT : 1)
+      )
       const paid = Math.min(bill, p.cash)
       p.cash -= paid
       log(state, key, `${p.name} got hit with a $${paid} doctor's bill`)
@@ -439,7 +514,6 @@ function personalEvent(state: GameState, key: PlayerKey) {
  * after upkeep, before this week's personalEvent can start a new one. */
 function resolveActiveEvents(state: GameState, key: PlayerKey) {
   const p = state[key]
-  if (p.activeEvents.length === 0) return
   const remaining: ActiveEvent[] = []
   for (const ev of p.activeEvents) {
     const weeksInStage = ev.weeksInStage + 1
@@ -459,9 +533,44 @@ function resolveActiveEvents(state: GameState, key: PlayerKey) {
         continue
       }
       remaining.push({ ...ev, weeksInStage })
+    } else if (ev.chainId === 'chronic') {
+      // Weekly cost applies through the resolving week too — still being
+      // managed until it's actually cleared. Capped at cash, same pattern as
+      // every other recurring cost.
+      const paidCost = Math.min(CHRONIC_WEEKLY_COST, p.cash)
+      p.cash -= paidCost
+      p.timeLeft = Math.max(0, p.timeLeft - CHRONIC_WEEKLY_TIME_COST)
+      // `stage` here is a recovery counter (see ActiveEvent's own doc
+      // comment), not a story position — a relapse week resets it rather
+      // than just failing to advance it.
+      const stage = isNeglecting(p) ? 0 : ev.stage + 1
+      if (stage >= CHRONIC_RECOVERY_WEEKS) {
+        log(
+          state,
+          key,
+          `${p.name}'s chronic condition has finally cleared after sustained care.`
+        )
+        continue
+      }
+      log(
+        state,
+        key,
+        `${p.name}'s chronic condition costs $${paidCost} and ${CHRONIC_WEEKLY_TIME_COST}h this week`
+      )
+      remaining.push({ ...ev, weeksInStage, stage })
     }
   }
   p.activeEvents = remaining
+
+  // Sustained neglect (see neglectUpkeep()) starts a new chain — checked
+  // after the loop above so a chain that just resolved this same week can't
+  // immediately restart from stale neglectWeeks (starting one always resets
+  // it to 0).
+  if (p.neglectWeeks >= CHRONIC_ONSET_WEEKS && !hasActiveChain(p, 'chronic')) {
+    p.activeEvents.push({ chainId: 'chronic', stage: 0, weeksInStage: 0 })
+    p.neglectWeeks = 0
+    log(state, key, `${p.name} has developed a chronic condition from sustained neglect.`)
+  }
 }
 
 /** Per-player log line for a fixed-week holiday beat — kept out of

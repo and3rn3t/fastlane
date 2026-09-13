@@ -9,6 +9,7 @@ import {
   originById,
   ORIGINS,
   RULE_PRESETS,
+  shuffledLayout,
   WEEK_TIME,
 } from './data'
 import { rollInt } from './rng'
@@ -59,6 +60,7 @@ function newPlayer(
     dress,
     items,
     apartment: origin.apartment ?? 'none',
+    insurance: 'none',
     rentDue: 0,
     weeksBehindOnRent: 0,
     fed: 0,
@@ -66,6 +68,10 @@ function newPlayer(
     lotteryTickets: 0,
     relaxedThisWeek: 0,
     health: HEALTH_START,
+    fitness: 0,
+    workedOutThisWeek: 0,
+    burnout: 0,
+    neglectWeeks: 0,
     hoursWorkedThisWeek: 0,
     jobTenureWeeks: 0,
     promotionLevel: 0,
@@ -134,6 +140,7 @@ function drawRileyOrigin(rngState: { rngSeed: number }): OriginId {
 export function initialRngSeed(seed: number): number {
   const rngState = { rngSeed: seed }
   drawRileyOrigin(rngState)
+  shuffledLayout(rngState)
   return rngState.rngSeed
 }
 
@@ -147,6 +154,7 @@ export function newGame(opts: NewGameOptions): GameState {
   const rngState = { rngSeed: opts.seed ?? Math.floor(Math.random() * 2 ** 31) }
   const drawnRileyOriginId = drawRileyOrigin(rngState)
   const rileyOriginId = opts.rileyOriginId ?? drawnRileyOriginId
+  const layout = shuffledLayout(rngState)
   return {
     version: SAVE_VERSION,
     week: 1,
@@ -154,6 +162,7 @@ export function newGame(opts: NewGameOptions): GameState {
     phase: 'playing',
     winner: null,
     goals: opts.goals,
+    layout,
     economy: {
       priceIndex: 1,
       wageIndex: 1,
@@ -259,11 +268,17 @@ export function applyAction(state: GameState, action: GameAction): GameState {
     case 'rentApartment':
       act.rentApartment(draft, 'player', action.tier)
       break
+    case 'buyInsurance':
+      act.buyInsurance(draft, 'player', action.tier)
+      break
     case 'sellItem':
       act.sellItem(draft, 'player', action.itemId)
       break
     case 'relax':
       act.relax(draft, 'player', action.hours)
+      break
+    case 'workOut':
+      act.workOut(draft, 'player', action.hours)
       break
     case 'seeDoctor':
       act.seeDoctor(draft, 'player')

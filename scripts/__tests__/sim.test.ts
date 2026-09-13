@@ -4,6 +4,7 @@ import {
   crossedGoal,
   flagStallOutlier,
   flushStreak,
+  isUnwell,
   newStallTracker,
   parseGameCount,
   STALL_RATE_ABSOLUTE_GUARD_PCT,
@@ -13,7 +14,13 @@ import {
   type GoalKey,
   type StallKeyStats,
 } from '../sim.ts'
-import { LOCATIONS, type LocationId, type LogEntry } from '../../src/engine/index.ts'
+import {
+  BURNOUT_HIGH_THRESHOLD,
+  HEALTH_SICK_THRESHOLD,
+  LOCATIONS,
+  type LocationId,
+  type LogEntry,
+} from '../../src/engine/index.ts'
 
 function emptyLocationRecord(): Record<LocationId, number> {
   const record = {} as Record<LocationId, number>
@@ -48,6 +55,10 @@ function emptyBatch(
     },
     stallBreakdown: { player: {}, riley: {} },
     locationActions: { player: emptyLocationRecord(), riley: emptyLocationRecord() },
+    unwellLossBreakdown: {
+      player: { losses: 0, longUnwellLossPct: 0 },
+      riley: { losses: 0, longUnwellLossPct: 0 },
+    },
     ...overrides,
   }
 }
@@ -98,6 +109,34 @@ describe('crossedGoal', () => {
     const prior = progress({ career: 0.2, education: 0.9 })
     const post = progress({ career: 0.2, education: 1 })
     expect(crossedGoal(prior, post)).toBe('education')
+  })
+})
+
+describe('isUnwell', () => {
+  it('is false when health and burnout both sit in the healthy zone', () => {
+    expect(isUnwell({ health: 100, burnout: 0 })).toBe(false)
+  })
+
+  it('is true once health drops below HEALTH_SICK_THRESHOLD', () => {
+    expect(isUnwell({ health: HEALTH_SICK_THRESHOLD - 1, burnout: 0 })).toBe(true)
+  })
+
+  it('is not tripped by health sitting exactly at the threshold', () => {
+    expect(isUnwell({ health: HEALTH_SICK_THRESHOLD, burnout: 0 })).toBe(false)
+  })
+
+  it('is true once burnout rises above BURNOUT_HIGH_THRESHOLD', () => {
+    expect(isUnwell({ health: 100, burnout: BURNOUT_HIGH_THRESHOLD + 1 })).toBe(true)
+  })
+
+  it('is not tripped by burnout sitting exactly at the threshold', () => {
+    expect(isUnwell({ health: 100, burnout: BURNOUT_HIGH_THRESHOLD })).toBe(false)
+  })
+
+  it('is true when both conditions hold at once, same as either alone', () => {
+    expect(
+      isUnwell({ health: HEALTH_SICK_THRESHOLD - 1, burnout: BURNOUT_HIGH_THRESHOLD + 1 })
+    ).toBe(true)
   })
 })
 
