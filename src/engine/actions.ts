@@ -154,7 +154,9 @@ export function work(state: GameState, key: PlayerKey, hours: number) {
   require_(hours >= 1, 'Work at least one hour')
   spendTime(p, hours)
   const pay = Math.round(
-    hours * wagePerHour(state, job.id, p.promotionLevel, traitWageMultiplier(p)) * burnoutEfficiency(p)
+    hours *
+      wagePerHour(state, job.id, p.promotionLevel, traitWageMultiplier(p)) *
+      burnoutEfficiency(p)
   )
   p.experience += hours
   p.hoursWorkedThisWeek += hours
@@ -501,7 +503,10 @@ export function rentApartment(
 export function buyInsurance(state: GameState, key: PlayerKey, tier: InsuranceTier) {
   const p = state[key]
   require_(p.location === 'bank', 'Insurance is at First Bank')
-  require_(p.insurance !== tier, tier === 'none' ? 'Already uninsured' : 'Already have that coverage')
+  require_(
+    p.insurance !== tier,
+    tier === 'none' ? 'Already uninsured' : 'Already have that coverage'
+  )
   spendTime(p, 1)
   p.insurance = tier
   log(
@@ -573,7 +578,8 @@ export function seeDoctor(state: GameState, key: PlayerKey) {
   require_(p.location === 'clinic', 'The doctor is at the Clinic')
   require_(p.health < 100, 'Already at full health')
   spendTime(p, DOCTOR_TIME)
-  const cost = price(state, DOCTOR_PRICE) * (p.insurance === 'full' ? INSURANCE_MEDICAL_DISCOUNT : 1)
+  const cost =
+    price(state, DOCTOR_PRICE) * (p.insurance === 'full' ? INSURANCE_MEDICAL_DISCOUNT : 1)
   spendCash(p, Math.round(cost))
   p.health = Math.min(100, p.health + DOCTOR_HEAL)
   log(state, key, `Saw the doctor (+${DOCTOR_HEAL} health)`)

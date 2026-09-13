@@ -545,11 +545,7 @@ function resolveActiveEvents(state: GameState, key: PlayerKey) {
       // than just failing to advance it.
       const stage = isNeglecting(p) ? 0 : ev.stage + 1
       if (stage >= CHRONIC_RECOVERY_WEEKS) {
-        log(
-          state,
-          key,
-          `${p.name}'s chronic condition has finally cleared after sustained care.`
-        )
+        log(state, key, `${p.name}'s chronic condition has finally cleared after sustained care.`)
         continue
       }
       log(

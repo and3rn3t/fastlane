@@ -628,9 +628,7 @@ function printUnwellBreakdown(batch: BatchSummary) {
   console.log(
     `Health/burnout as a loss factor (losses where the losing side spent ${LONG_STALL_WEEKS}+ weeks unwell):`
   )
-  console.log(
-    `  Player losses — ${player.longUnwellLossPct.toFixed(1)}% (${player.losses} losses)`
-  )
+  console.log(`  Player losses — ${player.longUnwellLossPct.toFixed(1)}% (${player.losses} losses)`)
   console.log(`  Riley losses  — ${riley.longUnwellLossPct.toFixed(1)}% (${riley.losses} losses)\n`)
 }
 

@@ -564,7 +564,9 @@ export function FitnessAction({ game }: { game: GameState }) {
   const clamped = Math.max(1, Math.min(hours, workoutLeft, p.timeLeft))
   if (p.apartment === 'none') return null
   if (p.fitness >= 100) {
-    return <p className="blurb">Peak fitness — health decay is already slowed as much as it gets.</p>
+    return (
+      <p className="blurb">Peak fitness — health decay is already slowed as much as it gets.</p>
+    )
   }
   return (
     <ActionRow
@@ -572,7 +574,9 @@ export function FitnessAction({ game }: { game: GameState }) {
         <>
           Fitness: <strong>{p.fitness}/100</strong> ({workoutLeft}h left this week)
           <br />
-          <span className="desc">Slows health decay from overwork and cheap food — never reverses it</span>
+          <span className="desc">
+            Slows health decay from overwork and cheap food — never reverses it
+          </span>
         </>
       }
     >

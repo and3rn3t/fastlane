@@ -231,7 +231,9 @@ describe('traits', () => {
     const plainPay = Math.round(10 * wagePerHour(s, 'fry-cook', 0))
     const actualPay = s.player.cash - before
     expect(actualPay).toBeGreaterThan(plainPay)
-    expect(actualPay).toBe(Math.round(10 * wagePerHour(s, 'fry-cook', 0, traitWageMultiplier(s.player))))
+    expect(actualPay).toBe(
+      Math.round(10 * wagePerHour(s, 'fry-cook', 0, traitWageMultiplier(s.player)))
+    )
   })
 
   it("scrappy (first-gen-student) discounts rent via seasonalPrice's multiplier", () => {
