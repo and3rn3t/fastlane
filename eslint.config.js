@@ -4,6 +4,9 @@ import jsxA11y from 'eslint-plugin-jsx-a11y'
 
 export default [
   ...and3rn3t,
+  // Template configs to copy into other repos — not linted in place (ESLint 10
+  // would otherwise load profiles/web/eslint.config.js for that directory).
+  { ignores: ['profiles/'] },
   {
     files: ['**/*.{ts,tsx}'],
     plugins: { 'jsx-a11y': jsxA11y },
