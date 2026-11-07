@@ -1,5 +1,5 @@
 # Applied by .github/workflows/labeler.yml on every PR.
-# TODO: adjust globs to your project layout.
+# Globs match the and3rn3t web layout; adjust per repo as needed.
 
 documentation:
   - changed-files:
